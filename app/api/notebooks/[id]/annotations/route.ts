@@ -3,6 +3,8 @@ import connectToDatabase from '@/lib/db';
 import Notebook from '@/models/Notebook';
 import { verifyAuth } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;

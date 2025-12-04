@@ -115,16 +115,19 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
     const nextCard = () => {
         if (currentIndex < cards.length - 1) {
             setIsFlipped(false);
-            setTimeout(() => setCurrentIndex(prev => prev + 1), 200);
+            // Fix race condition: Ensure we don't exceed bounds even if clicked rapidly
+            setTimeout(() => setCurrentIndex(prev => Math.min(prev + 1, cards.length - 1)), 200);
         }
     };
 
     const prevCard = () => {
         if (currentIndex > 0) {
             setIsFlipped(false);
-            setTimeout(() => setCurrentIndex(prev => prev - 1), 200);
+            setTimeout(() => setCurrentIndex(prev => Math.max(prev - 1, 0)), 200);
         }
     };
+
+    const currentCard = cards[currentIndex];
 
     return (
         <div className="h-full p-6 overflow-y-auto flex flex-col overscroll-contain" data-lenis-prevent>
@@ -161,7 +164,7 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
                         progress={progress}
                     />
                 </div>
-            ) : cards.length > 0 ? (
+            ) : cards.length > 0 && currentCard ? (
                 <div className="flex-1 flex flex-col items-center justify-center perspective-1000">
                     <div className="relative w-full max-w-md aspect-[3/2] cursor-pointer group" onClick={() => setIsFlipped(!isFlipped)}>
                         <motion.div
@@ -175,7 +178,7 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
                             <div className="absolute inset-0 backface-hidden">
                                 <GlassCard className="w-full h-full flex flex-col items-center justify-center p-8 text-center border-primary/30 bg-black/40">
                                     <span className="text-xs text-primary uppercase tracking-widest mb-4">Concept</span>
-                                    <h3 className="text-xl font-medium">{cards[currentIndex].front}</h3>
+                                    <h3 className="text-xl font-medium">{currentCard.front}</h3>
                                     <div className="absolute bottom-4 text-muted text-xs flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
                                         <RotateCw size={12} /> Click to flip
                                     </div>
@@ -189,7 +192,7 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
                             >
                                 <GlassCard className="w-full h-full flex flex-col items-center justify-center p-8 text-center border-secondary/30 bg-black/40">
                                     <span className="text-xs text-secondary uppercase tracking-widest mb-4">Explanation</span>
-                                    <p className="text-lg leading-relaxed">{cards[currentIndex].back}</p>
+                                    <p className="text-lg leading-relaxed">{currentCard.back}</p>
                                 </GlassCard>
                             </div>
                         </motion.div>

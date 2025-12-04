@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
@@ -14,7 +15,7 @@ const Notebook = mongoose.models.Notebook || mongoose.model('Notebook', Notebook
 
 async function inspectDatabase() {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://shivam:shivam@cluster0.f13s0.mongodb.net/notebook_lm_app?retryWrites=true&w=majority&appName=Cluster0');
+        await mongoose.connect(process.env.MONGODB_URI);
         console.log('Connected to MongoDB');
 
         const notebook = await Notebook.findOne().sort({ createdAt: -1 });

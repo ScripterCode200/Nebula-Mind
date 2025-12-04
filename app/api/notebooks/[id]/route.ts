@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Notebook from '@/models/Notebook';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
