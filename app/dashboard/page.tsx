@@ -1,0 +1,380 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+    Activity, Clock, Zap, BookOpen,
+    TrendingUp, Calendar, ArrowRight,
+    MoreHorizontal, Star, PieChart,
+    BarChart2, Target, Award, MessageSquare
+} from 'lucide-react';
+import GlassCard from '@/components/ui/GlassCard';
+import NeonButton from '@/components/ui/NeonButton';
+import Link from 'next/link';
+import { useUserStore } from '@/store/useUserStore';
+
+export default function DashboardPage() {
+    const { name } = useUserStore();
+    const [loading, setLoading] = useState(true);
+    const [data, setData] = useState<any>(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const res = await fetch('/api/dashboard');
+                if (res.ok) {
+                    const json = await res.json();
+                    setData(json);
+                }
+            } catch (error) {
+                console.error('Failed to fetch dashboard data', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const stats = [
+        { label: 'Study Streak', value: data?.stats?.streak || '0 Days', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
+        { label: 'Time Focused', value: data?.stats?.timeFocused || '0h 0m', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+        { label: 'Notebooks', value: data?.stats?.notebooks || '0 Active', icon: BookOpen, color: 'text-purple-400', bg: 'bg-purple-400/10' },
+        { label: 'Knowledge Score', value: data?.stats?.xp || '0 XP', icon: Star, color: 'text-green-400', bg: 'bg-green-400/10' },
+    ];
+
+    const recentActivity = data?.recentActivity || [];
+
+    const recommended = [
+        { title: 'Advanced Machine Learning', category: 'Computer Science', difficulty: 'Hard', color: 'from-blue-500 to-cyan-500' },
+        { title: 'History of Renaissance', category: 'History', difficulty: 'Medium', color: 'from-orange-500 to-red-500' },
+        { title: 'Organic Chemistry Basics', category: 'Science', difficulty: 'Easy', color: 'from-green-500 to-emerald-500' },
+    ];
+
+    // Prepare Chart Data
+    const chartData = data?.chartData || [];
+    const chartPoints = chartData.map((d: any, i: number) => {
+        // Normalize 0-300 height based on max XP (e.g. 100)
+        const y = 300 - Math.min((d.xpGained / 100) * 300, 300);
+        const x = (i / (chartData.length - 1 || 1)) * 800;
+        return `${x},${y}`;
+    }).join(' ');
+
+    // Smooth curve approximation (simplified)
+    const chartPath = chartData.length > 1 ? `M0,300 L${chartPoints} L800,300 Z` : "M0,300 L800,300 Z";
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    return (
+        <main className="min-h-screen bg-[#050505] text-white overflow-x-hidden selection:bg-primary/30 relative pt-32 pb-20 px-4 md:px-8">
+            {/* Background Effects */}
+            <div className="fixed inset-0 z-0 pointer-events-none">
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+                <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-secondary/10 rounded-full blur-[120px]" />
+            </div>
+
+            <div className="max-w-7xl mx-auto relative z-10">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6 }}
+                    >
+                        <h1 className="text-4xl md:text-5xl font-bold mb-2">
+                            Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">{name}</span>
+                        </h1>
+                        <p className="text-muted-foreground text-lg">
+                            You're on a roll! Keep up the momentum.
+                        </p>
+                    </motion.div>
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.6, delay: 0.2 }}
+                    >
+                        <Link href="/notebook">
+                            <NeonButton>
+                                Resume Learning <ArrowRight size={18} className="ml-2" />
+                            </NeonButton>
+                        </Link>
+                    </motion.div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                    {stats.map((stat, index) => (
+                        <motion.div
+                            key={stat.label}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4, delay: index * 0.1 }}
+                        >
+                            <GlassCard className="p-6 flex items-center gap-4 hover:bg-white/10 transition-colors">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bg} ${stat.color}`}>
+                                    <stat.icon size={24} />
+                                </div>
+                                <div>
+                                    <div className="text-2xl font-bold">{stat.value}</div>
+                                    <div className="text-sm text-muted-foreground">{stat.label}</div>
+                                </div>
+                            </GlassCard>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                    {/* Learning Curve Chart */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.4 }}
+                        className="lg:col-span-2"
+                    >
+                        <GlassCard className="h-full min-h-[400px] p-8 relative overflow-hidden flex flex-col">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="text-xl font-bold flex items-center gap-2">
+                                    <TrendingUp size={20} className="text-primary" />
+                                    Knowledge Growth (XP)
+                                </h3>
+                                <div className="flex gap-2">
+                                    <span className="px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-medium cursor-pointer">Last 30 Days</span>
+                                </div>
+                            </div>
+
+                            {/* Custom SVG Line Chart */}
+                            <div className="flex-1 w-full relative">
+                                {chartData.length > 0 ? (
+                                    <svg className="w-full h-full overflow-visible" viewBox="0 0 800 300" preserveAspectRatio="none">
+                                        <defs>
+                                            <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="rgba(0, 240, 255, 0.5)" />
+                                                <stop offset="100%" stopColor="rgba(0, 240, 255, 0)" />
+                                            </linearGradient>
+                                        </defs>
+                                        {/* Grid Lines */}
+                                        {[0, 1, 2, 3, 4].map(i => (
+                                            <line key={i} x1="0" y1={i * 75} x2="800" y2={i * 75} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                                        ))}
+
+                                        {/* Area Path */}
+                                        <motion.path
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            d={chartPath}
+                                            fill="url(#lineGradient)"
+                                        />
+
+                                        {/* Line Path (Simplified for now, just connecting points) */}
+                                        <polyline
+                                            fill="none"
+                                            stroke="#00f0ff"
+                                            strokeWidth="3"
+                                            points={chartPoints.replace(/ /g, ', ')}
+                                        />
+                                    </svg>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                                        No activity data yet. Start learning!
+                                    </div>
+                                )}
+                            </div>
+                        </GlassCard>
+                    </motion.div>
+
+                    {/* Subject Mastery Radar Chart (Simulated) */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.5 }}
+                    >
+                        <GlassCard className="h-full p-6 flex flex-col">
+                            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                <Target size={20} className="text-secondary" />
+                                Subject Mastery
+                            </h3>
+                            <div className="flex-1 flex items-center justify-center relative">
+                                {/* Simulated Radar Chart using CSS/SVG */}
+                                <div className="relative w-64 h-64">
+                                    {/* Background Circles */}
+                                    {[1, 2, 3].map(i => (
+                                        <div key={i} className="absolute inset-0 m-auto rounded-full border border-white/5" style={{ width: `${i * 33}%`, height: `${i * 33}%` }} />
+                                    ))}
+                                    {/* Axes */}
+                                    <div className="absolute inset-0 m-auto w-full h-[1px] bg-white/5 rotate-0" />
+                                    <div className="absolute inset-0 m-auto w-full h-[1px] bg-white/5 rotate-60" />
+                                    <div className="absolute inset-0 m-auto w-full h-[1px] bg-white/5 rotate-120" />
+
+                                    {/* Shape */}
+                                    <motion.div
+                                        initial={{ scale: 0, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ duration: 1, delay: 0.8 }}
+                                        className="absolute inset-0 m-auto w-4/5 h-4/5 bg-secondary/20 border-2 border-secondary rounded-full"
+                                        style={{ clipPath: 'polygon(50% 0%, 100% 25%, 80% 100%, 20% 100%, 0% 25%)' }}
+                                    />
+
+                                    {/* Labels */}
+                                    <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 text-xs font-bold text-secondary">Physics</span>
+                                    <span className="absolute top-1/4 right-0 translate-x-4 text-xs font-bold text-secondary">Math</span>
+                                    <span className="absolute bottom-1/4 right-0 translate-x-4 text-xs text-muted-foreground">History</span>
+                                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-4 text-xs text-muted-foreground">Lit</span>
+                                    <span className="absolute top-1/4 left-0 -translate-x-4 text-xs font-bold text-secondary">CS</span>
+                                </div>
+                            </div>
+                            <div className="mt-6 text-center">
+                                <p className="text-sm text-muted-foreground">Top Subject: <span className="text-white font-bold">Physics (92%)</span></p>
+                            </div>
+                        </GlassCard>
+                    </motion.div>
+                </div>
+
+                {/* Second Row: Heatmap & Recent Activity */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                    {/* Study Heatmap */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.6 }}
+                        className="lg:col-span-2"
+                    >
+                        <GlassCard className="p-8">
+                            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                <Calendar size={20} className="text-green-400" />
+                                Study Consistency
+                            </h3>
+                            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                                {Array.from({ length: 52 }).map((_, weekIndex) => (
+                                    <div key={weekIndex} className="flex flex-col gap-2">
+                                        {Array.from({ length: 7 }).map((_, dayIndex) => {
+                                            const intensity = Math.random(); // TODO: Map real dailyStats here
+                                            const active = intensity > 0.7;
+                                            const colorClass = !active ? 'bg-white/5' :
+                                                intensity > 0.9 ? 'bg-green-500' :
+                                                    intensity > 0.8 ? 'bg-green-500/70' :
+                                                        'bg-green-500/40';
+
+                                            return (
+                                                <motion.div
+                                                    key={dayIndex}
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    transition={{ delay: (weekIndex * 0.01) + (dayIndex * 0.01) }}
+                                                    className={`w-3 h-3 rounded-sm ${colorClass}`}
+                                                    title={`Study session`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                ))}
+                            </div>
+                        </GlassCard>
+                    </motion.div>
+
+                    {/* Recent Activity List */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.7 }}
+                    >
+                        <GlassCard className="h-full p-6">
+                            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                <Clock size={20} className="text-blue-400" />
+                                Recent Activity
+                            </h3>
+                            <div className="space-y-6">
+                                {recentActivity.length > 0 ? recentActivity.map((item: any, i: number) => {
+                                    const Icon = item.icon === 'BookOpen' ? BookOpen : item.icon === 'Activity' ? Activity : item.icon === 'MessageSquare' ? MessageSquare : Zap;
+                                    return (
+                                        <div key={i} className="flex items-start gap-4 group">
+                                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0 group-hover:bg-white/10 transition-colors border border-white/5">
+                                                <Icon size={18} className="text-muted-foreground group-hover:text-white transition-colors" />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium group-hover:text-primary transition-colors cursor-pointer">
+                                                    {item.title}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {item.action}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }) : (
+                                    <div className="text-sm text-muted-foreground">No recent activity.</div>
+                                )}
+                            </div>
+                        </GlassCard>
+                    </motion.div>
+                </div>
+
+                {/* Recommended Content */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.8 }}
+                    className="mb-12"
+                >
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-2xl font-bold flex items-center gap-2">
+                            <Sparkles size={24} className="text-purple-400" />
+                            Recommended for You
+                        </h3>
+                        <button className="text-sm text-primary hover:underline">View All</button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {recommended.map((item, i) => (
+                            <GlassCard key={i} className="p-6 group hover:bg-white/10 transition-colors cursor-pointer relative overflow-hidden">
+                                <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${item.color}`} />
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+                                        {item.category}
+                                    </span>
+                                    <span className={`text-xs font-bold ${item.difficulty === 'Hard' ? 'text-red-400' :
+                                        item.difficulty === 'Medium' ? 'text-yellow-400' :
+                                            'text-green-400'
+                                        }`}>
+                                        {item.difficulty}
+                                    </span>
+                                </div>
+                                <h4 className="text-lg font-bold mb-2 group-hover:text-primary transition-colors">{item.title}</h4>
+                                <p className="text-sm text-muted-foreground mb-4">Based on your recent interest in Physics and Math.</p>
+                                <div className="flex items-center text-xs text-muted-foreground gap-4">
+                                    <span className="flex items-center gap-1"><BookOpen size={12} /> 12 Chapters</span>
+                                    <span className="flex items-center gap-1"><Clock size={12} /> 4h 30m</span>
+                                </div>
+                            </GlassCard>
+                        ))}
+                    </div>
+                </motion.div>
+            </div>
+        </main>
+    );
+}
+
+function Sparkles({ className, size }: { className?: string, size?: number }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+        >
+            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+        </svg>
+    );
+}

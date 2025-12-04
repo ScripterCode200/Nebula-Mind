@@ -1,0 +1,56 @@
+﻿
+> notebook_lm_app@0.1.0 lint
+> eslint
+
+node.exe : (node:9764) 
+ESLintIgnoreWarning: The 
+".eslintignore" file is no longer 
+supported. Switch to using the 
+"ignores" property in 
+"eslint.config.js": https://eslint.o
+rg/docs/latest/use/configure/migrati
+on-guide#ignoring-files
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSp 
+   ecified: ((node:9764) ESL...#ig  
+  noring-files:String) [], Remote   
+ Exception
+    + FullyQualifiedErrorId : Nativ 
+   eCommandError
+ 
+(Use `node --trace-warnings ...` to 
+show where the warning was created)
+
+C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app\app\api\chat\route.ts
+  116:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app\app\api\notebooks\route.ts
+  48:63  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app\app\notebook\page.tsx
+  5:0  error  Parsing error: Declaration or statement expected
+
+C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app\check-db.js
+  1:7   warning  'mongoose' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1:18  error    A `require()` style import is forbidden        @typescript-eslint/no-require-imports
+
+C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app\list-models.js
+   1:15  error    A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  24:18  warning  'e' is defined but never used            @typescript-eslint/no-unused-vars
+
+C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app\test-gemini.js
+  1:32  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app\test-pdf.js
+  1:19  error    A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:7   warning  'fs' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  2:12  error    A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  9:41  warning  'pdfData' is defined but never used      @typescript-eslint/no-unused-vars
+
+Γ£û 12 problems (8 errors, 4 warnings)
+
