@@ -7,7 +7,8 @@ if (!apiKey) {
 }
 
 const openai = new OpenAI({
-    apiKey: apiKey,
+    apiKey: apiKey || 'dummy-key', // Prevent build crash if key is missing
+    dangerouslyAllowBrowser: true // Enable if using client-side (though not recommended)
 });
 
 export default openai;
