@@ -53,6 +53,7 @@ const SocialLink = ({ href, icon: Icon }: { href: string, icon: any }) => (
     </Link>
 );
 
+// Force recompile
 export default function Footer() {
     const pathname = usePathname();
 

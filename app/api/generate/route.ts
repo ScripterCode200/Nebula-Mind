@@ -32,7 +32,10 @@ function extractJson(text: string) {
     }
 }
 
-async function generateWithProvider(prompt: string, modelProvider: 'gemini' | 'openai' | 'ollama', options: { jsonMode?: boolean } = {}) {
+async function generateWithProvider(prompt: string, modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b', options: { jsonMode?: boolean } = {}) {
+    console.log(`[Generate API] Sending request to provider: ${modelProvider}`);
+    console.log('[Generate API] Prompt Payload:');
+    console.log(prompt);
     if (modelProvider === 'openai') {
         const completion = await openai.chat.completions.create({
             messages: [{ role: "user", content: prompt }],
@@ -40,10 +43,19 @@ async function generateWithProvider(prompt: string, modelProvider: 'gemini' | 'o
             response_format: options.jsonMode ? { type: "json_object" } : undefined,
         });
         return completion.choices[0].message.content || '';
-    } else if (modelProvider === 'ollama') {
-        console.log('Generating with Ollama...');
+    } else if (modelProvider === 'ollama' || modelProvider === 'phi3.5:3.8b') {
+        let ollamaBaseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+        let modelName = "llama3.2:latest";
+
+        if (modelProvider === 'phi3.5:3.8b') {
+            ollamaBaseUrl = "http://72.61.231.120:11434";
+            modelName = "phi3.5:3.8b";
+        }
+
+        console.log(`Generating with Ollama (${modelName}) at ${ollamaBaseUrl}...`);
+
         const body: any = {
-            model: "llama3.2:latest",
+            model: modelName,
             messages: [{ role: "user", content: prompt }],
             stream: false
         };
@@ -52,7 +64,7 @@ async function generateWithProvider(prompt: string, modelProvider: 'gemini' | 'o
             body.format = "json";
         }
 
-        const response = await fetch(`${process.env.OLLAMA_BASE_URL}/api/chat`, {
+        const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -123,22 +135,36 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Notebook not found' }, { status: 404 });
         }
 
-        // Truncate context
-        // Truncate context only for non-Gemini providers
+        // Context Strategy
         let context = notebook.pdfContent || '';
-        if (modelProvider !== 'gemini') {
-            context = context.substring(0, 30000);
+
+        // Truncate context for Nebula 3 (Phi 3.5) and Ollama as requested
+        if (modelProvider === 'phi3.5:3.8b' || modelProvider === 'ollama') {
+            const MAX_GENERATE_CONTEXT = 30000;
+            if (context.length > MAX_GENERATE_CONTEXT) {
+                context = context.substring(0, MAX_GENERATE_CONTEXT);
+                console.log(`[Generate API] ${modelProvider} provider. Context truncated to ${MAX_GENERATE_CONTEXT} chars.`);
+            } else {
+                console.log(`[Generate API] Using full PDF content (length: ${context.length}).`);
+            }
         } else {
-            console.log('[Generate API] Gemini provider detected. Using full PDF content (unlimited context).');
+            console.log(`[Generate API] Using full PDF content (unlimited context) for ${modelProvider}. Length: ${context.length}`);
         }
+
         let prompt = '';
         let resultData;
 
         switch (type) {
             case 'notes':
                 prompt = `
-          Based on the following context, generate ${config.type} notes.
-          Format the output as Markdown.
+          Topic: ${notebook.title}
+          
+          Based on the Topic and the following context (if available), generate ${config.type} notes.
+          
+          FORMATTING INSTRUCTIONS:
+          - Use Markdown formatting.
+          - IMPORTANT: Do NOT wrap the entire output in a code block (like \`\`\`markdown ... \`\`\`).
+          - Return the raw markdown text directly.
           
           Context:
           ${context}
@@ -148,6 +174,7 @@ export async function POST(req: NextRequest) {
                 const stream = new ReadableStream({
                     async start(controller) {
                         let fullContent = '';
+                        let isStreamClosed = false;
                         try {
                             if (modelProvider === 'openai') {
                                 const completion = await openai.chat.completions.create({
@@ -160,17 +187,31 @@ export async function POST(req: NextRequest) {
                                     const content = chunk.choices[0]?.delta?.content || '';
                                     if (content) {
                                         fullContent += content;
-                                        controller.enqueue(encoder.encode(content));
+                                        try {
+                                            controller.enqueue(encoder.encode(content));
+                                        } catch (e) {
+                                            console.warn('Controller closed during enqueue (OpenAI), stopping stream.');
+                                            isStreamClosed = true;
+                                            break;
+                                        }
                                     }
                                 }
-                            } else if (modelProvider === 'ollama') {
+                            } else if (modelProvider === 'ollama' || modelProvider === 'phi3.5:3.8b') {
+                                let ollamaBaseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+                                let modelName = "llama3.2:latest";
+
+                                if (modelProvider === 'phi3.5:3.8b') {
+                                    ollamaBaseUrl = "http://72.61.231.120:11434";
+                                    modelName = "phi3.5:3.8b";
+                                }
+
                                 const body = {
-                                    model: "llama3.2:latest",
+                                    model: modelName,
                                     messages: [{ role: "user", content: prompt }],
                                     stream: true
                                 };
 
-                                const response = await fetch(`${process.env.OLLAMA_BASE_URL}/api/chat`, {
+                                const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify(body),
@@ -198,10 +239,16 @@ export async function POST(req: NextRequest) {
                                                 fullContent += content;
                                                 controller.enqueue(encoder.encode(content));
                                             }
-                                        } catch (e) {
+                                            if (json.done) break;
+                                        } catch (e: any) {
                                             console.error('Error parsing Ollama chunk:', e);
+                                            if (e.message && e.message.includes('closed')) {
+                                                isStreamClosed = true;
+                                                break;
+                                            }
                                         }
                                     }
+                                    if (isStreamClosed) break;
                                 }
                             } else {
                                 // Vertex AI Logic (Gemini 2.5 Flash)
@@ -236,7 +283,13 @@ export async function POST(req: NextRequest) {
                                     const chunkText = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
                                     if (chunkText) {
                                         fullContent += chunkText;
-                                        controller.enqueue(encoder.encode(chunkText));
+                                        try {
+                                            controller.enqueue(encoder.encode(chunkText));
+                                        } catch (e) {
+                                            console.warn('Controller closed during enqueue (Vertex), stopping stream.');
+                                            isStreamClosed = true;
+                                            break;
+                                        }
                                     }
                                     if (chunk.usageMetadata) {
                                         const { logTokenUsage } = await import('@/lib/token-cost');
@@ -251,9 +304,18 @@ export async function POST(req: NextRequest) {
 
                         } catch (error) {
                             console.error('Streaming error:', error);
-                            controller.error(error);
+                            if (!isStreamClosed) {
+                                try {
+                                    controller.error(error);
+                                    isStreamClosed = true;
+                                } catch (e) { }
+                            }
                         } finally {
-                            controller.close();
+                            if (!isStreamClosed) {
+                                try {
+                                    controller.close();
+                                } catch (e) { console.error('Error closing controller:', e) }
+                            }
                         }
                     }
                 });

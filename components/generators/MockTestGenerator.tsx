@@ -11,7 +11,7 @@ import FuturisticLoader from '@/components/ui/FuturisticLoader';
 
 interface MockTestGeneratorProps {
     notebookId: string;
-    modelProvider: 'gemini' | 'openai' | 'ollama';
+    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b';
 }
 
 interface Question {

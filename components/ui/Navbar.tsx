@@ -8,41 +8,96 @@ import {
     Brain, Menu, X, Search, Bell, ChevronDown,
     User, Sparkles, BookOpen,
     Layout, Zap, MessageSquare,
-    Settings, LogOut, CreditCard
+    Settings, LogOut, CreditCard, ArrowRight
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import NeonButton from './NeonButton';
 import { useUserStore } from '@/store/useUserStore';
 
-const navItems = [
+interface NavItem {
+    name: string;
+    href: string;
+    dropdown?: {
+        name: string;
+        href: string;
+        icon: any;
+        desc: string;
+    }[];
+}
+
+const navItems: NavItem[] = [
     { name: 'Home', href: '/' },
-    {
-        name: 'Features',
-        href: '#',
-        dropdown: [
-            { name: 'AI Notebooks', href: '/notebook', icon: BookOpen, desc: 'Smart note-taking' },
-            { name: 'Knowledge Graph', href: '#', icon: Layout, desc: 'Visual learning' },
-            { name: 'Mock Tests', href: '#', icon: Zap, desc: 'Exam prep' },
-            { name: 'AI Chat', href: '#', icon: MessageSquare, desc: '24/7 Tutor' },
-        ]
-    },
-    { name: 'Pricing', href: '#' },
+    // {
+    //     name: 'Features',
+    //     href: '#',
+    //     dropdown: [
+    //         { name: 'AI Notebooks', href: '/notebook', icon: BookOpen, desc: 'Smart note-taking' },
+    //         { name: 'Knowledge Graph', href: '#', icon: Layout, desc: 'Visual learning' },
+    //         { name: 'Mock Tests', href: '#', icon: Zap, desc: 'Exam prep' },
+    //         { name: 'AI Chat', href: '#', icon: MessageSquare, desc: '24/7 Tutor' },
+    //     ]
+    // },
+    { name: 'Pricing', href: '/#pricing' },
     { name: 'Docs', href: '/docs' },
 ];
 
 export default function Navbar() {
     const pathname = usePathname();
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const { name, email, logout, isAuthenticated, user } = useUserStore();
+
     const [isOpen, setIsOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
     const [searchFocused, setSearchFocused] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
 
-    const searchInputRef = useRef<HTMLInputElement>(null);
-    const { name, email, logout, isAuthenticated, user } = useUserStore();
+    const [recentSearches, setRecentSearches] = useState<any[]>([]);
 
+    const searchablePages = [
+        { name: 'Dashboard', href: '/dashboard', type: 'Page' },
+        { name: 'Notebooks', href: '/notebook', type: 'Page' },
+        { name: 'Profile', href: '/profile', type: 'Page' },
+        { name: 'Settings', href: '/settings', type: 'Page' },
+        { name: 'Pricing', href: '/#pricing', type: 'Section' },
+        { name: 'Docs', href: '/docs', type: 'Page' },
+        // Expanded Settings
+        { name: 'Account Settings', href: '/settings?tab=account', type: 'Setting' },
+        { name: 'Security', href: '/settings?tab=security', type: 'Setting' },
+        { name: 'Notifications', href: '/settings?tab=notifications', type: 'Setting' },
+        { name: 'Billing', href: '/billing', type: 'Setting' },
+        { name: 'Appearance', href: '/settings?tab=appearance', type: 'Setting' },
+    ];
+
+    // Load recent searches
+    useEffect(() => {
+        const saved = localStorage.getItem('recentSearches');
+        if (saved) {
+            setRecentSearches(JSON.parse(saved));
+        }
+    }, []);
+
+    const addToRecents = (item: any) => {
+        const newRecents = [item, ...recentSearches.filter(r => r.name !== item.name)].slice(0, 5);
+        setRecentSearches(newRecents);
+        localStorage.setItem('recentSearches', JSON.stringify(newRecents));
+        setSearchQuery('');
+    };
+
+    const clearRecents = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setRecentSearches([]);
+        localStorage.removeItem('recentSearches');
+    };
+
+    // Fetch user on mount
     useEffect(() => {
         useUserStore.getState().fetchUser();
+    }, []);
 
+    // Scroll effect
+    useEffect(() => {
         const handleScroll = () => {
             setScrolled(window.scrollY > 20);
         };
@@ -50,6 +105,7 @@ export default function Navbar() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, [pathname]);
 
+    // Keydown effect for search
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -61,9 +117,45 @@ export default function Navbar() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    // Search logic
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(async () => {
+            if (searchQuery) {
+                // local pages search
+                const localResults = searchablePages.filter(page =>
+                    page.name.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+
+                // api notebooks search
+                let notebookResults: any[] = [];
+                if (isAuthenticated) {
+                    try {
+                        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            notebookResults = data.notebooks.map((nb: any) => ({
+                                name: nb.title,
+                                href: `/notebook/${nb._id}`,
+                                type: 'Notebook',
+                                icon: BookOpen
+                            }));
+                        }
+                    } catch (err) {
+                        console.error('Search failed', err);
+                    }
+                }
+
+                setSearchResults([...localResults, ...notebookResults]);
+            } else {
+                setSearchResults([]);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery, isAuthenticated]);
+
     const isHome = pathname === '/';
 
-    // Add Admin link if user is admin
     const currentNavItems = [...navItems];
     if (user?.role === 'admin') {
         currentNavItems.push({ name: 'Admin', href: '/admin' });
@@ -152,8 +244,112 @@ export default function Navbar() {
                         placeholder="Search..."
                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-12 text-sm text-foreground focus:outline-none focus:border-primary/50 focus:bg-black/50 focus:ring-1 focus:ring-primary/50 transition-all shadow-inner"
                         onFocus={() => setSearchFocused(true)}
-                        onBlur={() => setSearchFocused(false)}
+                        onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        value={searchQuery}
                     />
+                    <AnimatePresence>
+                        {searchFocused && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="absolute top-full left-0 right-0 mt-2 bg-[#0A0A0A] border border-white/10 rounded-xl p-2 shadow-2xl backdrop-blur-xl overflow-hidden z-50 divide-y divide-white/5"
+                            >
+                                {/* Recent Searches */}
+                                {!searchQuery && recentSearches.length > 0 && (
+                                    <>
+                                        <div className="flex items-center justify-between px-2 py-1.5 opacity-70">
+                                            <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">Recent</span>
+                                            <button
+                                                onClick={clearRecents}
+                                                className="text-[10px] text-muted hover:text-red-400 transition-colors"
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
+                                        {recentSearches.map((result, index) => (
+                                            <Link
+                                                key={`recent-${index}`}
+                                                href={result.href}
+                                                className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/5 text-sm transition-colors group"
+                                                onClick={() => addToRecents(result)}
+                                            >
+                                                <div className="flex items-center gap-3 text-foreground/80">
+                                                    <div className="p-1 rounded bg-white/5 text-muted group-hover:text-primary transition-colors">
+                                                        <Search size={12} />
+                                                    </div>
+                                                    {result.name}
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </>
+                                )}
+
+                                {/* Search Results */}
+                                {searchQuery && searchResults.length > 0 && (
+                                    <>
+                                        {/* Settings & Pages Section */}
+                                        {searchResults.some(r => r.type !== 'Notebook') && (
+                                            <div className="block px-2 text-[10px] font-semibold text-muted uppercase tracking-wider py-1.5 opacity-70">Pages & Settings</div>
+                                        )}
+                                        {searchResults.filter(r => r.type !== 'Notebook').map((result, index) => (
+                                            <Link
+                                                key={`page-${index}`}
+                                                href={result.href}
+                                                className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/5 text-sm transition-colors group"
+                                                onClick={() => addToRecents(result)}
+                                            >
+                                                <div className="flex items-center gap-3 text-foreground">
+                                                    <div className="p-1 rounded bg-white/5 text-muted group-hover:text-primary transition-colors">
+                                                        {result.type === 'Setting' ? <Settings size={12} /> : (result.type === 'Section' ? <Layout size={12} /> : <Zap size={12} />)}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-medium mr-2">{result.name}</span>
+                                                        {result.type === 'Setting' && <span className="text-[10px] text-muted border border-white/10 px-1 rounded">Setting</span>}
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        ))}
+
+                                        {/* Notebooks Section */}
+                                        {searchResults.some(r => r.type === 'Notebook') && (
+                                            <>
+                                                <div className="block px-2 text-[10px] font-semibold text-muted uppercase tracking-wider py-1.5 mt-2 opacity-70">Notebooks</div>
+                                                {searchResults.filter(r => r.type === 'Notebook').map((result, index) => (
+                                                    <Link
+                                                        key={`nb-${index}`}
+                                                        href={result.href}
+                                                        className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/5 text-sm transition-colors group"
+                                                        onClick={() => addToRecents(result)}
+                                                    >
+                                                        <div className="flex items-center gap-3 text-foreground">
+                                                            <div className="p-1 rounded bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                                                                <BookOpen size={12} />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">{result.name}</span>
+                                                                <span className="text-[10px] text-muted">Notebook</span>
+                                                            </div>
+                                                        </div>
+                                                        <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity -translate-x-1 group-hover:translate-x-0" />
+                                                    </Link>
+                                                ))}
+                                            </>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* No Results */}
+                                {searchQuery && searchResults.length === 0 && (
+                                    <div className="px-3 py-4 text-center text-sm text-muted">
+                                        <div className="mb-2 flex justify-center"><Search size={24} className="opacity-20" /></div>
+                                        No results found
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     <div className="absolute right-2 flex items-center gap-1 pointer-events-none">
                         <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-white/10 bg-white/5 px-1.5 font-mono text-[10px] font-medium text-muted opacity-100">
                             <span className="text-xs">⌘</span>K
@@ -163,58 +359,9 @@ export default function Navbar() {
 
                 {/* Right Actions */}
                 <div className="flex items-center gap-4">
-                    <div
-                        className="relative hidden sm:block"
-                        onMouseEnter={() => setActiveDropdown('notifications')}
-                        onMouseLeave={() => setActiveDropdown(null)}
-                    >
-                        <button className="relative p-2 text-muted hover:text-foreground transition-colors">
-                            <Bell size={20} />
-                            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 border-2 border-black" />
-                        </button>
-
-                        <AnimatePresence>
-                            {activeDropdown === 'notifications' && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="absolute top-full right-0 pt-4 w-80"
-                                >
-                                    <div className="bg-[#0A0A0A] border border-white/10 rounded-xl shadow-2xl backdrop-blur-xl overflow-hidden">
-                                        <div className="p-3 border-b border-white/5 flex justify-between items-center">
-                                            <span className="text-sm font-medium text-foreground">Notifications</span>
-                                            <span className="text-xs text-primary cursor-pointer hover:underline">Mark all read</span>
-                                        </div>
-                                        <div className="max-h-[300px] overflow-y-auto">
-                                            {[
-                                                { title: 'New Feature', desc: 'AI Chat is now available in beta.', time: '2m ago', icon: Sparkles, color: 'text-yellow-400' },
-                                                { title: 'Notebook Ready', desc: 'Your "Quantum Physics" notes are ready.', time: '1h ago', icon: BookOpen, color: 'text-blue-400' },
-                                                { title: 'System Update', desc: 'Maintenance scheduled for tonight.', time: '5h ago', icon: Zap, color: 'text-purple-400' }
-                                            ].map((notif, i) => (
-                                                <div key={i} className="flex gap-3 p-3 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-0">
-                                                    <div className={`mt-1 p-1.5 rounded-full bg-white/5 ${notif.color}`}>
-                                                        <notif.icon size={14} />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-sm font-medium text-foreground">{notif.title}</div>
-                                                        <div className="text-xs text-muted leading-relaxed">{notif.desc}</div>
-                                                        <div className="text-[10px] text-muted/60 mt-1">{notif.time}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="p-2 border-t border-white/5 text-center">
-                                            <Link href="/notifications" className="text-xs text-muted hover:text-foreground transition-colors block w-full py-1">
-                                                View all notifications
-                                            </Link>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                    <Link href="/notifications" className="relative p-2 text-muted hover:text-foreground transition-colors group">
+                        <Bell size={20} className="group-hover:text-primary transition-colors" />
+                    </Link>
 
                     <div className="h-8 w-[1px] bg-white/10 hidden sm:block" />
 
@@ -230,7 +377,7 @@ export default function Navbar() {
                                     onMouseEnter={() => setActiveDropdown('user')}
                                     onMouseLeave={() => setActiveDropdown(null)}
                                 >
-                                    <button className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-secondary p-[1px] group relative">
+                                    <button className="w-9 h-9 cursor-pointer rounded-full bg-gradient-to-tr from-primary to-secondary p-[1px] group relative">
                                         <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                                             <User size={18} className="text-white group-hover:scale-110 transition-transform" />
                                         </div>
@@ -296,7 +443,7 @@ export default function Navbar() {
 
                     {user && (
                         <Link href="/notebook" className="hidden md:block">
-                            <NeonButton size="sm" className="px-5" variant="secondary">
+                            <NeonButton size="sm" className="px-5 cursor-pointer" variant="secondary">
                                 <Sparkles size={16} className="mr-2" />
                                 New
                             </NeonButton>
@@ -358,19 +505,49 @@ export default function Navbar() {
                         </div>
                     ))}
 
-                    <div className="pt-4 border-t border-white/10 flex items-center gap-4">
+                    <div className="pt-4 border-t border-white/10">
                         {user ? (
-                            <>
-                                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                                    <User size={20} />
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                                        <User size={20} />
+                                    </div>
+                                    <div className="overflow-hidden">
+                                        <div className="font-medium truncate">{name}</div>
+                                        <div className="text-xs text-muted truncate">{email}</div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="font-medium">{name}</div>
-                                    <div className="text-xs text-muted">{email}</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Link href="/dashboard" onClick={() => setIsOpen(false)} className="flex items-center gap-2 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm text-foreground">
+                                        <Layout size={16} />
+                                        Dashboard
+                                    </Link>
+                                    <Link href="/profile" onClick={() => setIsOpen(false)} className="flex items-center gap-2 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm text-foreground">
+                                        <User size={16} />
+                                        Profile
+                                    </Link>
+                                    <Link href="/settings" onClick={() => setIsOpen(false)} className="flex items-center gap-2 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm text-foreground">
+                                        <Settings size={16} />
+                                        Settings
+                                    </Link>
+                                    <Link href="/billing" onClick={() => setIsOpen(false)} className="flex items-center gap-2 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm text-foreground">
+                                        <CreditCard size={16} />
+                                        Billing
+                                    </Link>
                                 </div>
-                            </>
+                                <button
+                                    onClick={() => {
+                                        logout();
+                                        setIsOpen(false);
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors text-sm"
+                                >
+                                    <LogOut size={16} />
+                                    Log Out
+                                </button>
+                            </div>
                         ) : (
-                            <Link href="/login" onClick={() => setIsOpen(false)} className="w-full">
+                            <Link href="/login" onClick={() => setIsOpen(false)} className="w-full block">
                                 <NeonButton className="w-full">Log In</NeonButton>
                             </Link>
                         )}

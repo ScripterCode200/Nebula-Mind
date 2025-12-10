@@ -23,7 +23,7 @@ export const useUserStore = create<UserState>()(
     persist(
         (set, get) => ({
             user: null,
-            name: 'Guest',
+            name: 'User',
             email: '',
             bio: '',
             dob: null,
@@ -49,6 +49,7 @@ export const useUserStore = create<UserState>()(
                 user: state.user ? { ...state.user, stats } : null
             })),
             fetchUser: async () => {
+                // Prevent concurrent fetches if already fetching? (Not implemented yet, but good practice)
                 try {
                     const res = await fetch('/api/auth/me');
                     if (res.ok) {

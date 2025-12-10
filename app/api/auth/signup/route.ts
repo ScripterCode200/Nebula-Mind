@@ -24,11 +24,16 @@ export async function POST(req: Request) {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+        console.log('------------------------------------------------');
+        console.log(`🆕 SIGNUP OTP for ${email}: ${otp}`);
+        console.log('------------------------------------------------');
+
         // Check if this is the super admin
-        const role = email === 'codstom@gmail.com' ? 'admin' : 'user';
+        // const role = email === 'codstom@gmail.com' ? 'admin' : 'user';
+        const role = 'user'; // Default to user, admin must be set manually in DB
+
         // Auto-verify admin for convenience, or force them to verify too? Let's force verify for consistency.
-        // Actually, let's auto-verify admin to avoid getting locked out if email fails.
-        const isVerified = email === 'codstom@gmail.com';
+        const isVerified = false;
 
         const newUser = await User.create({
             email,
@@ -42,12 +47,11 @@ export async function POST(req: Request) {
 
         if (!isVerified) {
             try {
-                await sendOTP(email, otp);
+                const { sendOTP } = await import('@/lib/mail');
+                const success = await sendOTP(email, otp);
+                if (!success) throw new Error('Email sending returned false');
             } catch (emailError) {
                 console.error('Failed to send OTP:', emailError);
-                // We still create the user, but they will need to resend OTP.
-                // Or should we fail? Better to fail so they can try again or fix email.
-                // But if we fail, we should delete the user.
                 await User.findByIdAndDelete(newUser._id);
                 return NextResponse.json({ error: 'Failed to send verification email. Please check your email address.' }, { status: 500 });
             }

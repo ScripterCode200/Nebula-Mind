@@ -45,9 +45,9 @@ export async function POST(req: Request) {
             const user = await User.findById(userId);
             if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-            // Prevent blocking self
-            if (user.email === 'codstom@gmail.com') {
-                return NextResponse.json({ error: 'Cannot block super admin' }, { status: 400 });
+            // Prevent blocking admins
+            if (user.role === 'admin') {
+                return NextResponse.json({ error: 'Cannot block an admin' }, { status: 400 });
             }
 
             user.isBlocked = !user.isBlocked;

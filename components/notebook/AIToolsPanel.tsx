@@ -27,7 +27,7 @@ const tabs = [
 
 const AIToolsPanel = ({ notebookId, chatHistory }: AIToolsPanelProps) => {
     const [activeTab, setActiveTab] = useState('chat');
-    const [modelProvider, setModelProvider] = useState<'gemini' | 'openai' | 'ollama'>('ollama');
+    const [modelProvider, setModelProvider] = useState<'gemini' | 'ollama' | 'phi3.5:3.8b'>('gemini');
 
     return (
         <div className="flex flex-col h-full bg-black/40 backdrop-blur-xl border-l border-white/5 relative overflow-hidden">
@@ -42,12 +42,12 @@ const AIToolsPanel = ({ notebookId, chatHistory }: AIToolsPanelProps) => {
                     <div className="relative group">
                         <select
                             value={modelProvider}
-                            onChange={(e) => setModelProvider(e.target.value as 'gemini' | 'openai' | 'ollama')}
+                            onChange={(e) => setModelProvider(e.target.value as 'gemini' | 'ollama' | 'phi3.5:3.8b')}
                             className="appearance-none bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-white pl-3 pr-8 py-1.5 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all cursor-pointer hover:bg-white/10"
                         >
                             <option value="gemini" className="bg-[#050505]">Gemini 2.5 Flash</option>
-                            <option value="openai" className="bg-[#050505]">GPT-4o</option>
                             <option value="ollama" className="bg-[#050505]">Nebula Ai 2.0</option>
+                            <option value="phi3.5:3.8b" className="bg-[#050505]">Nebula AI 3.0</option>
                         </select>
                         <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-white transition-colors" />
                     </div>

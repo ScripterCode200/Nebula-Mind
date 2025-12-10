@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 interface FlashcardGeneratorProps {
     notebookId: string;
-    modelProvider: 'gemini' | 'openai' | 'ollama';
+    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b';
 }
 
 interface Flashcard {

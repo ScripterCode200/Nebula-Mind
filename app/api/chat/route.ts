@@ -1,3 +1,4 @@
+// Force build refresh
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Notebook from '@/models/Notebook';
@@ -44,19 +45,19 @@ export async function POST(req: NextRequest) {
         console.log(`[Chat API] User message saved. History length: ${chat.messages.length}`);
 
         // Context Retrieval Strategy
-        // RAG has been removed. Using full PDF content.
         let context = notebook.pdfContent || '';
-        console.log('[Chat API] Using full PDF content');
 
-        // Truncate if still too long (safety net)
-        // Truncate if still too long (safety net), but allow full context for Gemini
-        if (modelProvider !== 'gemini') {
-            const MAX_CONTEXT_LENGTH = 8000; // Keep conservative for OpenAI/Ollama
+        // Truncate context for Nebula 3 (Phi 3.5) and Ollama as requested
+        if (modelProvider === 'phi3.5:3.8b' || modelProvider === 'ollama') {
+            const MAX_CONTEXT_LENGTH = 30000;
             if (context.length > MAX_CONTEXT_LENGTH) {
                 context = context.substring(0, MAX_CONTEXT_LENGTH) + "... (truncated)";
+                console.log(`[Chat API] ${modelProvider} provider. Context truncated to ${MAX_CONTEXT_LENGTH} chars.`);
+            } else {
+                console.log(`[Chat API] ${modelProvider} provider. Using full PDF content (length: ${context.length}).`);
             }
         } else {
-            console.log('[Chat API] Gemini provider detected. Using full PDF content (unlimited context).');
+            console.log(`[Chat API] Using full PDF content (unlimited context) for ${modelProvider}. Length: ${context.length}`);
         }
 
         // Extract metadata
@@ -65,6 +66,8 @@ export async function POST(req: NextRequest) {
 
         const systemPrompt = `You are Nebula, an AI assistant for this notebook: "${notebookName}".
         
+        TOPIC: ${notebookName}
+        
         CONTEXT (PDF Content):
         ${context}
         
@@ -72,7 +75,8 @@ export async function POST(req: NextRequest) {
         - Answer based PRIMARILY on the Context above.
         - If the answer is missing, say so politely.
         - Keep answers concise and helpful.
-        - FORMATTING: Use Markdown (bold, lists, code blocks) to make your response easy to read.`;
+        - FORMATTING: Use Markdown (bold, lists, code blocks for code snippets only) to make your response easy to read.
+        - IMPORTANT: Do NOT wrap your entire response in a markdown code block (like \`\`\`markdown ... \`\`\`). Return the raw markdown directly.`;
 
         console.log('[Chat API] System Prompt Preview:', systemPrompt.substring(0, 200) + '...');
         console.log('[Chat API] Full Context Length in Prompt:', context.length);
@@ -81,37 +85,57 @@ export async function POST(req: NextRequest) {
         const stream = new ReadableStream({
             async start(controller) {
                 let fullAiResponse = '';
+                let isStreamClosed = false;
                 try {
                     if (modelProvider === 'openai') {
+                        const messages = [
+                            { role: "system" as const, content: systemPrompt },
+                            { role: "user" as const, content: message }
+                        ];
+                        console.log('[Chat API] OpenAI Payload Messages:');
+                        messages.forEach((msg, index) => {
+                            console.log(`[Message ${index} - ${msg.role}] Length: ${msg.content.length}`);
+                            console.log(msg.content);
+                        });
+
                         const completion = await openai.chat.completions.create({
                             model: "gpt-4o",
-                            messages: [
-                                { role: "system", content: systemPrompt },
-                                { role: "user", content: message }
-                            ],
+                            messages: messages,
                             stream: true,
                         });
 
                         for await (const chunk of completion) {
-                            const content = chunk.choices[0]?.delta?.content || '';
-                            if (content) {
-                                fullAiResponse += content;
-                                controller.enqueue(encoder.encode(content));
+                            const chunkText = chunk.choices[0]?.delta?.content || '';
+                            if (chunkText) {
+                                fullAiResponse += chunkText;
+                                try {
+                                    controller.enqueue(encoder.encode(chunkText));
+                                } catch (e) {
+                                    console.warn('Controller closed during enqueue (OpenAI), stopping stream.');
+                                    isStreamClosed = true;
+                                    break;
+                                }
                             }
                         }
-                    } else if (modelProvider === 'ollama') {
+                    } else if (modelProvider === 'ollama' || modelProvider === 'phi3.5:3.8b') {
                         const messages = [
                             { role: "system", content: systemPrompt },
                             { role: "user", content: message }
                         ];
 
-                        console.log('[Chat API] Ollama Payload Messages (Preview):');
+                        console.log('[Chat API] Ollama Payload Messages:');
                         messages.forEach((msg, index) => {
-                            const preview = msg.content.length > 500 ? msg.content.substring(0, 500) + '... [truncated]' : msg.content;
-                            console.log(`[Message ${index} - ${msg.role}]: ${preview}`);
+                            console.log(`[Message ${index} - ${msg.role}]:`);
+                            console.log(msg.content);
                         });
 
                         let ollamaBaseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+                        let modelName = "llama3.2:latest";
+
+                        if (modelProvider === 'phi3.5:3.8b') {
+                            ollamaBaseUrl = "http://72.61.231.120:11434";
+                            modelName = "phi3.5:3.8b";
+                        }
 
                         // Robust URL sanitization
                         if (ollamaBaseUrl.endsWith('/')) {
@@ -121,17 +145,27 @@ export async function POST(req: NextRequest) {
                             ollamaBaseUrl = ollamaBaseUrl.slice(0, -9);
                         }
 
-                        console.log(`[Chat API] Connecting to Ollama at "${ollamaBaseUrl}"...`);
+                        console.log(`[Chat API] Connecting to Ollama at "${ollamaBaseUrl}" with model "${modelName}"...`);
+
+                        const body: any = {
+                            model: modelName,
+                            messages: messages,
+                            stream: true
+                        };
+
+                        // Check for "/bye" command to unload model (stop server)
+                        if (message.toLowerCase().includes('/bye')) {
+                            console.log('[Chat API] "/bye" detected. Setting keep_alive to 0s to unload model.');
+                            body.keep_alive = 0;
+                        }
+
                         const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                model: "llama3.2:latest",
-                                messages: messages,
-                                stream: true
-                            }),
+                            body: JSON.stringify(body),
                             signal: AbortSignal.timeout(480000) // 8 minutes timeout
                         });
+
 
                         console.log(`[Chat API] Ollama response status: ${response.status}`);
 
@@ -164,10 +198,15 @@ export async function POST(req: NextRequest) {
                                         controller.enqueue(encoder.encode(content));
                                     }
                                     if (json.done) break;
-                                } catch (e) {
+                                } catch (e: any) {
                                     console.error('Error parsing Ollama chunk:', e);
+                                    if (e.message && e.message.includes('closed')) {
+                                        isStreamClosed = true;
+                                        break;
+                                    }
                                 }
                             }
+                            if (isStreamClosed) break;
                         }
                     } else {
                         // Vertex AI Logic (Gemini 2.5 Flash)
@@ -176,6 +215,8 @@ export async function POST(req: NextRequest) {
                         // Helper to run chat stream with fallback
                         const runChatStream = async (modelName: string) => {
                             console.log(`[Chat API] Attempting to use model: ${modelName}`);
+                            console.log('[Chat API] Gemini User Message:', message);
+                            console.log('[Chat API] Gemini System Prompt (First 500 chars):', systemPrompt.substring(0, 500) + '...');
                             const model = getVertexModel(modelName);
                             const chat = model.startChat({
                                 history: [
@@ -218,7 +259,13 @@ export async function POST(req: NextRequest) {
                             const chunkText = chunk.candidates?.[0]?.content?.parts?.[0]?.text || '';
                             if (chunkText) {
                                 fullAiResponse += chunkText;
-                                controller.enqueue(encoder.encode(chunkText));
+                                try {
+                                    controller.enqueue(encoder.encode(chunkText));
+                                } catch (e) {
+                                    console.warn('Controller closed during enqueue (Vertex), stopping stream.');
+                                    isStreamClosed = true;
+                                    break;
+                                }
                             }
                             // Vertex AI sends usage metadata in the last chunk (or cumulatively)
                             if (chunk.usageMetadata) {
@@ -230,6 +277,16 @@ export async function POST(req: NextRequest) {
 
                     // Save AI Response
                     if (fullAiResponse) {
+                        if (modelProvider === 'phi3.5:3.8b') {
+                            console.log('Response by Nebula 3.0:', fullAiResponse);
+                        } else if (modelProvider === 'openai') {
+                            console.log('Response by GPT-4o:', fullAiResponse);
+                        } else if (modelProvider === 'gemini') {
+                            console.log('Response by Gemini:', fullAiResponse);
+                        } else {
+                            console.log('Response by Ollama:', fullAiResponse);
+                        }
+
                         console.log(`[Chat API] Saving AI response for notebook ${notebookId}`);
                         await Chat.findOneAndUpdate(
                             { notebookId },
@@ -248,9 +305,18 @@ export async function POST(req: NextRequest) {
 
                 } catch (error) {
                     console.error('Streaming error:', error);
-                    controller.error(error);
+                    if (!isStreamClosed) {
+                        try {
+                            controller.error(error);
+                            isStreamClosed = true;
+                        } catch (e) { }
+                    }
                 } finally {
-                    controller.close();
+                    if (!isStreamClosed) {
+                        try {
+                            controller.close();
+                        } catch (e) { console.error('Error closing controller:', e) }
+                    }
                 }
             }
         });

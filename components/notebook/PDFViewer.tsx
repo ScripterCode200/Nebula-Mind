@@ -69,6 +69,9 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
     const [pageHistory, setPageHistory] = useState<Record<number, DrawingPath[][]>>({});
     const [pageHistoryStep, setPageHistoryStep] = useState<Record<number, number>>({});
 
+    // Canvas Size State for sync
+    const [canvasSize, setCanvasSize] = useState<{ width: number; height: number } | null>(null);
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -88,8 +91,6 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
             .then(data => {
                 if (data.annotations) {
                     setPaths(data.annotations);
-                    // Initialize history for loaded pages? 
-                    // For now, history starts empty, so you can't undo loaded state, only new actions.
                 }
             })
             .catch(err => console.error('Failed to load annotations:', err));
@@ -115,6 +116,7 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
 
     const handlePageChange = (newPage: number) => {
         setPageNumber(Math.min(Math.max(1, newPage), numPages));
+        setCanvasSize(null); // Reset canvas size to force redraw wait
     };
 
     // Drawing Logic
@@ -156,10 +158,7 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
         setPageHistory(prev => {
             const currentStep = pageHistoryStep[page] ?? -1;
             const currentHistory = prev[page] || [];
-            // If we are in the middle of history, truncate future
             const newHistory = currentHistory.slice(0, currentStep + 1);
-            // We need to store the state *after* the change.
-            // Actually, let's store the full array of paths for that page.
             return {
                 ...prev,
                 [page]: [...newHistory, newPaths]
@@ -171,25 +170,9 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
         }));
     };
 
-
-
     const undo = () => {
         const currentStep = pageHistoryStep[pageNumber] ?? -1;
-        // If step is -1, we are at initial state (loaded from DB or empty). 
-        // If we have history, we can go back.
-        // Wait, if currentStep is 0, we have 1 item in history. Undo should go to empty/initial.
-
-        if (currentStep < 0) return; // Nothing to undo? 
-        // Actually if step is 0, we want to go back to "before step 0".
-        // So we need to know what was before.
-
-        // Simplified: History stores states.
-        // If we are at step 0, undo means go to state *before* step 0.
-        // If we don't have that stored, we assume empty? Or we need to store initial state.
-
-        // Let's assume initial state is what we loaded.
-        // This is getting complicated.
-        // Let's just store the array of paths.
+        if (currentStep < 0) return;
 
         const newStep = currentStep - 1;
         const history = pageHistory[pageNumber] || [];
@@ -198,16 +181,7 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
         if (newStep >= 0) {
             prevPaths = history[newStep];
         } else {
-            // Revert to initial? Or just empty?
-            // For now, empty. (Issue: if we loaded annotations, undoing the first new stroke will clear everything? 
-            // Yes, unless we pushed initial state to history.
-            // Let's push initial state to history on load?)
-            // For now, let's just say undoing past 0 clears the page (or reverts to what was there before we started drawing in this session).
-            // To fix this properly, on load, we should maybe set history?
-            // Or just accept that undo stack starts from current session.
-            prevPaths = []; // This clears everything. Ideally we want "initial loaded state".
-            // But we don't have that easily accessible without another state var.
-            // Let's just use empty for now.
+            prevPaths = [];
         }
 
         setPaths(prev => ({ ...prev, [pageNumber]: prevPaths }));
@@ -226,17 +200,19 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
         setPageHistoryStep(prev => ({ ...prev, [pageNumber]: newStep }));
     };
 
-    // Eraser Logic (Simple "remove nearby" or just draw white? Drawing white is easier for now, but "remove" is better)
-    // For this implementation, let's treat eraser as a "white pen" for simplicity and performance, 
-    // but a true eraser would check intersection. 
-    // Actually, let's implement the eraser as "drawing with destination-out" composite operation if possible,
-    // but since we are storing paths, we can just add a "clear" path or filter paths.
-    // Let's stick to "Eraser is a tool that draws transparent/clearing lines" -> composite operation 'destination-out'.
-
     // Canvas Rendering
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
+
+        // Ensure canvas size matches state if available
+        if (canvasSize) {
+            if (canvas.width !== canvasSize.width || canvas.height !== canvasSize.height) {
+                canvas.width = canvasSize.width;
+                canvas.height = canvasSize.height;
+            }
+        }
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
@@ -273,7 +249,7 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
         });
 
         ctx.restore();
-    }, [paths, pageNumber, currentPath, scale]);
+    }, [paths, pageNumber, currentPath, scale, canvasSize]);
 
     const clearPage = () => {
         setPaths(prev => ({
@@ -296,10 +272,6 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
         return {};
     };
 
-
-
-    // Eraser Logic (Simple "remove nearby" or just draw white? Drawing white is easier for now, but "remove" is better)
-
     const stopDrawing = () => {
         if (!isDrawing || !currentPath) return;
         setIsDrawing(false);
@@ -316,16 +288,6 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
         setCurrentPath(null);
     };
 
-    // ... (rest of the file)
-
-    // Update Toolbar to include Undo/Redo
-    // ...
-
-    // Wait, I need to replace the whole file content or specific parts.
-    // The previous tool call was just a view.
-    // I will use replace_file_content to inject the logic.
-
-    // Let's rewrite the stopDrawing and add the hooks.
     const [isToolbarVisible, setIsToolbarVisible] = useState(true);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 
@@ -379,8 +341,9 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
                                     renderAnnotationLayer={true}
                                     className="shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/5 rounded-sm overflow-hidden bg-white"
                                     onLoadSuccess={(page) => {
+                                        const viewport = page.getViewport({ scale });
+                                        setCanvasSize({ width: viewport.width, height: viewport.height });
                                         if (canvasRef.current) {
-                                            const viewport = page.getViewport({ scale });
                                             canvasRef.current.width = viewport.width;
                                             canvasRef.current.height = viewport.height;
                                         }
@@ -436,10 +399,6 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
                                                     key={c}
                                                     onClick={() => {
                                                         setActiveColor(c);
-                                                        // Optional: Close on select? Let's keep it open for exploration, user can close with back button or toggle.
-                                                        // Actually, for better UX, let's close it after selection if it's a quick pick.
-                                                        // But maybe user wants to try colors. Let's keep it open? 
-                                                        // Let's auto-close for now as it's a "picker".
                                                         setIsColorPickerOpen(false);
                                                     }}
                                                     className={`w-8 h-8 rounded-full border border-white/10 transition-transform hover:scale-110 ${activeColor === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1e1e1e] scale-110' : ''}`}

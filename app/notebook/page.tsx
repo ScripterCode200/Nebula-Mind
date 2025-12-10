@@ -168,7 +168,7 @@ export default function Dashboard() {
                                     <Link href={`/notebook/${notebook._id}`}>
                                         <GlassCard
                                             hoverEffect
-                                            className="h-full flex flex-col justify-between group cursor-pointer border-white/5 hover:border-primary/30 bg-black/40 !backdrop-blur-xl min-h-[240px] relative overflow-hidden"
+                                            className="h-full flex flex-col justify-between group !cursor-pointer border-white/5 hover:border-primary/30 bg-black/40 !backdrop-blur-xl min-h-[240px] relative overflow-hidden"
                                         >
                                             <div>
                                                 <div className="flex justify-between items-start mb-6">

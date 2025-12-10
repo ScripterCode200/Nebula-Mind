@@ -57,7 +57,11 @@ export async function POST(req: Request) {
 
         // Send OTP Email
         const { sendOTP } = await import('@/lib/mail');
-        await sendOTP(user.email, otp);
+        const emailSent = await sendOTP(user.email, otp);
+
+        if (!emailSent) {
+            return NextResponse.json({ error: 'Failed to send OTP. Please check your email configuration.' }, { status: 500 });
+        }
 
         return NextResponse.json({
             message: 'OTP sent to your email',

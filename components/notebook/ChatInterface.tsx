@@ -18,7 +18,7 @@ interface Message {
 
 const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
     notebookId: string,
-    modelProvider: 'gemini' | 'openai' | 'ollama',
+    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b',
     initialHistory?: { role: string, content: string }[]
 }) => {
     const [messages, setMessages] = useState<Message[]>(() => {

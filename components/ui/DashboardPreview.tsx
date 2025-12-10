@@ -6,6 +6,7 @@ import {
     FileText, PieChart, MessageSquare, Zap, Folder, MoreVertical,
     Calendar, Plus, Brain, Target, Database, Cpu, Radio, Share2
 } from 'lucide-react';
+import { useUserStore } from '@/store/useUserStore';
 
 const SidebarItem = ({ icon: Icon, label, active = false, hasBadge = false }: { icon: any, label: string, active?: boolean, hasBadge?: boolean }) => (
     <div className={`group flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${active ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]' : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}`}>
@@ -61,6 +62,7 @@ const FileRow = ({ name, type, date, size }: { name: string, type: string, date:
 );
 
 export default function DashboardPreview({ className }: { className?: string }) {
+    const { name } = useUserStore();
     return (
         <div className={`relative w-full max-w-6xl mx-auto perspective-1000 ${className}`}>
             {/* Ambient Glow */}
@@ -100,11 +102,11 @@ export default function DashboardPreview({ className }: { className?: string }) 
                         <div className="flex items-center gap-3 md:gap-4 border-l border-white/10 pl-4 md:pl-6">
                             <div className="flex items-center gap-3">
                                 <div className="text-right hidden sm:block">
-                                    <div className="text-xs font-bold text-white tracking-wider">SHIVAM</div>
+                                    <div className="text-xs font-bold text-white tracking-wider">{name ? name.toUpperCase() : 'USER'}</div>
                                     <div className="text-[10px] text-cyan-400 font-mono">ADMIN_ACCESS</div>
                                 </div>
                                 <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 p-[1px] shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                                    <div className="w-full h-full rounded-[7px] bg-black flex items-center justify-center text-xs font-bold text-white">S</div>
+                                    <div className="w-full h-full rounded-[7px] bg-black flex items-center justify-center text-xs font-bold text-white">{(name?.[0] || 'U').toUpperCase()}</div>
                                 </div>
                             </div>
                         </div>
@@ -151,7 +153,7 @@ export default function DashboardPreview({ className }: { className?: string }) 
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 md:mb-8 gap-4">
                             <div>
                                 <h1 className="text-2xl md:text-3xl font-bold mb-1 text-white tracking-tight">
-                                    Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Shivam</span>
+                                    Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">{name || 'User'}</span>
                                 </h1>
                                 <p className="text-[10px] md:text-xs text-gray-500 font-mono uppercase tracking-widest">System ready for new inputs.</p>
                             </div>

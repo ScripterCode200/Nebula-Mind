@@ -15,7 +15,7 @@ import FuturisticLoader from '@/components/ui/FuturisticLoader';
 
 interface NotesGeneratorProps {
     notebookId: string;
-    modelProvider: 'gemini' | 'openai' | 'ollama';
+    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b';
 }
 
 const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
@@ -376,15 +376,15 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
                                 <div id="markdown-content" className="p-6 md:p-10 bg-black text-white">
                                     <div className="prose prose-invert prose-lg max-w-none 
                                         prose-headings:font-sans prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-white
-                                        prose-h1:text-4xl prose-h1:mb-8 prose-h1:border-b prose-h1:border-white/10 prose-h1:pb-4
-                                        prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-primary/90
+                                        prose-h1:text-4xl prose-h1:mb-8 prose-h1:border-b prose-h1:border-[#ffffff1a] prose-h1:pb-4
+                                        prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-[#00F0FFE6]
                                         prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-4 prose-h3:text-secondary
                                         prose-p:text-gray-300 prose-p:leading-loose prose-p:font-serif prose-p:text-lg
                                         prose-li:text-gray-300 prose-li:font-serif prose-li:text-lg
                                         prose-strong:text-white prose-strong:font-semibold
-                                        prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
-                                        prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 prose-pre:rounded-xl
-                                        prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:bg-white/5 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:italic prose-blockquote:text-gray-400
+                                        prose-code:text-primary prose-code:bg-[#00F0FF1A] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
+                                        prose-pre:bg-[#00000080] prose-pre:border prose-pre:border-[#ffffff1a] prose-pre:rounded-xl
+                                        prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:bg-[#ffffff0d] prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:italic prose-blockquote:text-gray-400
                                         ">
                                         <ReactMarkdown
                                             rehypePlugins={[rehypeHighlight]}

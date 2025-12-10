@@ -293,7 +293,9 @@ export default function Home() {
       <FeaturesSection />
 
       {/* Pricing Section */}
-      <PricingSection />
+      <div id="pricing">
+        <PricingSection />
+      </div>
 
 
     </main>

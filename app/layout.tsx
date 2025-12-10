@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('http://localhost:3000'),
   title: {
     default: "Nebula Mind | AI-Powered Second Brain",
     template: "%s | Nebula Mind"
@@ -62,6 +63,7 @@ export const metadata: Metadata = {
 import { Toaster } from 'sonner';
 
 import Navbar from "@/components/ui/Navbar";
+// Force recompile
 import Footer from "@/components/ui/Footer";
 import SmoothScroll from "@/components/ui/SmoothScroll";
 
