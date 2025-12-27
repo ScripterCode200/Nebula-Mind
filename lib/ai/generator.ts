@@ -28,7 +28,7 @@ interface GeneratedGoal {
     }[];
 }
 
-export async function generateSingleGoal(preference: GoalPreference, aiModelName: string = 'gemini-2.5-flash'): Promise<GeneratedGoal> {
+export async function generateSingleGoal(preference: GoalPreference, aiModelName: string = 'gemini-1.5-flash-002'): Promise<GeneratedGoal> {
     const prompt = `
     Generate ONE study goal JSON object for: ${preference.topic || preference.subject}.
     Difficulty: ${preference.difficulty}.

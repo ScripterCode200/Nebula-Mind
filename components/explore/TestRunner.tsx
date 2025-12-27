@@ -321,7 +321,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
         const canStart = !isDisqualified && !isLoadingStatus;
 
         return (
-            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4 overflow-y-auto custom-scrollbar" data-lenis-prevent>
+            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4 overflow-y-auto no-scrollbar" data-lenis-prevent>
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -413,7 +413,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
         }
 
         return (
-            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4 overflow-y-auto custom-scrollbar" data-lenis-prevent>
+            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4 overflow-y-auto no-scrollbar" data-lenis-prevent>
                 {passed && <Confetti recycle={false} numberOfPieces={500} />}
 
                 <motion.div
@@ -426,7 +426,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                         isDisqualified ? "bg-red-600" : (passed ? "bg-green-500" : "bg-red-500")
                     )} />
 
-                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar" data-lenis-prevent>
+                    <div className="flex-1 overflow-y-auto pr-2 no-scrollbar" data-lenis-prevent>
 
                         <div className="mb-6 flex justify-center">
                             <div className={cn(
@@ -585,7 +585,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto relative z-10 py-12 px-4 md:px-8 custom-scrollbar" data-lenis-prevent>
+            <main className="flex-1 overflow-y-auto relative z-10 py-12 px-4 md:px-8 no-scrollbar" data-lenis-prevent>
                 <div className="max-w-5xl mx-auto">
                     {/* Question */}
                     <motion.div

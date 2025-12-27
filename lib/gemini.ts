@@ -15,14 +15,16 @@ const vertex_ai = new VertexAI({
     }
 });
 
-// Helper to get a model instance with the Vertex SDK
-// We wrap it to match the previous export shape if possible, or export the vertex instance
 const getModel = (modelName: string): GenerativeModel => {
-    return vertex_ai.getGenerativeModel({ model: modelName });
+    // Standardize model name for Vertex AI - 1.5-flash-002 is stable and fast
+    let sanitizedModel = modelName;
+    if (modelName === 'gemini-2.5-flash' || modelName.includes('2.5')) sanitizedModel = 'gemini-1.5-flash-002';
+
+    return vertex_ai.getGenerativeModel({ model: sanitizedModel });
 };
 
-export const model = getModel("gemini-2.5-flash");
-export const visionModel = getModel("gemini-2.5-flash");
+export const model = getModel("gemini-1.5-flash-002");
+export const visionModel = getModel("gemini-1.5-flash-002");
 
 export default vertex_ai;
 

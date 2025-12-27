@@ -141,18 +141,24 @@ export default function ExplorePage() {
                         if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
 
                         try {
-                            const offset = currentGoals.length + i; // Logic remains same: if we had 3, i=0 -> index 3
+                            const offset = currentGoals.length + i;
                             console.log(`[Explore] Requesting slot index: ${offset}`);
+
+                            // Add a 45s timeout to prevent infinite "generating" state
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 45000);
 
                             const genRes = await fetch('/api/daily-goals', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ index: offset })
+                                body: JSON.stringify({ index: offset }),
+                                signal: controller.signal
                             });
+
+                            clearTimeout(timeoutId);
 
                             if (!genRes.ok) {
                                 console.error(`[Explore] Slot ${offset} failed with status: ${genRes.status}`);
-                                // Continue to next even if one fails
                                 continue;
                             }
 
