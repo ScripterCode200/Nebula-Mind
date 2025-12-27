@@ -26,7 +26,13 @@ export async function GET() {
     // For now, let's just return the setting.
     let setting = await SystemSetting.findOne({ key: 'global' });
     if (!setting) {
-        setting = await SystemSetting.create({ key: 'global', maintenanceMode: false });
+        // 'value' is required by schema, providing dummy
+        setting = await SystemSetting.create({
+            key: 'global',
+            value: 'system_global',
+            maintenanceMode: false,
+            antiCheatEnabled: false
+        });
     }
     return NextResponse.json(setting);
 }
@@ -37,13 +43,22 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { maintenanceMode } = await req.json();
+        const { maintenanceMode, aiModel, antiCheatEnabled } = await req.json();
         await connectToDatabase();
 
+        const updateData: any = {};
+        if (maintenanceMode !== undefined) updateData.maintenanceMode = maintenanceMode;
+        if (aiModel !== undefined) updateData.aiModel = aiModel;
+        if (antiCheatEnabled !== undefined) updateData.antiCheatEnabled = antiCheatEnabled;
+
+        // Ensure 'value' exists if upserting a new doc
         const setting = await SystemSetting.findOneAndUpdate(
             { key: 'global' },
-            { maintenanceMode },
-            { upsert: true, new: true }
+            {
+                ...updateData,
+                $setOnInsert: { value: 'system_global' } // Satisfy required field on insert
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
         );
 
         return NextResponse.json(setting);

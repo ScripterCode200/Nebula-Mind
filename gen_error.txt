@@ -1,0 +1,20 @@
+[VertexAI.GoogleAuthError]: 
+Unable to authenticate your request        
+Depending on your run time environment, you can get authentication by        
+- if in local instance or cloud shell: `!gcloud auth login`        
+- if in Colab:        
+    -`from google.colab import auth`        
+    -`auth.authenticate_user()`        
+- if in service account or other: please follow guidance in https://cloud.google.com/docs/authentication
+GoogleAuthError: [VertexAI.GoogleAuthError]: 
+Unable to authenticate your request        
+Depending on your run time environment, you can get authentication by        
+- if in local instance or cloud shell: `!gcloud auth login`        
+- if in Colab:        
+    -`from google.colab import auth`        
+    -`auth.authenticate_user()`        
+- if in service account or other: please follow guidance in https://cloud.google.com/docs/authentication
+    at <anonymous> (C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app2\node_modules\@google-cloud\vertexai\src\models\generative_models.ts:106:13)
+    at async generateContent (C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app2\node_modules\@google-cloud\vertexai\src\functions\generate_content.ts:86:12)
+    at async generateSingleGoal (C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app2\lib\ai\generator.ts:63:24)
+    at async testGoalGeneration (C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app2\test-goal-gen.js:24:22)

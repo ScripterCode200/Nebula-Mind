@@ -14,11 +14,12 @@ const PDFViewer = dynamic(() => import('./PDFViewer'), {
         </div>
     ),
 });
+const WordViewer = dynamic(() => import('./WordViewer'), { ssr: false });
+
 import AIToolsPanel from './AIToolsPanel';
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { toast } from 'sonner';
 
 interface NotebookWorkspaceProps {
     notebook: {
@@ -30,13 +31,14 @@ interface NotebookWorkspaceProps {
             content: string;
             timestamp: string;
         }[];
+        fileType?: 'pdf' | 'docx';
+        contentHtml?: string;
     };
 }
 
 const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
     const [isPdfVisible, setIsPdfVisible] = React.useState(true);
     const [isMobile, setIsMobile] = React.useState(false);
-    const [isOptimizing, setIsOptimizing] = React.useState(false);
 
     React.useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -56,8 +58,6 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
-
-
 
     return (
         <div className="flex flex-col h-screen bg-[#050505] overflow-hidden">
@@ -85,8 +85,6 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                 </div>
 
                 <div className="flex items-center gap-3 md:gap-4">
-
-
                     <button
                         onClick={() => setIsPdfVisible(!isPdfVisible)}
                         className="flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-muted-foreground hover:text-white transition-all border border-white/5 hover:border-white/10"
@@ -109,7 +107,7 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
                 </div>
 
-                {/* Left Panel: PDF Viewer */}
+                {/* Left Panel: Viewer (PDF or Word) */}
                 <motion.div
                     initial={false}
                     animate={{
@@ -122,7 +120,11 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     className="flex-shrink-0 border-r border-white/5 overflow-hidden bg-black/20 relative z-30"
                 >
                     <div className="h-full w-full min-w-[300px] md:min-w-[500px]">
-                        <PDFViewer url={notebook.pdfUrl} />
+                        {notebook.fileType === 'docx' ? (
+                            <WordViewer contentHtml={notebook.contentHtml || ''} notebookId={notebook._id} />
+                        ) : (
+                            <PDFViewer url={notebook.pdfUrl} />
+                        )}
                     </div>
                 </motion.div>
 

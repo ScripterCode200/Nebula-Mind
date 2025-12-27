@@ -35,7 +35,10 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: { 'application/pdf': ['.pdf'] },
+        accept: {
+            'application/pdf': ['.pdf'],
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+        },
         maxFiles: 1,
         multiple: false,
     });
@@ -77,14 +80,19 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
         const formData = new FormData();
         formData.append('title', title);
 
-        // Extract text on client side
+        // Extract text on client side (PDF only)
         let extractedText = '';
-        if (file) {
+        if (file && file.type === 'application/pdf') {
             formData.append('file', file);
             extractedText = await extractPdfText(file);
+        } else if (file) {
+            // DOCX or other
+            formData.append('file', file);
         } else if (pdfUrl) {
             formData.append('pdfUrl', pdfUrl);
-            extractedText = await extractPdfText(pdfUrl);
+            if (pdfUrl.toLowerCase().endsWith('.pdf')) {
+                extractedText = await extractPdfText(pdfUrl);
+            }
         }
 
         if (extractedText) {
@@ -105,8 +113,9 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
                 setLoadingStep('Opening Notebook...');
                 router.push(`/notebook/${data.notebookId}`);
             } else {
-                console.error('Failed to create notebook');
-                setLoadingStep('Error creating notebook');
+                const errorData = await res.json();
+                console.error('Failed to create notebook:', errorData);
+                setLoadingStep(`Error: ${errorData.error || 'Failed to create notebook'}`);
                 setTimeout(() => setIsUploading(false), 2000);
             }
         } catch (error) {
@@ -163,7 +172,7 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
                                     />
                                 </div>
 
-                                <label className="block text-sm font-medium text-muted mb-2">Source Material (PDF)</label>
+                                <label className="block text-sm font-medium text-muted mb-2">Source Material (PDF or Word)</label>
 
                                 <div className="space-y-4">
                                     <div
@@ -184,7 +193,7 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
                                         ) : (
                                             <div className="flex flex-col items-center gap-2 text-muted">
                                                 <Upload size={24} />
-                                                <p>Drop PDF here or click to upload</p>
+                                                <p>Drop PDF or Word file here or click to upload</p>
                                             </div>
                                         )}
                                     </div>

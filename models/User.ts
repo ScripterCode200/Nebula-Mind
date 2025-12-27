@@ -4,7 +4,7 @@ export interface IUser extends Document {
     email: string;
     password?: string;
     name?: string;
-    role?: 'user' | 'admin';
+    role?: 'user' | 'admin' | 'editor';
     isBlocked?: boolean;
     isVerified?: boolean;
     otp?: string;
@@ -18,6 +18,14 @@ export interface IUser extends Document {
     createdAt?: Date;
     isSubscribed?: boolean;
     lastActiveAt?: Date;
+    dailyGoalPreferences?: {
+        id: number;
+        enabled: boolean;
+        subject: string;
+        difficulty: string;
+        topic: string;
+        isTimeBound: boolean;
+    }[];
 }
 
 const UserSchema: Schema = new Schema({
@@ -28,11 +36,20 @@ const UserSchema: Schema = new Schema({
     bio: { type: String, default: '' },
     dob: { type: Date },
     university: { type: String, default: '' },
+    // Daily Goal Preferences
+    dailyGoalPreferences: [{
+        id: { type: Number },
+        enabled: { type: Boolean, default: true },
+        subject: { type: String },
+        difficulty: { type: String },
+        topic: { type: String },
+        isTimeBound: { type: Boolean, default: true }
+    }],
     // Account Deletion
     deletionScheduledAt: { type: Date },
     role: {
         type: String,
-        enum: ['user', 'admin'],
+        enum: ['user', 'admin', 'editor'],
         default: 'user'
     },
     isBlocked: {
@@ -65,7 +82,13 @@ const UserSchema: Schema = new Schema({
         },
         totalTimeSpent: { type: Number, default: 0 }, // in minutes
         xp: { type: Number, default: 0 },
-        level: { type: Number, default: 1 }
+        level: { type: Number, default: 1 },
+        rarityStats: {
+            uncommon: { type: Number, default: 0 },
+            rare: { type: Number, default: 0 },
+            epic: { type: Number, default: 0 },
+            legendary: { type: Number, default: 0 }
+        }
     },
     achievements: [{
         id: { type: String },

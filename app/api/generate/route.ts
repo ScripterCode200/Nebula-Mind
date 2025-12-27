@@ -32,7 +32,7 @@ function extractJson(text: string) {
     }
 }
 
-async function generateWithProvider(prompt: string, modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b', options: { jsonMode?: boolean } = {}) {
+async function generateWithProvider(prompt: string, modelProvider: string, options: { jsonMode?: boolean, modelName?: string } = {}) {
     console.log(`[Generate API] Sending request to provider: ${modelProvider}`);
     console.log('[Generate API] Prompt Payload:');
     console.log(prompt);
@@ -83,8 +83,19 @@ async function generateWithProvider(prompt: string, modelProvider: 'gemini' | 'o
         console.log('Ollama Generate Raw Output:', data.message.content);
         return data.message.content;
     } else {
-        // Vertex AI Logic (Gemini 2.5 Flash)
+        // Vertex AI Logic
         const { getVertexModel } = await import('@/lib/vertex-client');
+
+        // Determine which model to use
+        // If modelProvider is a specific Gemini model (e.g. gemini-3.0-flash), use it.
+        // If it's the generic 'gemini', check options.modelName or default to 2.5.
+        let targetModel = "gemini-2.5-flash";
+
+        if (modelProvider.startsWith('gemini-') && modelProvider !== 'gemini') {
+            targetModel = modelProvider;
+        } else if (options.modelName) {
+            targetModel = options.modelName;
+        }
 
         const runGenerate = async (modelName: string) => {
             console.log(`[Generate API Helper] Attempting to use model: ${modelName}`);
@@ -94,22 +105,36 @@ async function generateWithProvider(prompt: string, modelProvider: 'gemini' | 'o
 
         let result;
         try {
-            result = await runGenerate("gemini-2.5-flash");
+            result = await runGenerate(targetModel);
         } catch (error: any) {
-            console.warn(`[Generate API Helper] Failed with gemini-2.5-flash: ${error.message}`);
-            try {
-                console.log('[Generate API Helper] Falling back to gemini-2.5-flash-preview-001...');
-                result = await runGenerate("gemini-2.5-flash-preview-001");
-            } catch (previewError: any) {
-                console.warn(`[Generate API Helper] Failed with gemini-2.5-flash-preview-001: ${previewError.message}`);
-                if (error.message?.includes('404') || error.message?.includes('NOT_FOUND') || previewError.message?.includes('404')) {
+            console.warn(`[Generate API Helper] Failed with ${targetModel}: ${error.message}`);
+
+            // Fallback Strategy
+            // 1. If we tried 3.0, fallback to 2.5
+            if (targetModel.includes('3.0')) {
+                try {
+                    console.log('[Generate API Helper] Falling back to gemini-2.5-flash...');
+                    result = await runGenerate("gemini-2.5-flash");
+                } catch (e) {
+                    // 2. If 2.5 fails, try 1.5
                     console.log('[Generate API Helper] Falling back to gemini-1.5-flash-001...');
                     result = await runGenerate("gemini-1.5-flash-001");
-                } else {
-                    throw error;
+                }
+            } else {
+                // Legacy fallback for 2.5
+                try {
+                    console.log('[Generate API Helper] Falling back to gemini-2.5-flash-preview-001...');
+                    result = await runGenerate("gemini-2.5-flash-preview-001");
+                } catch (previewError: any) {
+                    console.log('[Generate API Helper] Falling back to gemini-1.5-flash-001...');
+                    result = await runGenerate("gemini-1.5-flash-001");
                 }
             }
         }
+
+        // Ensure we have a result
+        if (!result) throw new Error(`All attempts failed for model ${targetModel}`);
+
         const response = await result.response;
         if (response.usageMetadata) {
             const { logTokenUsage } = await import('@/lib/token-cost');
@@ -251,8 +276,18 @@ export async function POST(req: NextRequest) {
                                     if (isStreamClosed) break;
                                 }
                             } else {
-                                // Vertex AI Logic (Gemini 2.5 Flash)
+                                // Vertex AI Logic (Dynamic!)
                                 const { getVertexModel } = await import('@/lib/vertex-client');
+
+                                // Determine Target Model
+                                let targetModel = "gemini-2.5-flash";
+                                // If specific gemini model name is passed, use it.
+                                if (modelProvider.startsWith('gemini-') && modelProvider !== 'gemini') {
+                                    targetModel = modelProvider;
+                                } else {
+                                    // Otherwise fallback to whatever is default
+                                    targetModel = "gemini-2.5-flash";
+                                }
 
                                 const runStream = async (modelName: string) => {
                                     console.log(`[Generate API] Attempting to use model: ${modelName}`);
@@ -262,19 +297,26 @@ export async function POST(req: NextRequest) {
 
                                 let result;
                                 try {
-                                    result = await runStream("gemini-2.5-flash");
+                                    result = await runStream(targetModel);
                                 } catch (error: any) {
-                                    console.warn(`[Generate API] Failed with gemini-2.5-flash: ${error.message}`);
-                                    try {
-                                        console.log('[Generate API] Falling back to gemini-2.5-flash-preview-001...');
-                                        result = await runStream("gemini-2.5-flash-preview-001");
-                                    } catch (previewError: any) {
-                                        console.warn(`[Generate API] Failed with gemini-2.5-flash-preview-001: ${previewError.message}`);
-                                        if (error.message?.includes('404') || error.message?.includes('NOT_FOUND') || previewError.message?.includes('404')) {
+                                    console.warn(`[Generate API] Failed with ${targetModel}: ${error.message}`);
+                                    // Fallback
+                                    if (targetModel.includes('3.0')) {
+                                        try {
+                                            console.log('[Generate API] Falling back to gemini-2.5-flash...');
+                                            result = await runStream("gemini-2.5-flash");
+                                        } catch (e) {
                                             console.log('[Generate API] Falling back to gemini-1.5-flash-001...');
                                             result = await runStream("gemini-1.5-flash-001");
-                                        } else {
-                                            throw error;
+                                        }
+                                    } else {
+                                        // Legacy fallback
+                                        try {
+                                            console.log('[Generate API] Falling back to gemini-2.5-flash-preview-001...');
+                                            result = await runStream("gemini-2.5-flash-preview-001");
+                                        } catch (previewError: any) {
+                                            console.log('[Generate API] Falling back to gemini-1.5-flash-001...');
+                                            result = await runStream("gemini-1.5-flash-001");
                                         }
                                     }
                                 }

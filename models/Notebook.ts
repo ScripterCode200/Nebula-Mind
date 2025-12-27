@@ -10,6 +10,8 @@ export interface INotebook extends Document {
         timestamp: Date;
     }[];
     annotations: Record<number, any[]>; // Page number -> Array of paths
+    fileType: 'pdf' | 'docx';
+    contentHtml?: string;
     createdAt: Date;
 }
 
@@ -25,6 +27,8 @@ const NotebookSchema: Schema = new Schema({
     //     timestamp: { type: Date, default: Date.now }
     // }],
     annotations: { type: Map, of: [Object], default: {} },
+    fileType: { type: String, enum: ['pdf', 'docx'], default: 'pdf' },
+    contentHtml: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },
 });
 

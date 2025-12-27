@@ -112,6 +112,11 @@ export async function proxy(req: NextRequest) {
             return NextResponse.redirect(new URL('/dashboard', req.url));
         }
 
+        // Editor Route Protection
+        if (pathname.startsWith('/editor') && payload.role !== 'admin' && payload.role !== 'editor') {
+            return NextResponse.redirect(new URL('/dashboard', req.url));
+        }
+
         return nextWithHeader();
     } catch (error) {
         // Invalid token

@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             stats,
+            rarityStats: user.stats?.rarityStats || { uncommon: 0, rare: 0, epic: 0, legendary: 0 },
             recentActivity,
             chartData,
             achievements: user.achievements

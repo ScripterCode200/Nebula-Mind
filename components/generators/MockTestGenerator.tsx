@@ -11,7 +11,7 @@ import FuturisticLoader from '@/components/ui/FuturisticLoader';
 
 interface MockTestGeneratorProps {
     notebookId: string;
-    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b';
+    modelProvider: string;
 }
 
 interface Question {
@@ -381,7 +381,7 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
 
     return (
         <div className="h-full p-6 overflow-y-auto flex flex-col relative overflow-x-hidden overscroll-contain" data-lenis-prevent>
-            <div className="flex-shrink-0 mb-6 flex justify-between items-center">
+            <div className="shrink-0 mb-6 flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-bold mb-2 text-glow">Mock Test</h2>
                     <p className="text-muted">Test your knowledge with AI-generated questions.</p>
@@ -479,7 +479,7 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                        className="absolute inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
                     >
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0 }}
@@ -582,7 +582,7 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
 
                             <GlassCard className="w-full p-5 border-primary/20 bg-black/40 backdrop-blur-xl relative overflow-hidden">
                                 {/* Background Grid */}
-                                <div className="absolute inset-0 bg-[linear-gradient(rgba(0,240,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,240,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px]" />
+                                <div className="absolute inset-0 bg-[linear-gradient(rgba(0,240,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,240,255,0.03)_1px,transparent_1px)] bg-size-[20px_20px]" />
 
                                 <div className="relative z-10">
                                     <div className="text-center mb-5 relative">
@@ -783,7 +783,7 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                             onClick={generateTest}
                                             className="w-full mt-4 group relative overflow-hidden"
                                         >
-                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                                            <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                             <Play size={16} className="mr-2 group-hover:scale-110 transition-transform" />
                                             INITIALIZE TEST SEQUENCE
                                         </NeonButton>
@@ -978,8 +978,8 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                 )}>
                                     <div className="flex items-start gap-3">
                                         {gradingResults[idx]?.score >= 5
-                                            ? <CheckCircle className="text-success flex-shrink-0 mt-1" size={20} />
-                                            : <XCircle className="text-destructive flex-shrink-0 mt-1" size={20} />
+                                            ? <CheckCircle className="text-success shrink-0 mt-1" size={20} />
+                                            : <XCircle className="text-destructive shrink-0 mt-1" size={20} />
                                         }
                                         <div className="w-full">
                                             <div className="flex justify-between items-start">

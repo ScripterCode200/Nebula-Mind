@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 interface FlashcardGeneratorProps {
     notebookId: string;
-    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b';
+    modelProvider: string;
 }
 
 interface Flashcard {
@@ -131,7 +131,7 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
 
     return (
         <div className="h-full p-6 overflow-y-auto flex flex-col overscroll-contain" data-lenis-prevent>
-            <div className="flex-shrink-0 mb-6">
+            <div className="shrink-0 mb-6">
                 <h2 className="text-2xl font-bold mb-2 text-glow">Flashcards</h2>
                 <p className="text-muted mb-6">Master key concepts with AI-generated cards.</p>
 
@@ -166,7 +166,7 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
                 </div>
             ) : cards.length > 0 && currentCard ? (
                 <div className="flex-1 flex flex-col items-center justify-center perspective-1000">
-                    <div className="relative w-full max-w-md aspect-[3/2] cursor-pointer group" onClick={() => setIsFlipped(!isFlipped)}>
+                    <div className="relative w-full max-w-md aspect-3/2 cursor-pointer group" onClick={() => setIsFlipped(!isFlipped)}>
                         <motion.div
                             initial={false}
                             animate={{ rotateY: isFlipped ? 180 : 0 }}
@@ -179,7 +179,7 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
                                 <GlassCard className="w-full h-full flex flex-col items-center justify-center p-8 text-center border-primary/30 bg-black/40">
                                     <span className="text-xs text-primary uppercase tracking-widest mb-4">Concept</span>
                                     <h3 className="text-xl font-medium">{currentCard.front}</h3>
-                                    <div className="absolute bottom-4 text-muted text-xs flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex-1 overflow-y-auto px-1 space-y-2 max-h-[200px] shrink-0 custom-scrollbar absolute bottom-4 text-muted text-xs flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
                                         <RotateCw size={12} /> Click to flip
                                     </div>
                                 </GlassCard>

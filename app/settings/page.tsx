@@ -6,19 +6,87 @@ import {
     User, Bell, Lock, Monitor,
     Globe, Moon, Volume2, Shield,
     ChevronRight, ToggleLeft, ToggleRight,
-    Timer, AlertTriangle
+    Timer, AlertTriangle, Target, Check, Calendar, BookOpen, AlertCircle
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
+import CustomSelect from '@/components/ui/CustomSelect';
 import { useUserStore } from '@/store/useUserStore';
 import { toast } from 'sonner';
 import DeleteAccountModal from '@/components/modals/DeleteAccountModal';
+import ConfirmSaveModal from '@/components/modals/ConfirmSaveModal';
+import { cn } from '@/lib/utils';
+
+// Types for Daily Goal Configuration
+type Difficulty = 'Easy' | 'Medium' | 'Hard';
+type Subject = 'Physics' | 'Math' | 'Chemistry' | 'Biology' | 'CS' | 'History' | 'English' | 'NEET Prep' | 'JEE Prep' | 'General Knowledge';
+
+interface DailyGoalConfig {
+    id: number;
+    enabled: boolean;
+    subject: Subject;
+    difficulty: Difficulty;
+    topic: string;
+    isTimeBound: boolean;
+}
+
+const SUBJECTS: Subject[] = ['Physics', 'Math', 'Chemistry', 'Biology', 'CS', 'History', 'English', 'NEET Prep', 'JEE Prep', 'General Knowledge'];
+const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard'];
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('general');
-    const { name, email, bio, dob, university, deletionScheduledAt, updateProfile, scheduleDeletion, cancelDeletion } = useUserStore();
+    const { user, name, email, bio, dob, university, deletionScheduledAt, updateProfile, scheduleDeletion, cancelDeletion, fetchUser } = useUserStore();
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [timeLeft, setTimeLeft] = useState<{ days: number, hours: number, minutes: number, seconds: number } | null>(null);
+
+    // Initial Mock State for Daily Goals (fallback)
+    const [dailyGoalConfigs, setDailyGoalConfigs] = useState<DailyGoalConfig[]>(
+        Array.from({ length: 7 }).map((_, i) => ({
+            id: i + 1,
+            enabled: true,
+            subject: SUBJECTS[i % SUBJECTS.length],
+            difficulty: 'Medium',
+            topic: '',
+            isTimeBound: true
+        }))
+    );
+
+    const [isModified, setIsModified] = useState(false);
+
+    // Hydrate Settings from User Store
+    useEffect(() => {
+        if (user && user.dailyGoalPreferences && user.dailyGoalPreferences.length > 0) {
+            // Ensure data types match our expectation (sometimes topic is null in DB)
+            const sanitizedPrefs = user.dailyGoalPreferences.map((p: any) => ({
+                id: p.id,
+                enabled: p.enabled ?? true,
+                subject: p.subject,
+                difficulty: p.difficulty,
+                topic: p.topic || '',
+                isTimeBound: p.isTimeBound ?? true
+            }));
+            setDailyGoalConfigs(sanitizedPrefs);
+        }
+    }, [user]);
+
+    // Check for modifications
+    useEffect(() => {
+        if (!user || !user.dailyGoalPreferences) return;
+
+        const currentJson = JSON.stringify(dailyGoalConfigs);
+        const serverJson = JSON.stringify(user.dailyGoalPreferences.map((p: any) => ({
+            id: p.id,
+            enabled: p.enabled ?? true,
+            subject: p.subject,
+            difficulty: p.difficulty,
+            topic: p.topic || '',
+            isTimeBound: p.isTimeBound ?? true
+        })));
+
+        setIsModified(currentJson !== serverJson);
+    }, [dailyGoalConfigs, user]);
+
 
     // Local state for form inputs
     const [formData, setFormData] = useState({
@@ -94,8 +162,43 @@ export default function SettingsPage() {
         toast.success('Account deletion cancelled.');
     };
 
+    const handleSaveDailyGoalsClick = () => {
+        if (!isModified) return;
+        setIsSaveModalOpen(true);
+    };
+
+    const confirmSaveGoals = async () => {
+        try {
+            const res = await fetch('/api/user/settings/daily-goals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ preferences: dailyGoalConfigs })
+            });
+
+            if (res.ok) {
+                // Clear the cache so Explore page regenerates goals with new settings
+                localStorage.removeItem('dailyGoalsCache');
+                toast.success('Daily goal preferences saved successfully!');
+
+                // Refresh user to get updated preferences and reset isModified
+                await fetchUser();
+            } else {
+                toast.error('Failed to save preferences.');
+            }
+        } catch (error) {
+            toast.error('An error occurred.');
+        }
+    };
+
+    const updateGoalConfig = (id: number, updates: Partial<DailyGoalConfig>) => {
+        setDailyGoalConfigs(prev => prev.map(config =>
+            config.id === id ? { ...config, ...updates } : config
+        ));
+    };
+
     const tabs = [
         { id: 'general', label: 'General', icon: User },
+        { id: 'daily-goals', label: 'Customize Daily Goals', icon: Target }, // NEW TAB
         { id: 'appearance', label: 'Appearance', icon: Monitor },
         { id: 'notifications', label: 'Notifications', icon: Bell },
         { id: 'privacy', label: 'Privacy & Security', icon: Lock },
@@ -109,13 +212,19 @@ export default function SettingsPage() {
                 onConfirm={handleDeleteAccount}
             />
 
+            <ConfirmSaveModal
+                isOpen={isSaveModalOpen}
+                onClose={() => setIsSaveModalOpen(false)}
+                onConfirm={confirmSaveGoals}
+            />
+
             {/* Background Effects */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]" />
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[150px]" />
             </div>
 
-            <div className="max-w-6xl mx-auto relative z-10">
+            <div className="max-w-7xl mx-auto relative z-10"> {/* Changed to max-w-7xl for more space */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -136,20 +245,32 @@ export default function SettingsPage() {
                         transition={{ duration: 0.6, delay: 0.2 }}
                         className="lg:col-span-1"
                     >
-                        <GlassCard className="p-4 space-y-2">
+                        <GlassCard className="p-4 space-y-2 sticky top-32">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${activeTab === tab.id
-                                        ? 'bg-primary/10 text-primary shadow-[0_0_15px_rgba(0,240,255,0.2)]'
-                                        : 'text-muted-foreground hover:bg-white/5 hover:text-white'
-                                        }`}
+                                    className={cn(
+                                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden group",
+                                        activeTab === tab.id
+                                            ? 'bg-primary/10 text-primary shadow-[0_0_15px_rgba(0,240,255,0.1)]'
+                                            : 'text-muted-foreground hover:bg-white/5 hover:text-white'
+                                    )}
                                 >
-                                    <tab.icon size={18} />
-                                    <span className="font-medium">{tab.label}</span>
                                     {activeTab === tab.id && (
-                                        <motion.div layoutId="active-indicator" className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
+                                        <motion.div
+                                            layoutId="active-tab-bg"
+                                            className="absolute inset-0 bg-primary/10"
+                                            initial={false}
+                                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                        />
+                                    )}
+                                    <div className="relative z-10 flex items-center gap-3">
+                                        <tab.icon size={18} />
+                                        <span className="font-medium text-sm">{tab.label}</span>
+                                    </div>
+                                    {activeTab === tab.id && (
+                                        <motion.div layoutId="active-indicator" className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
                                     )}
                                 </button>
                             ))}
@@ -163,7 +284,7 @@ export default function SettingsPage() {
                         transition={{ duration: 0.6, delay: 0.3 }}
                         className="lg:col-span-3"
                     >
-                        <GlassCard className="p-8 min-h-[500px]">
+                        <GlassCard className="p-6 md:p-8 min-h-[500px]">
                             <AnimatePresence mode="wait">
                                 {activeTab === 'general' && (
                                     <motion.div
@@ -174,6 +295,7 @@ export default function SettingsPage() {
                                         transition={{ duration: 0.3 }}
                                         className="space-y-8"
                                     >
+                                        {/* ... (Existing General Tab Content) */}
                                         <div>
                                             <h2 className="text-2xl font-bold mb-6">Profile Information</h2>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -232,6 +354,148 @@ export default function SettingsPage() {
                                     </motion.div>
                                 )}
 
+                                {activeTab === 'daily-goals' && (
+                                    <motion.div
+                                        key="daily-goals"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="space-y-8"
+                                    >
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div>
+                                                <h2 className="text-2xl font-bold flex items-center gap-3">
+                                                    Customize Daily Goals
+                                                    <span className="text-sm font-normal text-muted-foreground bg-white/5 px-2 py-1 rounded-md border border-white/10">7 Slots</span>
+                                                </h2>
+                                                <p className="text-muted-foreground text-sm mt-1">Configure your 7 daily exam slots to match your learning path.</p>
+                                            </div>
+                                            <NeonButton
+                                                onClick={handleSaveDailyGoalsClick}
+                                                size="sm"
+                                                disabled={!isModified}
+                                                className={!isModified ? 'opacity-50 cursor-not-allowed grayscale' : ''}
+                                            >
+                                                <Check size={16} className="mr-2" />
+                                                Save Config
+                                            </NeonButton>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {dailyGoalConfigs.map((config, index) => (
+                                                <motion.div
+                                                    key={config.id}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: index * 0.05 }}
+                                                    className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5 hover:bg-white/[0.07] transition-all p-5 shadow-sm hover:shadow-md hover:border-primary/20"
+                                                >
+                                                    <div className="absolute inset-0 bg-linear-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+                                                    <div className="flex flex-col md:flex-row gap-6 relative z-10">
+                                                        {/* Slot Info */}
+                                                        <div className="flex items-start md:items-center gap-4 min-w-[120px]">
+                                                            <div className={cn(
+                                                                "w-10 h-10 rounded-lg border flex items-center justify-center font-bold text-lg shadow-[0_0_10px_rgba(0,0,0,0.1)] transition-colors",
+                                                                config.enabled
+                                                                    ? "bg-black/40 border-primary/30 text-primary shadow-[0_0_10px_rgba(0,240,255,0.1)]"
+                                                                    : "bg-white/5 border-white/10 text-muted-foreground"
+                                                            )}>
+                                                                {index + 1}
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className={cn("text-sm font-bold", config.enabled ? "text-white" : "text-muted-foreground")}>Daily Slot {index + 1}</span>
+                                                                <button
+                                                                    onClick={() => updateGoalConfig(config.id, { enabled: !config.enabled })}
+                                                                    className={cn("text-xs text-left transition-colors", config.enabled ? "text-green-400 hover:text-green-300" : "text-muted-foreground hover:text-white")}
+                                                                >
+                                                                    {config.enabled ? 'Active' : 'Disabled'}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Controls Grid */}
+                                                        <div className={cn("flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start focus-within:ring-0 transition-opacity duration-300", !config.enabled && "opacity-40 pointer-events-none select-none")}>
+
+                                                            {/* Subject Select */}
+                                                            <div className="space-y-1.5">
+                                                                <CustomSelect
+                                                                    label="Subject"
+                                                                    value={config.subject}
+                                                                    onChange={(val) => updateGoalConfig(config.id, { subject: val as Subject })}
+                                                                    options={SUBJECTS}
+                                                                    placeholder="Select Subject"
+                                                                />
+                                                            </div>
+
+                                                            {/* Difficulty Toggle */}
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider ml-1">Difficulty</label>
+                                                                <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
+                                                                    {DIFFICULTIES.map(d => (
+                                                                        <button
+                                                                            key={d}
+                                                                            onClick={() => updateGoalConfig(config.id, { difficulty: d })}
+                                                                            className={cn(
+                                                                                "flex-1 py-1 text-[10px] font-bold uppercase rounded-md transition-all",
+                                                                                config.difficulty === d
+                                                                                    ? d === 'Easy' ? 'bg-green-500/20 text-green-400'
+                                                                                        : d === 'Medium' ? 'bg-yellow-500/20 text-yellow-400'
+                                                                                            : 'bg-red-500/20 text-red-400'
+                                                                                    : 'text-muted-foreground hover:text-white hover:bg-white/5'
+                                                                            )}
+                                                                        >
+                                                                            {d}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Topic Input */}
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider ml-1">Specific Topic</label>
+                                                                <div className="relative">
+                                                                    <Target size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Any specific topic..."
+                                                                        value={config.topic}
+                                                                        onChange={(e) => updateGoalConfig(config.id, { topic: e.target.value })}
+                                                                        className="w-full pl-9 pr-3 py-2 rounded-lg bg-black/40 border border-white/10 text-sm focus:border-primary/50 focus:outline-none transition-all placeholder:text-muted-foreground/50"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Time Bound Toggle */}
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider ml-1">Timer</label>
+                                                                <button
+                                                                    onClick={() => updateGoalConfig(config.id, { isTimeBound: !config.isTimeBound })}
+                                                                    className={cn(
+                                                                        "w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all h-[38px]",
+                                                                        config.isTimeBound
+                                                                            ? "bg-primary/10 border-primary/30 text-primary"
+                                                                            : "bg-black/40 border-white/10 text-muted-foreground hover:bg-white/5"
+                                                                    )}
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Timer size={14} />
+                                                                        <span className="text-xs font-medium">{config.isTimeBound ? 'Enabled' : 'Disabled'}</span>
+                                                                    </div>
+                                                                    {config.isTimeBound ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                                                                </button>
+                                                            </div>
+
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* ... (Rest of the tabs: activeTab === 'appearance', 'notifications', 'privacy' remain unchanged but rendered conditionally) */}
                                 {activeTab === 'appearance' && (
                                     <motion.div
                                         key="appearance"

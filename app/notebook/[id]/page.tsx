@@ -65,6 +65,8 @@ export default async function NotebookPage({ params }: PageProps) {
             content: msg.content,
             timestamp: msg.timestamp.toISOString()
         })) : [],
+        fileType: notebook.fileType || 'pdf',
+        contentHtml: notebook.contentHtml || '',
         // We don't pass pdfContent to client to save bandwidth, 
         // it will be used by server actions/API
     };

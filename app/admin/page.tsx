@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Users, Lock, Unlock, Power, Search, Bell } from 'lucide-react';
+import { Shield, Users, Lock, Unlock, Power, Search, Bell, Target } from 'lucide-react';
 import Link from 'next/link';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
@@ -11,7 +11,9 @@ import { toast } from 'sonner';
 export default function AdminPage() {
     const [users, setUsers] = useState<any[]>([]);
     const [maintenanceMode, setMaintenanceMode] = useState(false);
+    const [antiCheatEnabled, setAntiCheatEnabled] = useState(false); // Added
     const [loading, setLoading] = useState(true);
+
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
@@ -34,6 +36,7 @@ export default function AdminPage() {
             if (settingsRes.ok) {
                 const settings = await settingsRes.json();
                 setMaintenanceMode(settings.maintenanceMode);
+                setAntiCheatEnabled(settings.antiCheatEnabled); // Sync state
             }
         } catch (error) {
             console.error('Failed to refresh admin data');
@@ -41,8 +44,6 @@ export default function AdminPage() {
             setLoading(false);
         }
     };
-
-
 
     const toggleBlockUser = async (userId: string) => {
         try {
@@ -84,6 +85,27 @@ export default function AdminPage() {
         }
     };
 
+    const toggleAntiCheat = async () => {
+        try {
+            const newState = !antiCheatEnabled;
+            setAntiCheatEnabled(newState); // Optimistic
+            const res = await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ antiCheatEnabled: newState })
+            });
+            if (res.ok) {
+                toast.success(`Anti-Cheat ${newState ? 'Enabled' : 'Disabled'}`);
+            } else {
+                setAntiCheatEnabled(!newState);
+                toast.error('Failed to update setting');
+            }
+        } catch (error) {
+            setAntiCheatEnabled(!antiCheatEnabled);
+            toast.error('Failed to update setting');
+        }
+    };
+
     const filteredUsers = users.filter(u =>
         u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -110,6 +132,17 @@ export default function AdminPage() {
                             </NeonButton>
                         </Link>
 
+                        {/* Anti-Cheat Toggle */}
+                        <div className="flex-1 md:flex-none flex items-center justify-between md:justify-start gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/10">
+                            <span className="text-sm font-medium whitespace-nowrap">Anti-Cheat</span>
+                            <button
+                                onClick={toggleAntiCheat}
+                                className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${antiCheatEnabled ? 'bg-green-500' : 'bg-white/20'}`}
+                            >
+                                <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300 ${antiCheatEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                            </button>
+                        </div>
+
                         <div className="flex-1 md:flex-none flex items-center justify-between md:justify-start gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/10">
                             <span className="text-sm font-medium whitespace-nowrap">Maintenance Mode</span>
                             <button
@@ -123,6 +156,8 @@ export default function AdminPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-8">
+
+
                     <GlassCard className="p-6">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                             <h2 className="text-xl font-bold flex items-center gap-2">
@@ -153,7 +188,7 @@ export default function AdminPage() {
                                 </thead>
                                 <tbody className="block md:table-row-group space-y-4 md:space-y-0">
                                     {filteredUsers.map(user => (
-                                        <tr key={user._id} className="block md:table-row bg-white/[0.02] md:bg-transparent border border-white/10 md:border-b md:border-white/5 rounded-xl md:rounded-none overflow-hidden hover:bg-white/5 transition-colors">
+                                        <tr key={user._id} className="block md:table-row bg-white/2 md:bg-transparent border border-white/10 md:border-b md:border-white/5 rounded-xl md:rounded-none overflow-hidden hover:bg-white/5 transition-colors">
                                             {/* User Info */}
                                             <td className="p-4 flex items-center justify-between md:table-cell border-b border-white/5 md:border-none">
                                                 <span className="md:hidden text-sm text-muted-foreground font-medium">User</span>

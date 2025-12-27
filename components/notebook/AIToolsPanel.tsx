@@ -27,7 +27,7 @@ const tabs = [
 
 const AIToolsPanel = ({ notebookId, chatHistory }: AIToolsPanelProps) => {
     const [activeTab, setActiveTab] = useState('chat');
-    const [modelProvider, setModelProvider] = useState<'gemini' | 'ollama' | 'phi3.5:3.8b'>('gemini');
+    const [modelProvider, setModelProvider] = useState<string>('gemini');
 
     return (
         <div className="flex flex-col h-full bg-black/40 backdrop-blur-xl border-l border-white/5 relative overflow-hidden">
@@ -42,10 +42,12 @@ const AIToolsPanel = ({ notebookId, chatHistory }: AIToolsPanelProps) => {
                     <div className="relative group">
                         <select
                             value={modelProvider}
-                            onChange={(e) => setModelProvider(e.target.value as 'gemini' | 'ollama' | 'phi3.5:3.8b')}
+                            onChange={(e) => setModelProvider(e.target.value)}
                             className="appearance-none bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-white pl-3 pr-8 py-1.5 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all cursor-pointer hover:bg-white/10"
                         >
                             <option value="gemini" className="bg-[#050505]">Gemini 2.5 Flash</option>
+                            <option value="gemini-3.0-pro" className="bg-[#050505]">Gemini 3.0 Pro</option>
+                            <option value="gemini-3.0-flash" className="bg-[#050505]">Gemini 3.0 Flash</option>
                             <option value="ollama" className="bg-[#050505]">Nebula Ai 2.0</option>
                             <option value="phi3.5:3.8b" className="bg-[#050505]">Nebula AI 3.0</option>
                         </select>

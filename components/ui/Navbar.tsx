@@ -39,6 +39,7 @@ const navItems: NavItem[] = [
     // },
     { name: 'Pricing', href: '/#pricing' },
     { name: 'Docs', href: '/docs' },
+    { name: 'Explore', href: '/explore' },
 ];
 
 export default function Navbar() {
@@ -62,6 +63,7 @@ export default function Navbar() {
         { name: 'Settings', href: '/settings', type: 'Page' },
         { name: 'Pricing', href: '/#pricing', type: 'Section' },
         { name: 'Docs', href: '/docs', type: 'Page' },
+        { name: 'Explore', href: '/explore', type: 'Page' },
         // Expanded Settings
         { name: 'Account Settings', href: '/settings?tab=account', type: 'Setting' },
         { name: 'Security', href: '/settings?tab=security', type: 'Setting' },
@@ -157,8 +159,22 @@ export default function Navbar() {
     const isHome = pathname === '/';
 
     const currentNavItems = [...navItems];
+
+    // If logged in, replace "Home" with "Dashboard"
+    if (user) {
+        const homeIndex = currentNavItems.findIndex(i => i.name === 'Home');
+        if (homeIndex !== -1) {
+            currentNavItems[homeIndex] = { name: 'Dashboard', href: '/dashboard' };
+        }
+    }
+
+    // Role based links
     if (user?.role === 'admin') {
         currentNavItems.push({ name: 'Admin', href: '/admin' });
+    }
+
+    if (user?.role === 'admin' || user?.role === 'editor') {
+        currentNavItems.push({ name: 'Editor', href: '/editor' });
     }
 
     return (
@@ -172,7 +188,7 @@ export default function Navbar() {
             <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center justify-between gap-8">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2 group shrink-0">
-                    <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary text-black font-bold text-xl shadow-[0_0_20px_rgba(0,240,255,0.3)] group-hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] transition-shadow duration-300">
+                    <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-linear-to-br from-primary to-secondary text-black font-bold text-xl shadow-[0_0_20px_rgba(0,240,255,0.3)] group-hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] transition-shadow duration-300">
                         <Brain size={20} />
                     </div>
                     <span className="font-bold text-xl tracking-tight text-foreground hidden sm:block">Nebula Mind</span>
@@ -363,7 +379,7 @@ export default function Navbar() {
                         <Bell size={20} className="group-hover:text-primary transition-colors" />
                     </Link>
 
-                    <div className="h-8 w-[1px] bg-white/10 hidden sm:block" />
+                    <div className="h-8 w-px bg-white/10 hidden sm:block" />
 
                     <div className="hidden sm:flex items-center gap-3">
                         {user ? (
@@ -377,7 +393,7 @@ export default function Navbar() {
                                     onMouseEnter={() => setActiveDropdown('user')}
                                     onMouseLeave={() => setActiveDropdown(null)}
                                 >
-                                    <button className="w-9 h-9 cursor-pointer rounded-full bg-gradient-to-tr from-primary to-secondary p-[1px] group relative">
+                                    <button className="w-9 h-9 cursor-pointer rounded-full bg-linear-to-tr from-primary to-secondary p-px group relative">
                                         <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                                             <User size={18} className="text-white group-hover:scale-110 transition-transform" />
                                         </div>
@@ -417,7 +433,7 @@ export default function Navbar() {
                                                         Billing
                                                     </Link>
 
-                                                    <div className="h-[1px] bg-white/5 my-2" />
+                                                    <div className="h-px bg-white/5 my-2" />
 
                                                     <button
                                                         onClick={logout}

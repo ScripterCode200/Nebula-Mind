@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: '/vercel.svg',
+    icon: '/Nebula_Mind_Logo.png',
   },
 };
 

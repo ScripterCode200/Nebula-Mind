@@ -18,7 +18,7 @@ interface Message {
 
 const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
     notebookId: string,
-    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b',
+    modelProvider: string,
     initialHistory?: { role: string, content: string }[]
 }) => {
     const [messages, setMessages] = useState<Message[]>(() => {
@@ -123,7 +123,7 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
     return (
         <div className="flex flex-col h-full relative overflow-hidden">
             {/* Background Grid */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,240,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,240,255,0.02)_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,240,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,240,255,0.02)_1px,transparent_1px)] bg-size-[30px_30px] pointer-events-none" />
 
 
             {/* Messages Area */}
@@ -151,7 +151,7 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
                                             <div className="absolute inset-0 bg-secondary/40 blur-md rounded-full group-hover:bg-secondary/60 transition-colors" />
                                             <div className="relative w-8 h-8 rounded-full bg-black border border-secondary/50 flex items-center justify-center overflow-hidden">
                                                 <div className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(168,85,247,0.5)_360deg)] animate-[spin_4s_linear_infinite]" />
-                                                <div className="absolute inset-[1px] bg-black rounded-full flex items-center justify-center">
+                                                <div className="absolute inset-px bg-black rounded-full flex items-center justify-center">
                                                     <BrainCircuit size={14} className="text-secondary relative z-10" />
                                                 </div>
                                             </div>
@@ -169,7 +169,7 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
                                         <div className="relative group">
                                             <div className="absolute inset-0 bg-primary/40 blur-md rounded-lg group-hover:bg-primary/60 transition-colors" />
                                             <div className="relative w-8 h-8 bg-black border border-primary/50 flex items-center justify-center overflow-hidden" style={{ clipPath: 'polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)' }}>
-                                                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
+                                                <div className="absolute inset-0 bg-linear-to-br from-primary/20 to-transparent" />
                                                 <User size={14} className="text-primary relative z-10" />
                                             </div>
                                         </div>
@@ -187,7 +187,7 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
                                     {/* Generating Animation Border */}
                                     {isGenerating && (
                                         <div className="absolute inset-0 rounded-2xl rounded-tl-sm overflow-hidden pointer-events-none">
-                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-secondary/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                                            <div className="absolute inset-0 bg-linear-to-r from-transparent via-secondary/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
                                         </div>
                                     )}
 
@@ -266,13 +266,13 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
                             disabled={isLoading}
                         />
                         {/* Focus indicator line */}
-                        <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-300 input-focus-visible:opacity-100" />
+                        <div className="absolute bottom-0 left-4 right-4 h-px bg-linear-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-300 input-focus-visible:opacity-100" />
                     </div>
 
                     <NeonButton
                         onClick={handleSubmit}
                         disabled={!input.trim() || isLoading}
-                        className="h-10 w-10 p-0 flex items-center justify-center rounded-lg flex-shrink-0"
+                        className="h-10 w-10 p-0 flex items-center justify-center rounded-lg shrink-0"
                     >
                         {isLoading ? (
                             <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />

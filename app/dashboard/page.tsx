@@ -12,6 +12,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
 import Link from 'next/link';
 import { useUserStore } from '@/store/useUserStore';
+import RarityStats from '@/components/ui/RarityStats';
 
 export default function DashboardPage() {
     const { name } = useUserStore();
@@ -74,7 +75,7 @@ export default function DashboardPage() {
         <main className="min-h-screen bg-[#050505] text-white overflow-x-hidden selection:bg-primary/30 relative pt-32 pb-20 px-4 md:px-8">
             {/* Background Effects */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]" />
                 <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px]" />
                 <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-secondary/10 rounded-full blur-[120px]" />
             </div>
@@ -88,7 +89,7 @@ export default function DashboardPage() {
                         transition={{ duration: 0.6 }}
                     >
                         <h1 className="text-4xl md:text-5xl font-bold mb-2">
-                            Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">{name}</span>
+                            Welcome back, <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-secondary">{name}</span>
                         </h1>
                         <p className="text-muted-foreground text-lg">
                             You're on a roll! Keep up the momentum.
@@ -128,6 +129,9 @@ export default function DashboardPage() {
                         </motion.div>
                     ))}
                 </div>
+
+                {/* Rarity Stats Collection */}
+                <RarityStats stats={data?.rarityStats || { uncommon: 0, rare: 0, epic: 0, legendary: 0 }} />
 
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
@@ -208,9 +212,9 @@ export default function DashboardPage() {
                                         <div key={i} className="absolute inset-0 m-auto rounded-full border border-white/5" style={{ width: `${i * 33}%`, height: `${i * 33}%` }} />
                                     ))}
                                     {/* Axes */}
-                                    <div className="absolute inset-0 m-auto w-full h-[1px] bg-white/5 rotate-0" />
-                                    <div className="absolute inset-0 m-auto w-full h-[1px] bg-white/5 rotate-60" />
-                                    <div className="absolute inset-0 m-auto w-full h-[1px] bg-white/5 rotate-120" />
+                                    <div className="absolute inset-0 m-auto w-full h-px bg-white/5 rotate-0" />
+                                    <div className="absolute inset-0 m-auto w-full h-px bg-white/5 rotate-60" />
+                                    <div className="absolute inset-0 m-auto w-full h-px bg-white/5 rotate-120" />
 
                                     {/* Shape */}
                                     <motion.div
@@ -333,7 +337,7 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {recommended.map((item, i) => (
                             <GlassCard key={i} className="p-6 group hover:bg-white/10 transition-colors cursor-pointer relative overflow-hidden">
-                                <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${item.color}`} />
+                                <div className={`absolute top-0 left-0 w-1 h-full bg-linear-to-b ${item.color}`} />
                                 <div className="flex justify-between items-start mb-4">
                                     <span className="px-2 py-1 rounded-md bg-white/5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
                                         {item.category}

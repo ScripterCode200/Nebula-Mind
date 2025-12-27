@@ -4,6 +4,7 @@ import Notebook from '@/models/Notebook';
 import { parsePDF } from '@/lib/pdf-parser';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import mammoth from 'mammoth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
 
@@ -49,12 +50,24 @@ export async function POST(req: NextRequest) {
 
         let buffer: Buffer;
         let finalPdfUrl: string;
+        let fileType: 'pdf' | 'docx' = 'pdf';
+        let contentHtml = '';
+        let pdfContent = '';
 
         if (file) {
             const arrayBuffer = await file.arrayBuffer();
             buffer = Buffer.from(arrayBuffer);
             const base64 = buffer.toString('base64');
-            finalPdfUrl = `data:application/pdf;base64,${base64}`;
+
+            const isDocx = file.name.toLowerCase().endsWith('.docx') ||
+                file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+            if (isDocx) {
+                fileType = 'docx';
+                finalPdfUrl = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${base64}`;
+            } else {
+                finalPdfUrl = `data:application/pdf;base64,${base64}`;
+            }
         } else {
             // Fetch from URL
             const response = await fetch(pdfUrlInput);
@@ -67,21 +80,40 @@ export async function POST(req: NextRequest) {
             finalPdfUrl = `data:application/pdf;base64,${base64}`;
         }
 
-        // Extract text from PDF
-        console.log('Starting PDF parsing...');
-        let pdfContent = formData.get('pdfContent') as string || '';
-
-        if (pdfContent) {
-            console.log('Using client-provided PDF content, length:', pdfContent.length);
-        } else {
-            // Server-side fallback
+        if (fileType === 'docx') {
+            console.log('Parsing DOCX...');
             try {
-                pdfContent = await parsePDF(buffer);
-                console.log('PDF parsed successfully on server, length:', pdfContent.length);
-            } catch (pdfError: unknown) {
-                console.error('PDF Parse Error:', pdfError);
-                // Don't fail, just log
-                pdfContent = '';
+                const result = await mammoth.convertToHtml({ buffer });
+                contentHtml = result.value; // The generated HTML
+                const messages = result.messages; // Any messages, such as warnings during conversion
+                messages.forEach(msg => console.log('Mammoth msg:', msg));
+
+                const textResult = await mammoth.extractRawText({ buffer });
+                pdfContent = textResult.value;
+                console.log('DOCX parsed, text length:', pdfContent.length);
+            } catch (err) {
+                console.error('Error parsing DOCX:', err);
+                pdfContent = 'Error extracting text from Word document.';
+                contentHtml = '<p>Error loading document preview.</p>';
+            }
+        } else if (fileType === 'pdf') {
+            // Extract text from PDF
+            console.log('Starting PDF parsing...');
+            let clientPdfContent = formData.get('pdfContent') as string || '';
+
+            if (clientPdfContent) {
+                console.log('Using client-provided PDF content, length:', clientPdfContent.length);
+                pdfContent = clientPdfContent;
+            } else {
+                // Server-side fallback
+                try {
+                    pdfContent = await parsePDF(buffer);
+                    console.log('PDF parsed successfully on server, length:', pdfContent.length);
+                } catch (pdfError: unknown) {
+                    console.error('PDF Parse Error:', pdfError);
+                    // Don't fail, just log
+                    pdfContent = '';
+                }
             }
         }
 
@@ -90,6 +122,8 @@ export async function POST(req: NextRequest) {
             userId, // Save with userId
             pdfUrl: finalPdfUrl,
             pdfContent,
+            fileType,
+            contentHtml
         });
 
         return NextResponse.json({ success: true, notebookId: notebook._id });
@@ -109,7 +143,9 @@ export async function GET(req: NextRequest) {
         }
 
         await connectToDatabase();
-        const notebooks = await Notebook.find({ userId }).sort({ createdAt: -1 });
+        const notebooks = await Notebook.find({ userId })
+            .select('-pdfContent -contentHtml') // Exclude heavy fields
+            .sort({ createdAt: -1 });
         return NextResponse.json(notebooks);
     } catch {
         return NextResponse.json({ error: 'Failed to fetch notebooks' }, { status: 500 });

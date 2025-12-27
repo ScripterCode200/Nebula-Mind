@@ -15,7 +15,7 @@ import FuturisticLoader from '@/components/ui/FuturisticLoader';
 
 interface NotesGeneratorProps {
     notebookId: string;
-    modelProvider: 'gemini' | 'openai' | 'ollama' | 'phi3.5:3.8b';
+    modelProvider: string;
 }
 
 const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
@@ -192,7 +192,7 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
                     x: isMobile && !showSidebar ? '-100%' : 0
                 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className={`bg-black/90 md:bg-black/20 backdrop-blur-xl md:backdrop-blur-none border-r border-white/5 flex flex-col flex-shrink-0 overflow-hidden absolute md:relative z-30 h-full`}
+                className={`bg-black/90 md:bg-black/20 backdrop-blur-xl md:backdrop-blur-none border-r border-white/5 flex flex-col shrink-0 overflow-hidden absolute md:relative z-30 h-full`}
                 style={{ pointerEvents: showSidebar ? 'auto' : 'none' }}
             >
                 <div className="p-4 border-b border-white/5 flex items-center justify-between min-w-[256px]">
@@ -269,7 +269,7 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <div className="flex-shrink-0 p-4 md:p-8 pb-0">
+                <div className="shrink-0 p-4 md:p-8 pb-0">
                     <div className="flex items-start justify-between gap-4 mb-4 md:mb-6">
                         <div>
                             <h2 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2 text-white tracking-tight">AI Notes</h2>
@@ -331,7 +331,7 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
                             animate={{ opacity: 1, y: 0 }}
                             className="min-h-0 bg-black"
                         >
-                            <GlassCard className="overflow-hidden flex flex-col relative group border-primary/30 bg-black/40 backdrop-blur-xl shadow-[0_0_30px_rgba(0,240,255,0.15)] bg-black">
+                            <GlassCard className="overflow-hidden flex flex-col relative group border-primary/30 bg-black/40 backdrop-blur-xl shadow-[0_0_30px_rgba(0,240,255,0.15)]">
                                 <div className="absolute top-4 right-4 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 bg-black/60 p-1 rounded-lg backdrop-blur-md border border-white/10">
                                     <button
                                         onClick={() => {
@@ -396,7 +396,7 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
                             </GlassCard>
                         </motion.div>
                     ) : (
-                        <div className="flex-1 flex items-center justify-center text-muted-foreground/50 border-2 border-dashed border-white/5 rounded-2xl bg-white/[0.02] h-64">
+                        <div className="flex-1 flex items-center justify-center text-muted-foreground/50 border-2 border-dashed border-white/5 rounded-2xl bg-white/2 h-64">
                             <div className="text-center p-6">
                                 <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
                                     <FileText size={40} className="opacity-50" />
