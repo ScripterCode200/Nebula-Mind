@@ -4,11 +4,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, Sparkles, Download, Copy, ChevronUp, ChevronDown, ChevronLeft, PanelLeftOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import NeonButton from '@/components/ui/NeonButton';
 import GlassCard from '@/components/ui/GlassCard';
 
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import FuturisticLoader from '@/components/ui/FuturisticLoader';
@@ -23,6 +25,7 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
     const [notes, setNotes] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     const [savedNotes, setSavedNotes] = useState<any[]>([]);
     const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -345,31 +348,188 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
                                     </button>
                                     <button
                                         onClick={async () => {
-                                            const element = document.getElementById('markdown-content');
-                                            if (!element) return;
+                                            if (isDownloading) return;
+                                            setIsDownloading(true);
+                                            const downloadToast = toast.loading('Generating professional PDF...');
 
-                                            const opt = {
-                                                margin: [10, 10],
-                                                filename: `notes-${notebookId}.pdf`,
-                                                image: { type: 'jpeg', quality: 0.98 },
-                                                html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#000000' },
-                                                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                                            };
+                                            setTimeout(async () => {
+                                                try {
+                                                    const { jsPDF } = await import('jspdf');
+                                                    const autoTable = (await import('jspdf-autotable')).default;
+                                                    const doc = new jsPDF({
+                                                        orientation: 'p',
+                                                        unit: 'mm',
+                                                        format: 'a4',
+                                                    });
 
-                                            try {
-                                                // Dynamically import html2pdf to avoid SSR issues
-                                                const html2pdf = (await import('html2pdf.js')).default as any;
-                                                await html2pdf().set(opt).from(element).save();
-                                                toast.success('Downloaded notes as PDF');
-                                            } catch (error) {
-                                                console.error('PDF generation failed:', error);
-                                                toast.error('Failed to generate PDF');
-                                            }
+                                                    const margin = 20;
+                                                    const pageWidth = doc.internal.pageSize.getWidth();
+                                                    const pageHeight = doc.internal.pageSize.getHeight();
+                                                    const maxWidth = pageWidth - (margin * 2);
+                                                    let cursorY = margin;
+
+                                                    doc.setFont('Helvetica', 'normal');
+                                                    doc.setFontSize(16);
+                                                    doc.setTextColor(0, 0, 0);
+
+                                                    const lines = notes.split('\n');
+
+                                                    const renderWrappedText = (text: string, xOffset: number, size: number, isHeader = false) => {
+                                                        doc.setFontSize(size);
+                                                        const words = text.split(/(\*\*.*?\*\*|\s+)/g).filter(Boolean);
+                                                        let currentX = xOffset;
+                                                        const lineHeight = size * 0.5 + 2;
+
+                                                        const checkPageBreak = () => {
+                                                            if (cursorY > pageHeight - margin) {
+                                                                doc.addPage();
+                                                                cursorY = margin;
+                                                                return true;
+                                                            }
+                                                            return false;
+                                                        };
+
+                                                        words.forEach(word => {
+                                                            const isBoldMarker = word.startsWith('**') && word.endsWith('**');
+                                                            const cleanWord = isBoldMarker ? word.substring(2, word.length - 2) : word;
+
+                                                            doc.setFont('Helvetica', (isBoldMarker || isHeader) ? 'bold' : 'normal');
+                                                            const wordWidth = doc.getTextWidth(cleanWord);
+
+                                                            if (currentX + wordWidth > pageWidth - margin && currentX > xOffset) {
+                                                                cursorY += lineHeight;
+                                                                currentX = xOffset;
+                                                                checkPageBreak();
+                                                            }
+
+                                                            doc.text(cleanWord, currentX, cursorY);
+                                                            currentX += wordWidth;
+                                                        });
+
+                                                        cursorY += lineHeight + 2;
+                                                    };
+
+                                                    let i = 0;
+                                                    while (i < lines.length) {
+                                                        const line = lines[i];
+                                                        const trimmed = line.trim();
+
+                                                        if (!trimmed && cursorY > margin) {
+                                                            cursorY += 5;
+                                                            i++;
+                                                            continue;
+                                                        }
+
+                                                        if (cursorY > pageHeight - margin - 15) {
+                                                            doc.addPage();
+                                                            cursorY = margin;
+                                                        }
+
+                                                        // Table Detection: Improved regex for headers and separators
+                                                        const isSeparatorRow = (str: string) => str.trim().match(/^\s*\|?\s*([:-]+\s*\|?\s*)+\s*$/);
+                                                        const isTableLine = (str: string) => str.trim().includes('|');
+                                                        const matchesTableStart = isTableLine(line) && i + 1 < lines.length && isSeparatorRow(lines[i + 1]);
+
+                                                        if (matchesTableStart) {
+                                                            const tableRows: string[][] = [];
+                                                            let j = i;
+
+                                                            // Collect all rows that look like table rows
+                                                            while (j < lines.length && (isTableLine(lines[j]) || isSeparatorRow(lines[j]))) {
+                                                                const rowLine = lines[j].trim();
+                                                                // Skip only the separator row
+                                                                if (!isSeparatorRow(rowLine)) {
+                                                                    const cells = rowLine.split('|')
+                                                                        .map(c => c.trim())
+                                                                        .filter((c, idx, arr) => {
+                                                                            // Remove empty cells only if they are at the edges (caused by leading/trailing pipes)
+                                                                            if ((idx === 0 || idx === arr.length - 1) && c === '') return false;
+                                                                            return true;
+                                                                        });
+
+                                                                    if (cells.length > 0) tableRows.push(cells);
+                                                                }
+                                                                j++;
+                                                            }
+
+                                                            if (tableRows.length > 0) {
+                                                                const headers = tableRows[0];
+                                                                const body = tableRows.slice(1);
+
+                                                                autoTable(doc, {
+                                                                    head: [headers],
+                                                                    body: body,
+                                                                    startY: cursorY,
+                                                                    margin: { left: margin, right: margin },
+                                                                    styles: {
+                                                                        fontSize: 8.5,
+                                                                        cellPadding: 2.5,
+                                                                        lineColor: [180, 180, 180],
+                                                                        lineWidth: 0.1,
+                                                                        font: 'Helvetica'
+                                                                    },
+                                                                    headStyles: {
+                                                                        fillColor: [60, 60, 60],
+                                                                        textColor: [255, 255, 255],
+                                                                        fontStyle: 'bold',
+                                                                        halign: 'center'
+                                                                    },
+                                                                    columnStyles: {
+                                                                        0: { fontStyle: 'bold' } // Often the first column is a label
+                                                                    },
+                                                                    alternateRowStyles: {
+                                                                        fillColor: [248, 248, 248]
+                                                                    },
+                                                                    theme: 'grid'
+                                                                });
+
+                                                                cursorY = (doc as any).lastAutoTable.finalY + 10;
+                                                                i = j;
+                                                                continue;
+                                                            }
+                                                        }
+
+                                                        if (trimmed.startsWith('# ')) {
+                                                            renderWrappedText(trimmed.substring(2), margin, 22, true);
+                                                        } else if (trimmed.startsWith('## ')) {
+                                                            renderWrappedText(trimmed.substring(3), margin, 18, true);
+                                                        } else if (trimmed.startsWith('### ')) {
+                                                            renderWrappedText(trimmed.substring(4), margin, 14, true);
+                                                        } else if (trimmed.startsWith('- ') || trimmed.startsWith('• ') || trimmed.startsWith('* ')) {
+                                                            doc.setFont('Helvetica', 'normal');
+                                                            doc.setFontSize(12);
+                                                            doc.text('•', margin + 2, cursorY);
+                                                            renderWrappedText(trimmed.substring(2), margin + 7, 12);
+                                                        } else {
+                                                            renderWrappedText(trimmed, margin, 12);
+                                                        }
+                                                        i++;
+                                                    }
+
+                                                    doc.save(`notes-${notebookId}.pdf`);
+                                                    toast.dismiss(downloadToast);
+                                                    toast.success('Downloaded professional PDF');
+                                                } catch (error) {
+                                                    console.error('PDF generation failed:', error);
+                                                    toast.dismiss(downloadToast);
+                                                    toast.error('Failed to generate PDF document.');
+                                                } finally {
+                                                    setIsDownloading(false);
+                                                }
+                                            }, 100);
                                         }}
-                                        className="p-2 rounded-md hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
+                                        disabled={isDownloading}
+                                        className={cn(
+                                            "p-2 rounded-md hover:bg-white/10 text-muted-foreground hover:text-white transition-colors",
+                                            isDownloading && "opacity-50 cursor-not-allowed"
+                                        )}
                                         title="Download PDF"
                                     >
-                                        <Download size={16} />
+                                        {isDownloading ? (
+                                            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <Download size={16} />
+                                        )}
                                     </button>
                                 </div>
 
@@ -388,6 +548,7 @@ const NotesGenerator = ({ notebookId, modelProvider }: NotesGeneratorProps) => {
                                         ">
                                         <ReactMarkdown
                                             rehypePlugins={[rehypeHighlight]}
+                                            remarkPlugins={[remarkGfm]}
                                         >
                                             {notes}
                                         </ReactMarkdown>

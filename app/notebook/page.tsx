@@ -1,13 +1,17 @@
 'use client';
 
-'use client';
-
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Plus, Book, Calendar, Search, Sparkles, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
-import CreateNotebookModal from '@/components/notebook/CreateNotebookModal';
+
+const CreateNotebookModal = dynamic<{ isOpen: boolean; onClose: () => void }>(
+    () => import('@/components/notebook/CreateNotebookModal'),
+    { ssr: false }
+);
+
 import DeleteConfirmationModal from '@/components/notebook/DeleteConfirmationModal';
 import Link from 'next/link';
 
@@ -83,8 +87,8 @@ export default function Dashboard() {
         <main className="min-h-screen bg-[#050505] text-white overflow-x-hidden selection:bg-primary/30 relative">
             {/* Background Grid & Effects */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
-                <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-transparent to-[#050505]" />
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]" />
+                <div className="absolute inset-0 bg-linear-to-b from-[#050505] via-transparent to-[#050505]" />
 
                 <motion.div
                     animate={{ x: [0, 50, 0], y: [0, -30, 0], opacity: [0.2, 0.4, 0.2] }}
@@ -168,11 +172,11 @@ export default function Dashboard() {
                                     <Link href={`/notebook/${notebook._id}`}>
                                         <GlassCard
                                             hoverEffect
-                                            className="h-full flex flex-col justify-between group !cursor-pointer border-white/5 hover:border-primary/30 bg-black/40 !backdrop-blur-xl min-h-[240px] relative overflow-hidden"
+                                            className="h-full flex flex-col justify-between group cursor-pointer! border-white/5 hover:border-primary/30 bg-black/40 backdrop-blur-xl! min-h-[240px] relative overflow-hidden"
                                         >
                                             <div>
                                                 <div className="flex justify-between items-start mb-6">
-                                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/10 to-blue-500/10 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(0,240,255,0.2)] transition-all duration-500 border border-primary/20">
+                                                    <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-primary/10 to-blue-500/10 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(0,240,255,0.2)] transition-all duration-500 border border-primary/20">
                                                         <Book size={28} />
                                                     </div>
                                                     <div className="flex items-center gap-2">

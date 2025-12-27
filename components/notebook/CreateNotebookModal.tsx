@@ -7,11 +7,40 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, X, FileText } from 'lucide-react';
 import NeonButton from '@/components/ui/NeonButton';
 import { cn } from '@/lib/utils';
-import { pdfjs } from 'react-pdf';
+const extractPdfText = async (fileOrUrl: File | string): Promise<string> => {
+    try {
+        // Dynamically import pdfjs to avoid SSR issues (DOMMatrix not defined)
+        const { pdfjs } = await import('react-pdf');
 
-// Configure pdfjs worker
-// Use unpkg for the worker to avoid local file issues in Next.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+        // Configure worker only on client
+        if (typeof window !== 'undefined') {
+            pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+        }
+
+        let loadingTask;
+        if (typeof fileOrUrl === 'string') {
+            loadingTask = pdfjs.getDocument(fileOrUrl);
+        } else {
+            const arrayBuffer = await fileOrUrl.arrayBuffer();
+            loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+        }
+
+        const pdf = await loadingTask.promise;
+        let fullText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map((item: any) => item.str).join(' ');
+            fullText += pageText + '\n';
+        }
+
+        return fullText.trim();
+    } catch (error) {
+        console.error('Client-side PDF extraction failed:', error);
+        return '';
+    }
+};
 
 interface CreateNotebookModalProps {
     isOpen: boolean;
@@ -42,33 +71,6 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
         maxFiles: 1,
         multiple: false,
     });
-
-    const extractPdfText = async (fileOrUrl: File | string): Promise<string> => {
-        try {
-            let loadingTask;
-            if (typeof fileOrUrl === 'string') {
-                loadingTask = pdfjs.getDocument(fileOrUrl);
-            } else {
-                const arrayBuffer = await fileOrUrl.arrayBuffer();
-                loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-            }
-
-            const pdf = await loadingTask.promise;
-            let fullText = '';
-
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map((item: any) => item.str).join(' ');
-                fullText += pageText + '\n';
-            }
-
-            return fullText.trim();
-        } catch (error) {
-            console.error('Client-side PDF extraction failed:', error);
-            return '';
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -145,7 +147,7 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
                     >
                         <div className="glass-panel rounded-2xl p-8 relative overflow-hidden">
                             {/* Background Glow */}
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary" />
+                            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-primary to-secondary" />
 
                             {!isUploading && (
                                 <button
