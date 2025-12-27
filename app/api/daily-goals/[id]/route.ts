@@ -49,3 +49,34 @@ export async function GET(
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+
+export async function DELETE(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const userPayload = await getUser();
+        if (!userPayload) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { id } = await params;
+
+        await connectToDatabase();
+
+        const deletedGoal = await DailyGoal.findOneAndDelete({
+            _id: id,
+            userId: userPayload.userId || userPayload.id || userPayload.sub
+        });
+
+        if (!deletedGoal) {
+            return NextResponse.json({ error: 'Goal not found or not owned by user' }, { status: 404 });
+        }
+
+        return NextResponse.json({ message: 'Goal deleted successfully' });
+
+    } catch (error) {
+        console.error('Error deleting goal:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}

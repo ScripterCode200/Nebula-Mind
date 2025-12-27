@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { CheckCircle, Zap, ArrowRight, Timer, Brain, FileQuestion, ChevronRight, Play } from 'lucide-react';
+import { CheckCircle, Zap, ArrowRight, Timer, Brain, FileQuestion, ChevronRight, Play, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DailyGoal } from '@/app/explore/types';
 import GlassCard from '../ui/GlassCard';
@@ -61,13 +61,15 @@ const DailyGoalCard = ({ goal, onStart }: DailyGoalCardProps) => {
                         </h4>
                     </div>
 
-                    {/* Difficulty Badge */}
-                    <span className={cn(
-                        "text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
-                        difficultyColors[goal.difficulty]
-                    )}>
-                        {goal.difficulty}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        {/* Difficulty Badge */}
+                        <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                            difficultyColors[goal.difficulty]
+                        )}>
+                            {goal.difficulty}
+                        </span>
+                    </div>
                 </div>
 
                 <p className="text-sm text-gray-400 mb-5 line-clamp-2 leading-relaxed grow">

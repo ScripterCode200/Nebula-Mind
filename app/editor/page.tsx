@@ -229,18 +229,32 @@ export default function EditorPage() {
                                                 const resetRes = await fetch('/api/admin/daily-goals/reset', { method: 'POST' });
                                                 if (!resetRes.ok) throw new Error('Reset failed');
 
-                                                // 2. Generate One Card (Test)
-                                                console.log("Triggering test generation...");
-                                                const genRes = await fetch('/api/daily-goals', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ index: 0 })
-                                                });
+                                                // 2. Clear Local Cache (Important so admin sees fresh results on Explore)
+                                                localStorage.removeItem('dailyGoalsCache');
+                                                toast.info('Database reset. Triggering fresh generations...');
 
-                                                if (genRes.ok) {
-                                                    toast.success('Reset & Test Generation Successful! Check Explore page.');
+                                                // 3. Generate Multiple Cards (Slots 0, 1, 2)
+                                                // Triggering multiple ensures the user sees a "fuller" set immediately
+                                                const slotsToTrigger = [0, 1, 2];
+                                                let successCount = 0;
+
+                                                for (const slot of slotsToTrigger) {
+                                                    try {
+                                                        const genRes = await fetch('/api/daily-goals', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ index: slot })
+                                                        });
+                                                        if (genRes.ok) successCount++;
+                                                    } catch (err) {
+                                                        console.error(`Failed to trigger slot ${slot}`, err);
+                                                    }
+                                                }
+
+                                                if (successCount > 0) {
+                                                    toast.success(`Reset & ${successCount} Cards Generated! Check Explore page.`);
                                                 } else {
-                                                    toast.warning('Reset done, but generation test failed.');
+                                                    toast.warning('Reset done, but initial generation failed. Explore page will retry.');
                                                 }
                                             } catch (e) {
                                                 console.error(e);

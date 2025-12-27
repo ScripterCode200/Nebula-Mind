@@ -88,10 +88,9 @@ export default function ExplorePage() {
                         if (parsed.date === today) {
                             currentGoals = parsed.goals;
                             setDailyGoals(currentGoals);
-                            // If we have full set, stop loading
+                            // If we have full set, we still fetch later but we can stop initial spinner
                             if (currentGoals.length >= 7) {
                                 setIsLoadingGoals(false);
-                                return;
                             }
                         }
                     } catch (e) {
@@ -99,28 +98,30 @@ export default function ExplorePage() {
                     }
                 }
 
-                // 2. Fetch Existing from API (if cache invalid or incomplete)
-                if (currentGoals.length < 7) {
-                    try {
-                        const res = await fetch('/api/daily-goals');
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.goals) {
-                                // Merge with what we might have (deduplication usually good but let's trust API)
-                                const mapped = data.goals.map((g: any) => ({ ...g, id: g._id, duration: g.estimatedTime }));
+                // 2. ALWAYS Fetch Existing from API to ensure consistency with DB (especially after Admin Reset)
+                try {
+                    const res = await fetch('/api/daily-goals');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.goals) {
+                            const mapped = data.goals.map((g: any) => ({ ...g, id: g._id, duration: g.estimatedTime }));
+
+                            // If the API goals differ from our current goals (e.g. after reset, API returns []), update state
+                            if (JSON.stringify(mapped) !== JSON.stringify(currentGoals)) {
+                                console.log("[Explore] API data differs from cache. Updating...");
                                 currentGoals = mapped;
                                 setDailyGoals(currentGoals);
 
-                                // Update cache with what we have so far
+                                // Update cache immediately
                                 localStorage.setItem('dailyGoalsCache', JSON.stringify({
                                     date: today,
                                     goals: currentGoals
                                 }));
                             }
                         }
-                    } catch (fetchErr) {
-                        console.error("Initial fetch failed:", fetchErr);
                     }
+                } catch (fetchErr) {
+                    console.error("Initial fetch failed:", fetchErr);
                 }
 
                 // 3. Generate Missing Slots iteratively

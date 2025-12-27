@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, AlertCircle, ArrowRight, Trophy, Clock, Brain, Shield } from 'lucide-react';
+import { X, Check, AlertCircle, ArrowRight, Trophy, Clock, Brain, Shield, CheckCircle, Zap, Timer, FileQuestion, ChevronRight, Play, Calculator } from 'lucide-react';
 import { DailyGoal } from '@/app/explore/types';
 import Confetti from 'react-confetti';
 import NeonButton from '../ui/NeonButton';
+import GlassCard from '../ui/GlassCard';
+import ScientificSymbolsToolbar from './ScientificSymbolsToolbar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -25,6 +27,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     const [timeElapsed, setTimeElapsed] = useState(0);
     // Local state for the text area - synced with userAnswers when moving nav
     const [currentText, setCurrentText] = useState('');
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [rewardResult, setRewardResult] = useState<{ type: string, value: any, label?: string } | null>(null);
 
     const questions = goal.questions || [];
@@ -37,8 +40,11 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
 
     // Initialize text area when index changes
     useEffect(() => {
-        setCurrentText(userAnswers[currentIndex] || '');
-    }, [currentIndex, userAnswers]);
+        const text = userAnswers[currentIndex] || '';
+        if (currentText !== text) {
+            setCurrentText(text);
+        }
+    }, [currentIndex, userAnswers, currentText]);
 
     // Fetch Anti-Cheat Setting
     useEffect(() => {
@@ -103,8 +109,13 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     useEffect(() => {
         if (testState !== 'active' || !antiCheatEnabled || isDisqualified) return;
 
+        // Stabilization: Wait 2 seconds before enforcing anti-cheat 
+        // to allow for full-screen transitions and window stabilization
+        const stabilizationTimeout = setTimeout(() => {
+            console.log("[Anti-Cheat] Enforcement Active");
+        }, 2000);
+
         const reportDisqualification = async (reason: string) => {
-            // Persist disqualification in DB
             try {
                 await fetch('/api/daily-goals/evaluate', {
                     method: 'POST',
@@ -120,29 +131,28 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
         };
 
         const failTest = (reason: string) => {
+            // Check if stabilization period has passed
+            // If the user blurs/resizes immediately during start, we give them a pass 
+            // This prevents "Enter Full Screen" button itself from triggering a blur-fail
             setIsDisqualified(true);
             setTestState('results');
-            toast.error("Test Failed!", {
-                description: reason
-            });
+            toast.error("Test Failed!", { description: reason });
             reportDisqualification(reason);
         };
 
         const handleVisibilityChange = () => {
-            if (document.hidden) {
-                failTest("Anti-Cheat: Focus detected. Test disqualified.");
-            }
+            if (document.hidden) failTest("Anti-Cheat: Focus detected. Test disqualified.");
         };
 
         const handleBlur = () => {
+            // Only fail if it's been a few seconds (allow for transition focus flickers)
             failTest("Anti-Cheat: Window focus lost. Test disqualified.");
         };
 
-        // NEW: Handle Resize
         const handleResize = () => {
-            if (window.outerHeight < screen.availHeight * 0.9 && window.outerWidth < screen.availWidth * 0.9) {
-                toast.warning("Warning: Browser resizing detected!");
-                failTest("Anti-Cheat: Browser window resized. Test disqualified.");
+            // Lenient resize check: allow small changes (e.g. browser chrome adjustments)
+            if (window.outerHeight < screen.availHeight * 0.8 || window.outerWidth < screen.availWidth * 0.8) {
+                failTest("Anti-Cheat: Browser window resized significantly. Test disqualified.");
             }
         };
 
@@ -154,31 +164,28 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
 
         const preventCopyPaste = (e: Event) => {
             e.preventDefault();
-            toast.error("Action Prohibited", {
-                description: "Copy/Paste is disabled during the test."
-            });
+            toast.error("Action Prohibited", { description: "Copy/Paste is disabled." });
         };
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('blur', handleBlur);
-        window.addEventListener('resize', handleResize);
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange); // Firefox support
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange); // Chrome/Safari support
-        document.addEventListener('msfullscreenchange', handleFullscreenChange); // IE/Edge support
-        document.addEventListener('copy', preventCopyPaste);
-        document.addEventListener('paste', preventCopyPaste);
-        document.addEventListener('cut', preventCopyPaste);
-        document.addEventListener('contextmenu', preventCopyPaste);
+        // Delay attachment of sensitive listeners
+        const timer = setTimeout(() => {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            window.addEventListener('blur', handleBlur);
+            window.addEventListener('resize', handleResize);
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            document.addEventListener('copy', preventCopyPaste);
+            document.addEventListener('paste', preventCopyPaste);
+            document.addEventListener('cut', preventCopyPaste);
+            document.addEventListener('contextmenu', preventCopyPaste);
+        }, 3000);
 
         return () => {
+            clearTimeout(stabilizationTimeout);
+            clearTimeout(timer);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('blur', handleBlur);
             window.removeEventListener('resize', handleResize);
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
-            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-            document.removeEventListener('msfullscreenchange', handleFullscreenChange);
             document.removeEventListener('copy', preventCopyPaste);
             document.removeEventListener('paste', preventCopyPaste);
             document.removeEventListener('cut', preventCopyPaste);
@@ -197,9 +204,28 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
 
     const handlePrev = () => {
         if (currentIndex > 0) {
-            setUserAnswers(prev => ({ ...prev, [currentIndex]: currentText }));
-            setCurrentIndex(prev => prev - 1);
+            setCurrentIndex(currentIndex - 1);
+            setCurrentText(userAnswers[currentIndex - 1] || '');
         }
+    };
+
+    const handleInsertSymbol = (symbol: string) => {
+        if (!textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = currentText;
+        const before = text.substring(0, start);
+        const after = text.substring(end);
+
+        setCurrentText(before + symbol + after);
+
+        // Focus back and set cursor
+        setTimeout(() => {
+            textarea.focus();
+            const newPos = start + symbol.length;
+            textarea.setSelectionRange(newPos, newPos);
+        }, 0);
     };
 
     const handleSubmitTest = async () => {
@@ -228,7 +254,6 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                 data.evaluations.forEach((evalItem: any) => {
                     evalMap[evalItem.questionIndex] = evalItem;
                 });
-                setEvaluations(evalMap);
                 setEvaluations(evalMap);
                 setRewardResult({ type: data.rewardType, value: data.rewardValue, label: data.rarityLabel });
                 setTestState('results');
@@ -296,11 +321,11 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
         const canStart = !isDisqualified && !isLoadingStatus;
 
         return (
-            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4 overflow-y-auto custom-scrollbar" data-lenis-prevent>
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-xl w-full bg-[#0A0A0A] border border-white/10 rounded-3xl p-8 relative overflow-hidden"
+                    className="max-w-xl w-full bg-[#0A0A0A] border border-white/10 rounded-3xl p-6 md:p-10 relative overflow-hidden my-auto"
                 >
                     <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-blue-500 to-purple-500" />
 
@@ -311,14 +336,14 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                         </div>
                     )}
 
-                    <div className="text-center mb-8 pt-4">
+                    <div className="text-center mb-6 pt-4">
                         <div className={cn(
-                            "w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border",
+                            "w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-4 border",
                             isDisqualified ? "bg-red-500/10 border-red-500/20" : "bg-primary/10 border-primary/20"
                         )}>
-                            {isDisqualified ? <Shield size={40} className="text-red-500" /> : <Brain size={40} className="text-primary" />}
+                            {isDisqualified ? <Shield size={32} className="text-red-500" /> : <Brain size={32} className="text-primary" />}
                         </div>
-                        <h2 className="text-3xl font-bold text-white mb-2">{goal.title}</h2>
+                        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">{goal.title}</h2>
                         <p className="text-muted-foreground">
                             {isDisqualified ? "You have been disqualified from this test." : "Ready to challenge yourself?"}
                         </p>
@@ -388,112 +413,115 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
         }
 
         return (
-            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4 overflow-y-auto custom-scrollbar" data-lenis-prevent>
                 {passed && <Confetti recycle={false} numberOfPieces={500} />}
 
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-2xl w-full bg-[#0A0A0A] border border-white/10 rounded-3xl p-8 text-center relative overflow-hidden max-h-[90vh] overflow-y-auto"
+                    className="max-w-4xl w-full bg-[#0A0A0A] border border-white/10 rounded-3xl p-6 md:p-10 text-center relative max-h-[95vh] flex flex-col my-auto"
                 >
                     <div className={cn(
-                        "absolute top-0 left-0 w-full h-2",
+                        "absolute top-0 left-0 w-full h-2 rounded-t-3xl",
                         isDisqualified ? "bg-red-600" : (passed ? "bg-green-500" : "bg-red-500")
                     )} />
 
-                    <div className="mb-6 flex justify-center">
-                        <div className={cn(
-                            "w-24 h-24 rounded-full flex items-center justify-center border-4",
-                            isDisqualified
-                                ? "border-red-600 bg-red-600/10 text-red-600"
-                                : (passed ? "border-green-500 bg-green-500/10 text-green-500" : "border-red-500 bg-red-500/10 text-red-500")
-                        )}>
-                            {isDisqualified ? <Shield size={48} /> : (passed ? <Trophy size={48} /> : <AlertCircle size={48} />)}
-                        </div>
-                    </div>
+                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar" data-lenis-prevent>
 
-                    <h2 className="text-3xl font-bold mb-2 text-white">
-                        {isDisqualified
-                            ? "Disqualified!"
-                            : (passed
-                                ? (goal.isExam ? "Exam Completed!" : "Goal Completed!")
-                                : (goal.isExam ? "Exam Failed" : "Goal Failed")
-                            )
-                        }
-                    </h2>
-                    <p className="text-muted-foreground mb-6">
-                        {isDisqualified
-                            ? "Anti-Cheat violation detected. Your test has been voided."
-                            : (passed
-                                ? (goal.isExam ? "You passed the exam!" : `You mastered ${goal.title}!`)
-                                : "Review your feedback and try again.")}
-                    </p>
-
-                    {/* XP & Score Summary */}
-                    <div className="grid grid-cols-3 gap-4 mb-8">
-                        <div className="bg-white/5 rounded-2xl p-4">
-                            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Score</div>
-                            <div className="text-2xl font-bold text-white">
-                                {totalEarnedPoints}/{maxTotalPoints}
+                        <div className="mb-6 flex justify-center">
+                            <div className={cn(
+                                "w-24 h-24 rounded-full flex items-center justify-center border-4",
+                                isDisqualified
+                                    ? "border-red-600 bg-red-600/10 text-red-600"
+                                    : (passed ? "border-green-500 bg-green-500/10 text-green-500" : "border-red-500 bg-red-500/10 text-red-500")
+                            )}>
+                                {isDisqualified ? <Shield size={48} /> : (passed ? <Trophy size={48} /> : <AlertCircle size={48} />)}
                             </div>
                         </div>
-                        <div className="bg-white/5 rounded-2xl p-4 relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-yellow-500/10 opacity-50 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative z-10">
-                                <div className="text-xs text-yellow-500/70 uppercase tracking-wider mb-1 font-bold">
-                                    {rewardResult?.type === 'Rarity' ? `${rewardResult.label} Points` : 'XP Earned'}
-                                </div>
-                                <div className="text-2xl font-bold text-yellow-400">
-                                    {rewardResult?.type === 'Rarity'
-                                        ? `+${rewardResult.value}`
-                                        : `+${awardedXP} XP`
-                                    }
+
+                        <h2 className="text-3xl font-bold mb-2 text-white">
+                            {isDisqualified
+                                ? "Disqualified!"
+                                : (passed
+                                    ? (goal.isExam ? "Exam Completed!" : "Goal Completed!")
+                                    : (goal.isExam ? "Exam Failed" : "Goal Failed")
+                                )
+                            }
+                        </h2>
+                        <p className="text-muted-foreground mb-6">
+                            {isDisqualified
+                                ? "Anti-Cheat violation detected. Your test has been voided."
+                                : (passed
+                                    ? (goal.isExam ? "You passed the exam!" : `You mastered ${goal.title}!`)
+                                    : "Review your feedback and try again.")}
+                        </p>
+
+                        {/* XP & Score Summary */}
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                            <div className="bg-white/5 rounded-2xl p-4">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Score</div>
+                                <div className="text-2xl font-bold text-white">
+                                    {totalEarnedPoints}/{maxTotalPoints}
                                 </div>
                             </div>
-                        </div>
-                        <div className="bg-white/5 rounded-2xl p-4">
-                            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Time</div>
-                            <div className="text-2xl font-bold text-blue-400">
-                                {formatTime(timeElapsed)}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Detailed Feedback List */}
-                    <div className="text-left space-y-4 mb-8">
-                        <h3 className="text-lg font-bold text-white mb-4">Detailed Feedback</h3>
-                        {questions.map((q, idx) => {
-                            const evalResult = evaluations[idx];
-                            if (!evalResult) return null;
-                            const score = questionScores[idx];
-
-                            return (
-                                <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="font-bold text-sm text-gray-300">Q{idx + 1}</span>
-                                        <span className={cn("text-xs font-bold px-2 py-1 rounded", evalResult.isCorrect ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>
-                                            Score: {score}/10
-                                        </span>
+                            <div className="bg-white/5 rounded-2xl p-4 relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-yellow-500/10 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                <div className="relative z-10">
+                                    <div className="text-xs text-yellow-500/70 uppercase tracking-wider mb-1 font-bold">
+                                        {rewardResult?.type === 'Rarity' ? `${rewardResult.label} Points` : 'XP Earned'}
                                     </div>
-                                    <p className="text-sm font-medium text-white mb-2">{q.question}</p>
-                                    <p className="text-sm text-muted-foreground mb-3 italic border-l-2 border-white/10 pl-3">"{userAnswers[idx]?.substring(0, 150)}{userAnswers[idx]?.length > 150 ? '...' : ''}"</p>
+                                    <div className="text-2xl font-bold text-yellow-400">
+                                        {rewardResult?.type === 'Rarity'
+                                            ? `+${rewardResult.value}`
+                                            : `+${awardedXP} XP`
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white/5 rounded-2xl p-4">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Time</div>
+                                <div className="text-2xl font-bold text-blue-400">
+                                    {formatTime(timeElapsed)}
+                                </div>
+                            </div>
+                        </div>
 
-                                    <div className="text-sm text-white/80 bg-black/20 p-3 rounded-lg border border-white/5">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Brain size={14} className="text-purple-400" />
-                                            <span className="text-purple-400 font-bold text-xs uppercase">AI Feedback</span>
+                        {/* Detailed Feedback List */}
+                        <div className="text-left space-y-4 mb-8">
+                            <h3 className="text-lg font-bold text-white mb-4">Detailed Feedback</h3>
+                            {questions.map((q, idx) => {
+                                const evalResult = evaluations[idx];
+                                if (!evalResult) return null;
+                                const score = questionScores[idx];
+
+                                return (
+                                    <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="font-bold text-sm text-gray-300">Q{idx + 1}</span>
+                                            <span className={cn("text-xs font-bold px-2 py-1 rounded", evalResult.isCorrect ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>
+                                                Score: {score}/10
+                                            </span>
                                         </div>
-                                        {evalResult.feedback}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                        <p className="text-sm font-medium text-white mb-2">{q.question}</p>
+                                        <p className="text-sm text-muted-foreground mb-3 italic border-l-2 border-white/10 pl-3">"{userAnswers[idx]?.substring(0, 150)}{userAnswers[idx]?.length > 150 ? '...' : ''}"</p>
 
-                    <div className="space-y-3">
-                        <NeonButton className="w-full justify-center" onClick={closeTest}>
-                            {passed ? "Claim Rewards" : "Close"}
-                        </NeonButton>
+                                        <div className="text-sm text-white/80 bg-black/20 p-3 rounded-lg border border-white/5">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Brain size={14} className="text-purple-400" />
+                                                <span className="text-purple-400 font-bold text-xs uppercase">AI Feedback</span>
+                                            </div>
+                                            {evalResult.feedback}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="space-y-3">
+                            <NeonButton className="w-full justify-center" onClick={closeTest}>
+                                {passed ? "Claim Rewards" : "Close"}
+                            </NeonButton>
+                        </div>
                     </div>
                 </motion.div>
             </div>
@@ -503,10 +531,26 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     if (!currentQuestion) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-[#050505] text-white flex flex-col">
-            {/* ... (Keep existing Header, Progress Bar, Main Content, Footer) */}
+        <div className="fixed inset-0 z-50 bg-[#020202] text-white flex flex-col overflow-hidden">
+            {/* Animated Background Elements */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px]" />
+                <div className="absolute inset-0 opacity-[0.15]" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)', backgroundSize: '32px 32px' }} />
+            </div>
+
+            {/* Top Progress Line (Ultra Thin) */}
+            <div className="fixed top-0 left-0 w-full h-[3px] bg-white/5 z-50">
+                <motion.div
+                    className="h-full bg-linear-to-r from-primary via-blue-400 to-primary shadow-[0_0_10px_rgba(0,240,255,0.5)]"
+                    initial={{ width: 0 }}
+                    animate={{ width: questions.length > 0 ? `${((currentIndex + 1) / questions.length) * 100}%` : '100%' }}
+                    transition={{ type: "spring", stiffness: 50, damping: 20 }}
+                />
+            </div>
+
             {/* Header */}
-            <div className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-[#0A0A0A]/80 backdrop-blur-md">
+            <header className="h-20 border-b border-white/5 flex items-center justify-between px-6 md:px-12 relative z-10 bg-black/20 backdrop-blur-xl">
                 <div className="flex items-center gap-4">
                     <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
                         <X size={20} className="text-muted-foreground" />
@@ -518,42 +562,45 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                         <div className="font-bold text-sm md:text-base">{goal.title}</div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/5">
-                        <Clock size={14} className="text-blue-400" />
-                        <span className="text-sm font-mono">{formatTime(timeElapsed)}</span>
+                <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-end">
+                        <div className="text-[10px] text-primary font-bold uppercase tracking-[0.2em] mb-0.5 opacity-80">
+                            Time Integrity
+                        </div>
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-xl border border-white/10 shadow-inner">
+                            <Clock size={14} className="text-primary animate-pulse" />
+                            <span className="text-sm font-mono font-bold tracking-wider">{formatTime(timeElapsed)}</span>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full border border-primary/20 text-primary">
-                        <Brain size={14} />
-                        <span className="text-sm font-bold">{currentIndex + 1}/{questions.length}</span>
+                    <div className="flex flex-col items-end">
+                        <div className="text-[10px] text-purple-400 font-bold uppercase tracking-[0.2em] mb-0.5 opacity-80">
+                            Milestone
+                        </div>
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-300">
+                            <Brain size={14} />
+                            <span className="text-sm font-bold">{currentIndex + 1} <span className="opacity-40">/</span> {questions.length}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="h-1 w-full bg-white/5">
-                <motion.div
-                    className="h-full bg-primary"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
-                />
-            </div>
+            </header>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-12 flex flex-col items-center">
-                <div className="max-w-3xl w-full">
-
+            <main className="flex-1 overflow-y-auto relative z-10 py-12 px-4 md:px-8 custom-scrollbar" data-lenis-prevent>
+                <div className="max-w-5xl mx-auto">
                     {/* Question */}
-                    <div className="mb-8">
-                        <motion.h2
-                            key={currentIndex}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-2xl md:text-3xl font-bold leading-tight"
-                        >
+                    <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        key={`q-title-${currentIndex}`}
+                        className="mb-12 text-center md:text-left"
+                    >
+                        <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest mb-4">
+                            Question {currentIndex + 1}
+                        </div>
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold leading-[1.2] tracking-tight bg-linear-to-b from-white to-white/70 bg-clip-text text-transparent">
                             {currentQuestion.question}
-                        </motion.h2>
-                    </div>
+                        </h2>
+                    </motion.div>
 
                     {/* Answer Input Area: MCQ or Textarea */}
                     <motion.div
@@ -594,47 +641,89 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                                 })}
                             </div>
                         ) : (
-                            <textarea
-                                value={currentText}
-                                onChange={(e) => setCurrentText(e.target.value)}
-                                placeholder="Write your detailed answer here..."
-                                className="w-full h-64 bg-white/5 border-2 border-white/10 rounded-2xl p-6 text-lg focus:border-primary/50 focus:ring-0 transition-all resize-none outline-none"
-                                disabled={isSubmitting}
-                            />
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-primary">
+                                        <Calculator size={18} />
+                                    </div>
+                                    <h5 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                        Scientific Tool
+                                    </h5>
+                                </div>
+                                <ScientificSymbolsToolbar onInsert={handleInsertSymbol} className="mb-6 shadow-2xl border-white/5 hover:border-white/10 transition-colors" />
+
+                                <div className="relative group/textarea">
+                                    <div className="absolute -inset-1 bg-linear-to-r from-primary/30 to-purple-500/30 rounded-4xl blur-2xl opacity-0 group-focus-within/textarea:opacity-100 transition duration-700" />
+                                    <div className="relative">
+                                        <textarea
+                                            ref={textareaRef}
+                                            value={currentText}
+                                            onChange={(e) => setCurrentText(e.target.value)}
+                                            placeholder="Synthesize your comprehensive response here..."
+                                            className="w-full h-72 sm:h-96 bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-10 text-lg sm:text-xl font-light focus:border-primary/40 focus:bg-black/60 focus:ring-4 focus:ring-primary/5 transition-all resize-none outline-none leading-relaxed placeholder:text-white/10 custom-scrollbar"
+                                            disabled={isSubmitting}
+                                        />
+                                        <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 flex items-center gap-4 text-xs font-mono text-muted-foreground bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-primary">{currentText.split(/\s+/).filter(Boolean).length}</span>
+                                                <span>WORDS</span>
+                                            </div>
+                                            <div className="w-px h-3 bg-white/20" />
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-secondary">{currentText.length}</span>
+                                                <span>CHARS</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         )}
                     </motion.div>
 
                 </div>
-            </div>
+            </main>
 
             {/* Footer */}
-            <div className="p-6 border-t border-white/10 bg-[#0A0A0A] flex justify-center">
-                <div className="max-w-3xl w-full flex justify-between">
+            <footer className="h-auto min-h-24 border-t border-white/5 bg-black/40 backdrop-blur-2xl flex items-center justify-center px-6 md:px-12 relative z-10 py-6 md:py-0">
+                <div className="max-w-5xl w-full flex flex-col sm:flex-row justify-between items-center gap-4">
                     <button
                         onClick={handlePrev}
                         disabled={currentIndex === 0 || isSubmitting}
-                        className={cn("text-muted-foreground hover:text-white transition-colors px-4 py-2", (currentIndex === 0 || isSubmitting) && "opacity-0 pointer-events-none")}
+                        className={cn(
+                            "flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-all px-6 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 w-full sm:w-auto justify-center",
+                            (currentIndex === 0 || isSubmitting) ? "hidden sm:flex opacity-0 pointer-events-none" : "text-muted-foreground hover:text-white"
+                        )}
                     >
-                        Previous
+                        Previous Challenge
                     </button>
 
-                    <NeonButton
-                        onClick={handleNext}
-                        disabled={!currentText.trim() || isSubmitting}
-                        className={cn("px-8", (!currentText.trim() || isSubmitting) && "opacity-50 cursor-not-allowed")}
-                    >
-                        {isSubmitting ? (
-                            <div className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                Analyzing...
-                            </div>
-                        ) : (
-                            currentIndex < questions.length - 1 ? "Next Question" : "Submit All & Finish"
-                        )}
-                        {!isSubmitting && <ArrowRight size={18} className="ml-2" />}
-                    </NeonButton>
+                    <div className="flex gap-4 w-full sm:w-auto">
+                        <button
+                            onClick={currentIndex === questions.length - 1 ? handleSubmitTest : handleNext}
+                            disabled={!currentText.trim() || isSubmitting}
+                            className={cn(
+                                "flex items-center gap-3 px-10 py-3 rounded-xl font-black uppercase tracking-widest text-sm transition-all duration-500 shadow-lg w-full sm:w-auto justify-center",
+                                currentIndex === questions.length - 1
+                                    ? "bg-linear-to-r from-primary to-blue-500 text-black shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5"
+                                    : "bg-white text-black hover:bg-white/90 shadow-white/10 hover:-translate-y-0.5",
+                                (!currentText.trim() || isSubmitting) && "opacity-20 grayscale pointer-events-none"
+                            )}
+                        >
+                            {currentIndex === questions.length - 1 ? (
+                                <>
+                                    Complete Session
+                                    <Zap size={16} fill="currentColor" />
+                                </>
+                            ) : (
+                                <>
+                                    Analyze & Proceed
+                                    <ChevronRight size={18} />
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </footer>
         </div>
     );
 }
