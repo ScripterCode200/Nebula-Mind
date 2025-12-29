@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import DeleteAccountModal from '@/components/modals/DeleteAccountModal';
 import ConfirmSaveModal from '@/components/modals/ConfirmSaveModal';
 import { cn } from '@/lib/utils';
+import ProfileImageUpload from '@/components/profile/ProfileImageUpload';
 
 // Types for Daily Goal Configuration
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -296,55 +297,65 @@ export default function SettingsPage() {
                                         className="space-y-8"
                                     >
                                         {/* ... (Existing General Tab Content) */}
-                                        <div>
-                                            <h2 className="text-2xl font-bold mb-6">Profile Information</h2>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm text-muted-foreground">Display Name</label>
-                                                    <input
-                                                        type="text"
-                                                        value={formData.name}
-                                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm text-muted-foreground">Email Address</label>
-                                                    <input
-                                                        type="email"
-                                                        value={formData.email}
-                                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm text-muted-foreground">Date of Birth</label>
-                                                    <input
-                                                        type="date"
-                                                        value={formData.dob}
-                                                        onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors scheme-dark"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm text-muted-foreground">University / School</label>
-                                                    <input
-                                                        type="text"
-                                                        value={formData.university}
-                                                        onChange={(e) => setFormData({ ...formData, university: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors"
-                                                        placeholder="e.g. Stanford University"
-                                                    />
-                                                </div>
-                                                <div className="col-span-full space-y-2">
-                                                    <label className="text-sm text-muted-foreground">Bio</label>
-                                                    <textarea
-                                                        rows={4}
-                                                        value={formData.bio}
-                                                        onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors resize-none"
-                                                        placeholder="Tell us a bit about yourself..."
-                                                    />
+                                        <div className="flex flex-col md:flex-row gap-8 items-start">
+                                            <ProfileImageUpload
+                                                initialImage={user?.profileImage}
+                                                onSuccess={(url) => {
+                                                    // Optionally update local user store if it has profileImage
+                                                    fetchUser();
+                                                }}
+                                            />
+
+                                            <div className="flex-1 space-y-6 w-full">
+                                                <h2 className="text-2xl font-bold">Profile Information</h2>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm text-muted-foreground">Display Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.name}
+                                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm text-muted-foreground">Email Address</label>
+                                                        <input
+                                                            type="email"
+                                                            value={formData.email}
+                                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm text-muted-foreground">Date of Birth</label>
+                                                        <input
+                                                            type="date"
+                                                            value={formData.dob}
+                                                            onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors scheme-dark"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-sm text-muted-foreground">University / School</label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.university}
+                                                            onChange={(e) => setFormData({ ...formData, university: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors"
+                                                            placeholder="e.g. Stanford University"
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-full space-y-2">
+                                                        <label className="text-sm text-muted-foreground">Bio</label>
+                                                        <textarea
+                                                            rows={4}
+                                                            value={formData.bio}
+                                                            onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 transition-colors resize-none"
+                                                            placeholder="Tell us a bit about yourself..."
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

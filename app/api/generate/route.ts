@@ -41,6 +41,7 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
             messages: [{ role: "user", content: prompt }],
             model: "gpt-4o",
             response_format: options.jsonMode ? { type: "json_object" } : undefined,
+            stream_options: { include_usage: true }, // Request usage stats
         });
         return completion.choices[0].message.content || '';
     } else if (modelProvider === 'ollama' || modelProvider === 'phi3.5:3.8b') {
@@ -138,7 +139,7 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
         const response = await result.response;
         if (response.usageMetadata) {
             const { logTokenUsage } = await import('@/lib/token-cost');
-            logTokenUsage('Generate API Helper', response.usageMetadata);
+            logTokenUsage('Generate API Helper', targetModel, response.usageMetadata);
         }
         return response.candidates?.[0]?.content?.parts?.[0]?.text || '';
     }
@@ -161,7 +162,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Context Strategy
-        let context = notebook.pdfContent || '';
+        // Context Strategy
+        // Use helper to fetch from R2 or Mongo, filtering by config.sourceIds if present
+        const { getNotebookContent } = await import('@/lib/notebook-context');
+        let context = await getNotebookContent(notebook, config?.sourceIds);
 
         // Truncate context for Nebula 3 (Phi 3.5) and Ollama as requested
         if (modelProvider === 'phi3.5:3.8b' || modelProvider === 'ollama') {
@@ -185,6 +189,11 @@ export async function POST(req: NextRequest) {
           Topic: ${notebook.title}
           
           Based on the Topic and the following context (if available), generate ${config.type} notes.
+
+          ${config.customInstructions ? `
+          SPECIAL USER INSTRUCTIONS:
+          ${config.customInstructions}
+          ` : ''}
           
           FORMATTING INSTRUCTIONS:
           - Use Markdown formatting.
@@ -206,6 +215,7 @@ export async function POST(req: NextRequest) {
                                     messages: [{ role: "user", content: prompt }],
                                     model: "gpt-4o",
                                     stream: true,
+                                    stream_options: { include_usage: true },
                                 });
 
                                 for await (const chunk of completion) {
@@ -219,6 +229,14 @@ export async function POST(req: NextRequest) {
                                             isStreamClosed = true;
                                             break;
                                         }
+                                    }
+                                    if (chunk.usage) {
+                                        const { logTokenUsage } = await import('@/lib/token-cost');
+                                        logTokenUsage('Generate API (OpenAI)', "gpt-4o", {
+                                            promptTokenCount: chunk.usage.prompt_tokens,
+                                            candidatesTokenCount: chunk.usage.completion_tokens,
+                                            totalTokenCount: chunk.usage.total_tokens
+                                        });
                                     }
                                 }
                             } else if (modelProvider === 'ollama' || modelProvider === 'phi3.5:3.8b') {
@@ -264,7 +282,16 @@ export async function POST(req: NextRequest) {
                                                 fullContent += content;
                                                 controller.enqueue(encoder.encode(content));
                                             }
-                                            if (json.done) break;
+                                            if (json.done) {
+                                                if (json.prompt_eval_count || json.eval_count) {
+                                                    const { logTokenUsage } = await import('@/lib/token-cost');
+                                                    logTokenUsage('Generate API (Ollama)', modelName, {
+                                                        promptTokenCount: json.prompt_eval_count,
+                                                        candidatesTokenCount: json.eval_count
+                                                    });
+                                                }
+                                                break;
+                                            }
                                         } catch (e: any) {
                                             console.error('Error parsing Ollama chunk:', e);
                                             if (e.message && e.message.includes('closed')) {
@@ -335,7 +362,7 @@ export async function POST(req: NextRequest) {
                                     }
                                     if (chunk.usageMetadata) {
                                         const { logTokenUsage } = await import('@/lib/token-cost');
-                                        logTokenUsage('Generate API', chunk.usageMetadata);
+                                        logTokenUsage('Generate API', targetModel, chunk.usageMetadata);
                                     }
                                 }
                             }

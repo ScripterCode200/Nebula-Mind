@@ -56,22 +56,24 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: '/Nebula_Mind_Logo.png',
+    icon: '/favicon.svg?v=2',
   },
 };
 
 import { Toaster } from 'sonner';
 
 import Navbar from "@/components/ui/Navbar";
-// Force recompile
+import AppSidebar from "@/components/ui/AppSidebar";
+import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import Footer from "@/components/ui/Footer";
 import SmoothScroll from "@/components/ui/SmoothScroll";
 
 import AuthGuard from "@/components/AuthGuard";
 import MaintenanceListener from "@/components/MaintenanceListener";
 import ActivityTracker from "@/components/ActivityTracker";
-
 import { headers } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
 
 export default async function RootLayout({
   children,
@@ -80,7 +82,8 @@ export default async function RootLayout({
 }>) {
   const headersList = await headers();
   const pathname = headersList.get('x-current-path') || '';
-  const isSpecialPage = ['/maintenance', '/blocked'].includes(pathname);
+  // Hide global nav on special pages and inside notebooks
+  const isSpecialPage = ['/maintenance', '/blocked'].includes(pathname) || pathname.startsWith('/notebook/');
 
   return (
     <html lang="en">
@@ -92,9 +95,13 @@ export default async function RootLayout({
           <MaintenanceListener />
           <ActivityTracker />
           <SmoothScroll>
-            {!isSpecialPage && <Navbar />}
-            {children}
-            {!isSpecialPage && <Footer />}
+            {!isSpecialPage && <AppSidebar />}
+
+            <LayoutWrapper>
+              {!isSpecialPage && <Navbar />}
+              {children}
+              {!isSpecialPage && <Footer />}
+            </LayoutWrapper>
           </SmoothScroll>
         </AuthGuard>
         <Toaster position="top-center" theme="dark" />

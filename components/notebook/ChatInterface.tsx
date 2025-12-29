@@ -16,10 +16,11 @@ interface Message {
     content: string;
 }
 
-const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
+const ChatInterface = ({ notebookId, modelProvider, initialHistory, sourceIds }: {
     notebookId: string,
     modelProvider: string,
-    initialHistory?: { role: string, content: string }[]
+    initialHistory?: { role: string, content: string }[],
+    sourceIds?: string[]
 }) => {
     const [messages, setMessages] = useState<Message[]>(() => {
         return initialHistory && initialHistory.length > 0
@@ -70,7 +71,8 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory }: {
                     message: userMessage,
                     history: history.filter(m => m.role !== 'ai' || m.content !== 'Hello! I\'ve read your notebook. Ask me anything about it.'),
                     modelProvider,
-                    useRag // Pass the toggle state
+                    useRag, // Pass the toggle state
+                    sourceIds // Pass selected sources
                 }),
             });
 

@@ -4,7 +4,7 @@ import { jwtVerify } from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
     const token = req.cookies.get('token')?.value;
     const { pathname } = req.nextUrl;
 
@@ -128,11 +128,11 @@ export const config = {
     matcher: [
         /*
          * Match all request paths except for the ones starting with:
-         * - api (API routes) -> Wait, we WANT to protect API routes too, except auth.
+         * - api (API routes) -> Exclude to prevent body parsing issues with uploads
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
          */
-        '/((?!_next/static|_next/image|favicon.ico).*)',
+        '/((?!api|_next/static|_next/image|favicon.ico).*)',
     ],
 };

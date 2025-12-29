@@ -1,7 +1,11 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Sparkles, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import AIToolsPanel from './AIToolsPanel';
 
 const PDFViewer = dynamic(() => import('./PDFViewer'), {
     ssr: false,
@@ -16,16 +20,15 @@ const PDFViewer = dynamic(() => import('./PDFViewer'), {
 });
 const WordViewer = dynamic(() => import('./WordViewer'), { ssr: false });
 
-import AIToolsPanel from './AIToolsPanel';
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import SourceSidebar from './SourceSidebar';
 
+// Update props interface
 interface NotebookWorkspaceProps {
     notebook: {
         _id: string;
         title: string;
         pdfUrl: string;
+        sources?: any[]; // Added sources
         chatHistory?: {
             role: string;
             content: string;
@@ -39,6 +42,56 @@ interface NotebookWorkspaceProps {
 const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
     const [isPdfVisible, setIsPdfVisible] = React.useState(true);
     const [isMobile, setIsMobile] = React.useState(false);
+
+    // Multi-source State
+    const [sources, setSources] = React.useState<any[]>(() => {
+        if (notebook.sources && notebook.sources.length > 0) {
+            return notebook.sources;
+        }
+        // Legacy support: If no sources but pdfUrl/pdfKey exists, create a default source
+        if (notebook.pdfUrl) {
+            return [{
+                _id: 'default-source',
+                type: 'pdf',
+                name: notebook.title || 'Main Document', // Use notebook title as default name
+                url: notebook.pdfUrl,
+                fileKey: (notebook as any).pdfKey, // Type assertion if key missing in type def
+                addedAt: new Date().toISOString()
+            }];
+        }
+        return [];
+    });
+
+    const [activeSourceId, setActiveSourceId] = React.useState<string | null>(() => {
+        if (notebook.sources && notebook.sources.length > 0) {
+            return notebook.sources[0]._id;
+        }
+        if (notebook.pdfUrl) {
+            return 'default-source';
+        }
+        return null;
+    });
+
+    // Default all checked
+    const [selectedSourceIds, setSelectedSourceIds] = React.useState<string[]>(() => {
+        if (notebook.sources && notebook.sources.length > 0) {
+            return notebook.sources.map(s => s._id);
+        }
+        if (notebook.pdfUrl) {
+            return ['default-source'];
+        }
+        return [];
+    });
+    const [isAddingSource, setIsAddingSource] = React.useState(false);
+
+    // Derived active PDF URL
+    const activePdfUrl = React.useMemo(() => {
+        if (activeSourceId && sources.length > 0) {
+            const source = sources.find(s => s._id === activeSourceId);
+            return source ? source.url : notebook.pdfUrl;
+        }
+        return notebook.pdfUrl;
+    }, [activeSourceId, sources, notebook.pdfUrl]);
 
     React.useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -58,6 +111,70 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
+
+    const handleAddSource = async (file: File) => {
+        setIsAddingSource(true);
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('textContent', 'Extracting text on client is hard, ideally backend does it or we use pdfjs here.');
+        // NOTE: For now, we are sending dummy text. 
+        // In a real implementation with R2, we need to extract text here or on server.
+        // Given constraints, we'll try to extract text on client if possible, or send file to server to parse.
+        // Server route 'POST /api/notebooks/[id]/sources' expects 'textContent'.
+
+        try {
+            // Quick text extraction using pdfjs on client (simplified)
+            // Or better: Let's assume the user just wants the PDF for now and we'll fix text parsing later
+            // But the backend REQUIREMENTS say 'textContent' is needed.
+            // Let's implement a quick extract using the existing utility we have in CreateNotebookModal?
+            // Actually, we can't easily reuse that hook here without refactoring.
+            // For this iteration, we'll send a placeholder and maybe trigger a server-side parse if we had one.
+            // Or better, we import pdfjs dynamically here.
+
+            let text = "";
+            try {
+                const pdfjs = await import('pdfjs-dist');
+                pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjs.getDocument(arrayBuffer).promise;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    text += content.items.map((item: any) => item.str).join(' ') + '\n';
+                }
+            } catch (e) {
+                console.error("Client side PDF parse failed", e);
+                text = "Text extraction failed.";
+            }
+
+            formData.set('textContent', text);
+
+            const res = await fetch(`/api/notebooks/${notebook._id}/sources`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                // We need the signed URL for the new source to display it immediately.
+                // The API returns the source object but NOT the signed URL usually (unless we updated it).
+                // Let's just reload the page for now to get the signed URL from server props?
+                // Or better, ask the API to return a signed URL?
+                // For a smooth UX, we can optimistically add it, but we can't display R2 key directly.
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error("Failed to add source", error);
+        } finally {
+            setIsAddingSource(false);
+        }
+    };
+
+    const handleSourceToggle = (id: string, checked: boolean) => {
+        setSelectedSourceIds(prev =>
+            checked ? [...prev, id] : prev.filter(p => p !== id)
+        );
+    };
 
     return (
         <div className="flex flex-col h-screen bg-[#050505] overflow-hidden">
@@ -94,7 +211,7 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                         <span className="inline">{isMobile ? (isPdfVisible ? 'Show Chat' : 'Show PDF') : (isPdfVisible ? 'Hide PDF' : 'Show PDF')}</span>
                     </button>
 
-                    <div className="hidden md:block px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 border border-white/5 text-[10px] font-bold text-primary tracking-wider uppercase">
+                    <div className="hidden md:block px-3 py-1.5 rounded-full bg-linear-to-r from-primary/10 to-secondary/10 border border-white/5 text-[10px] font-bold text-primary tracking-wider uppercase">
                         Nebula Workspace
                     </div>
                 </div>
@@ -104,26 +221,36 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
             <div className="flex-1 flex overflow-hidden relative">
                 {/* Background Grid */}
                 <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
-                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]" />
                 </div>
+
+                {/* Source Sidebar */}
+                <SourceSidebar
+                    sources={sources}
+                    activeSourceId={activeSourceId}
+                    selectedSourceIds={selectedSourceIds}
+                    onSourceClick={setActiveSourceId}
+                    onToggledSource={handleSourceToggle}
+                    onAddSource={handleAddSource}
+                    isAddingSource={isAddingSource}
+                />
 
                 {/* Left Panel: Viewer (PDF or Word) */}
                 <motion.div
                     initial={false}
                     animate={{
-                        width: isMobile ? (isPdfVisible ? '100%' : '0%') : (isPdfVisible ? '50%' : '0%'),
+                        width: isMobile ? (isPdfVisible ? '100%' : '0%') : (isPdfVisible ? '40%' : '0%'),
                         opacity: isMobile ? (isPdfVisible ? 1 : 0) : (isPdfVisible ? 1 : 0),
-                        x: isMobile ? (isPdfVisible ? 0 : -20) : (isPdfVisible ? 0 : -20),
                         display: isMobile ? (isPdfVisible ? 'block' : 'none') : (isPdfVisible ? 'block' : 'none')
                     }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="flex-shrink-0 border-r border-white/5 overflow-hidden bg-black/20 relative z-30"
+                    className="shrink-0 border-r border-white/5 overflow-hidden bg-black/20 relative z-30"
                 >
-                    <div className="h-full w-full min-w-[300px] md:min-w-[500px]">
+                    <div className="h-full w-full min-w-0">
                         {notebook.fileType === 'docx' ? (
                             <WordViewer contentHtml={notebook.contentHtml || ''} notebookId={notebook._id} />
                         ) : (
-                            <PDFViewer url={notebook.pdfUrl} />
+                            <PDFViewer url={activePdfUrl} />
                         )}
                     </div>
                 </motion.div>
@@ -137,7 +264,11 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     }}
                     className="flex-1 min-w-0 bg-black/20 relative z-10 h-full"
                 >
-                    <AIToolsPanel notebookId={notebook._id} chatHistory={notebook.chatHistory} />
+                    <AIToolsPanel
+                        notebookId={notebook._id}
+                        chatHistory={notebook.chatHistory}
+                        sourceIds={selectedSourceIds} // Pass selected IDs to AI tools
+                    />
                 </motion.div>
             </div>
         </div>

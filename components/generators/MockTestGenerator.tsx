@@ -12,6 +12,7 @@ import FuturisticLoader from '@/components/ui/FuturisticLoader';
 interface MockTestGeneratorProps {
     notebookId: string;
     modelProvider: string;
+    sourceIds?: string[];
 }
 
 interface Question {
@@ -34,13 +35,13 @@ interface GradingResult {
     feedback: string;
 }
 
-const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps) => {
+const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGeneratorProps) => {
     const [step, setStep] = useState<'config' | 'loading' | 'test' | 'grading' | 'result'>('config');
     const [config, setConfig] = useState({
         count: 5,
         difficulty: 'Medium',
         questionTypes: ['mcq', 'true-false'],
-        durationMode: 'auto' as 'auto' | 'custom',
+        durationMode: 'auto' as 'auto' | 'custom' | 'infinity',
         customDuration: 10, // minutes
         timeLimits: {
             mcq: 30,
@@ -65,7 +66,7 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
     // Retake Config State
     const [retakeModalOpen, setRetakeModalOpen] = useState(false);
     const [selectedRetakeTest, setSelectedRetakeTest] = useState<MockTest | null>(null);
-    const [retakeTimeMode, setRetakeTimeMode] = useState<'auto' | 'custom'>('auto');
+    const [retakeTimeMode, setRetakeTimeMode] = useState<'auto' | 'custom' | 'infinity'>('auto');
     const [retakeCustomDuration, setRetakeCustomDuration] = useState(10);
 
     useEffect(() => {
@@ -87,7 +88,8 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
         }
     };
 
-    const calculateTimeLimit = (questions: Question[], mode: 'auto' | 'custom', customDur: number) => {
+    const calculateTimeLimit = (questions: Question[], mode: 'auto' | 'custom' | 'infinity', customDur: number) => {
+        if (mode === 'infinity') return Infinity;
         if (mode === 'custom') {
             return customDur * 60;
         }
@@ -165,9 +167,10 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
     // Timer Logic
     useEffect(() => {
         let timer: NodeJS.Timeout;
-        if (step === 'test' && !isPaused) {
+        if (step === 'test' && !isPaused && timeLeft !== Infinity) {
             timer = setInterval(() => {
                 setTimeLeft((prev) => {
+                    if (prev === Infinity) return Infinity;
                     if (prev <= 1) {
                         clearInterval(timer);
                         submitTest();
@@ -178,9 +181,10 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
             }, 1000);
         }
         return () => clearInterval(timer);
-    }, [step, isPaused]);
+    }, [step, isPaused, timeLeft]);
 
     const formatTime = (seconds: number) => {
+        if (seconds === Infinity) return "∞";
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -211,7 +215,8 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                     config: {
                         count: config.count,
                         difficulty: config.difficulty,
-                        questionTypes: config.questionTypes
+                        questionTypes: config.questionTypes,
+                        sourceIds // Pass selected sources
                     },
                     modelProvider,
                 }),
@@ -311,7 +316,8 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                 config: {
                                     question: q.question,
                                     userAnswer: answer,
-                                    referenceAnswer: q.answer
+                                    referenceAnswer: q.answer,
+                                    sourceIds // Pass selected sources for context if needed
                                 },
                                 modelProvider,
                             }),
@@ -380,19 +386,19 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
     };
 
     return (
-        <div className="h-full p-6 overflow-y-auto flex flex-col relative overflow-x-hidden overscroll-contain" data-lenis-prevent>
-            <div className="shrink-0 mb-6 flex justify-between items-center">
+        <div className="h-full p-4 overflow-y-auto flex flex-col relative overflow-x-hidden overscroll-contain" data-lenis-prevent>
+            <div className="shrink-0 mb-4 flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold mb-2 text-glow">Mock Test</h2>
-                    <p className="text-muted">Test your knowledge with AI-generated questions.</p>
+                    <h2 className="text-lg font-bold mb-1 text-glow">Mock Test</h2>
+                    <p className="text-muted text-xs">Test your knowledge with AI-generated questions.</p>
                 </div>
                 {step === 'config' && (
                     <NeonButton
                         onClick={() => setShowHistory(true)}
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 h-8 text-xs px-3"
                         variant="secondary"
                     >
-                        <History size={16} />
+                        <History size={14} />
                         History
                     </NeonButton>
                 )}
@@ -518,6 +524,15 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                                 >
                                                     Custom
                                                 </button>
+                                                <button
+                                                    onClick={() => setRetakeTimeMode('infinity')}
+                                                    className={cn(
+                                                        "px-3 py-1.5 rounded text-xs font-medium transition-all",
+                                                        retakeTimeMode === 'infinity' ? "bg-primary/20 text-primary" : "text-muted hover:text-white"
+                                                    )}
+                                                >
+                                                    Unlimited
+                                                </button>
                                             </div>
                                         </div>
 
@@ -546,6 +561,11 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                                 <div className="absolute right-2 text-xs font-mono text-primary pointer-events-none">
                                                     {retakeCustomDuration}m
                                                 </div>
+                                            </div>
+                                        ) : retakeTimeMode === 'infinity' ? (
+                                            <div className="flex items-center gap-2 p-3 rounded-md bg-white/5 border border-white/10 text-xs text-muted mt-2">
+                                                <Clock size={14} className="text-primary" />
+                                                <span>No time limit. Take as long as you need.</span>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-2 p-3 rounded-md bg-white/5 border border-white/10 text-xs text-muted mt-2">
@@ -577,39 +597,39 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                     >
                         <div className="relative w-full">
                             {/* Decorative Tech Elements - Scaled Down */}
-                            <div className="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-primary/30 rounded-tl-lg" />
-                            <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-primary/30 rounded-br-lg" />
+                            <div className="absolute -top-3 -left-3 w-6 h-6 border-t-2 border-l-2 border-primary/30 rounded-tl-lg" />
+                            <div className="absolute -bottom-3 -right-3 w-6 h-6 border-b-2 border-r-2 border-primary/30 rounded-br-lg" />
 
-                            <GlassCard className="w-full p-5 border-primary/20 bg-black/40 backdrop-blur-xl relative overflow-hidden">
+                            <GlassCard className="w-full p-4 border-primary/20 bg-black/40 backdrop-blur-xl relative overflow-hidden">
                                 {/* Background Grid */}
                                 <div className="absolute inset-0 bg-[linear-gradient(rgba(0,240,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,240,255,0.03)_1px,transparent_1px)] bg-size-[20px_20px]" />
 
                                 <div className="relative z-10">
-                                    <div className="text-center mb-5 relative">
+                                    <div className="text-center mb-4 relative">
                                         <div className="absolute right-0 top-0">
                                             <button
                                                 onClick={() => setShowHistory(true)}
-                                                className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/50 text-muted hover:text-primary transition-all"
+                                                className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/50 text-muted hover:text-primary transition-all"
                                                 title="View History"
                                             >
-                                                <History size={18} />
+                                                <History size={16} />
                                             </button>
                                         </div>
-                                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-1.5">
+                                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                                             SYSTEM_READY
                                         </div>
-                                        <h3 className="text-lg font-bold text-white tracking-tight">CONFIGURE SIMULATION</h3>
+                                        <h3 className="text-base font-bold text-white tracking-tight">CONFIGURE SIMULATION</h3>
                                     </div>
 
-                                    <div className="space-y-5">
+                                    <div className="space-y-4">
                                         {/* Question Count Slider */}
-                                        <div className="space-y-2">
+                                        <div className="space-y-1.5">
                                             <div className="flex justify-between items-end">
-                                                <label className="text-xs font-medium text-muted uppercase tracking-wider">Target Output</label>
-                                                <div className="text-2xl font-bold text-primary tabular-nums tracking-tighter leading-none">
+                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Target Output</label>
+                                                <div className="text-lg font-bold text-primary tabular-nums tracking-tighter leading-none">
                                                     {config.count.toString().padStart(2, '0')}
-                                                    <span className="text-xs font-normal text-muted-foreground ml-1.5">QUESTIONS</span>
+                                                    <span className="text-[10px] font-normal text-muted-foreground ml-1">QUESTIONS</span>
                                                 </div>
                                             </div>
 
@@ -649,17 +669,17 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {/* Difficulty Selector */}
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-medium text-muted uppercase tracking-wider">Difficulty</label>
-                                                <div className="flex flex-col gap-1.5">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Difficulty</label>
+                                                <div className="flex flex-col gap-1">
                                                     {['Easy', 'Medium', 'Hard'].map(d => (
                                                         <button
                                                             key={d}
                                                             onClick={() => setConfig({ ...config, difficulty: d })}
                                                             className={cn(
-                                                                "relative group overflow-hidden px-3 py-2 rounded-md border text-left transition-all duration-300",
+                                                                "relative group overflow-hidden px-2 py-1.5 rounded-md border text-left transition-all duration-300",
                                                                 config.difficulty === d
                                                                     ? "bg-primary/10 border-primary text-primary shadow-[0_0_10px_rgba(0,240,255,0.15)]"
                                                                     : "bg-white/5 border-white/10 hover:border-white/20 text-muted-foreground hover:text-white"
@@ -669,11 +689,11 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                                                 "absolute left-0 top-0 bottom-0 w-0.5 transition-all duration-300",
                                                                 config.difficulty === d ? "bg-primary" : "bg-transparent group-hover:bg-white/20"
                                                             )} />
-                                                            <span className="relative z-10 text-sm font-medium">{d}</span>
+                                                            <span className="relative z-10 text-xs font-medium">{d}</span>
                                                             {config.difficulty === d && (
                                                                 <motion.span
                                                                     layoutId="active-diff"
-                                                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_8px_rgba(0,240,255,1)]"
+                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-primary rounded-full shadow-[0_0_8px_rgba(0,240,255,1)]"
                                                                 />
                                                             )}
                                                         </button>
@@ -682,9 +702,9 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                             </div>
 
                                             {/* Question Types */}
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-medium text-muted uppercase tracking-wider">Modules</label>
-                                                <div className="flex flex-col gap-1.5">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Modules</label>
+                                                <div className="flex flex-col gap-1">
                                                     {[
                                                         { id: 'mcq', label: 'Multiple Choice', icon: 'A/B' },
                                                         { id: 'true-false', label: 'True / False', icon: '+/-' },
@@ -701,15 +721,15 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                                                     if (types.length > 0) setConfig({ ...config, questionTypes: types });
                                                                 }}
                                                                 className={cn(
-                                                                    "flex items-center justify-between px-3 py-2 rounded-md border transition-all duration-300",
+                                                                    "flex items-center justify-between px-2 py-1.5 rounded-md border transition-all duration-300",
                                                                     isActive
                                                                         ? "bg-secondary/10 border-secondary text-secondary shadow-[0_0_10px_rgba(168,85,247,0.15)]"
                                                                         : "bg-white/5 border-white/10 hover:border-white/20 text-muted-foreground hover:text-white"
                                                                 )}
                                                             >
-                                                                <span className="text-sm font-medium">{t.label}</span>
+                                                                <span className="text-xs font-medium">{t.label}</span>
                                                                 <span className={cn(
-                                                                    "text-[10px] font-mono px-1.5 py-0.5 rounded border",
+                                                                    "text-[10px] font-mono px-1 py-0.5 rounded border",
                                                                     isActive ? "border-secondary/50 bg-secondary/20" : "border-white/10 bg-white/5"
                                                                 )}>{t.icon}</span>
                                                             </button>
@@ -720,33 +740,27 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                         </div>
 
                                         {/* Time Configuration */}
-                                        <div className="space-y-2">
+                                        <div className="space-y-1.5">
                                             <div className="flex justify-between items-center">
-                                                <label className="text-xs font-medium text-muted uppercase tracking-wider">Time Limit</label>
-                                                <div className="flex bg-white/5 rounded-lg p-0.5 border border-white/10">
-                                                    <button
-                                                        onClick={() => setConfig({ ...config, durationMode: 'auto' })}
-                                                        className={cn(
-                                                            "px-2 py-1 rounded text-[10px] font-medium transition-all",
-                                                            config.durationMode === 'auto' ? "bg-primary/20 text-primary" : "text-muted hover:text-white"
-                                                        )}
-                                                    >
-                                                        Auto
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setConfig({ ...config, durationMode: 'custom' })}
-                                                        className={cn(
-                                                            "px-2 py-1 rounded text-[10px] font-medium transition-all",
-                                                            config.durationMode === 'custom' ? "bg-primary/20 text-primary" : "text-muted hover:text-white"
-                                                        )}
-                                                    >
-                                                        Custom
-                                                    </button>
+                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Time Limit</label>
+                                                <div className="flex bg-white/5 rounded-md p-0.5 border border-white/10 scale-90 origin-right">
+                                                    {['auto', 'custom', 'infinity'].map(mode => (
+                                                        <button
+                                                            key={mode}
+                                                            onClick={() => setConfig({ ...config, durationMode: mode as any })}
+                                                            className={cn(
+                                                                "px-2 py-0.5 rounded text-[10px] font-medium transition-all capitalize",
+                                                                config.durationMode === mode ? "bg-primary/20 text-primary" : "text-muted hover:text-white"
+                                                            )}
+                                                        >
+                                                            {mode === 'infinity' ? 'Unlimited' : mode}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
 
                                             {config.durationMode === 'custom' ? (
-                                                <div className="relative h-8 flex items-center">
+                                                <div className="relative h-6 flex items-center">
                                                     <div className="absolute inset-0 bg-white/5 rounded-md border border-white/10" />
                                                     <div
                                                         className="absolute left-0 top-0 bottom-0 bg-primary/10 rounded-l-md border-r border-primary/30 transition-all duration-75"
@@ -762,14 +776,19 @@ const MockTestGenerator = ({ notebookId, modelProvider }: MockTestGeneratorProps
                                                         className="w-full absolute inset-0 opacity-0 cursor-pointer z-20"
                                                     />
                                                     <div
-                                                        className="absolute h-6 w-3 bg-primary border border-white/50 shadow-[0_0_10px_rgba(0,240,255,0.5)] rounded-[2px] pointer-events-none transition-all duration-75 z-10 flex items-center justify-center"
-                                                        style={{ left: `calc(${(config.customDuration / 60) * 100}% - 6px)` }}
+                                                        className="absolute h-4 w-2 bg-primary border border-white/50 shadow-[0_0_10px_rgba(0,240,255,0.5)] rounded-[1px] pointer-events-none transition-all duration-75 z-10 flex items-center justify-center"
+                                                        style={{ left: `calc(${(config.customDuration / 60) * 100}% - 4px)` }}
                                                     >
-                                                        <div className="w-px h-3 bg-black/50" />
+                                                        <div className="w-px h-2 bg-black/50" />
                                                     </div>
-                                                    <div className="absolute right-2 text-xs font-mono text-primary pointer-events-none">
+                                                    <div className="absolute right-2 text-[10px] font-mono text-primary pointer-events-none">
                                                         {config.customDuration}m
                                                     </div>
+                                                </div>
+                                            ) : config.durationMode === 'infinity' ? (
+                                                <div className="flex items-center gap-2 p-2 rounded-md bg-white/5 border border-white/10 text-xs text-muted">
+                                                    <Clock size={12} className="text-primary" />
+                                                    <span>No time limit. Take as long as you need.</span>
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-2 p-2 rounded-md bg-white/5 border border-white/10 text-xs text-muted">

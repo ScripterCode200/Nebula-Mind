@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         console.log('[Chat API] Request received');
         await connectToDatabase();
         const reqBody = await req.json();
-        const { notebookId, message, history, modelProvider } = reqBody;
+        const { notebookId, message, history, modelProvider, sourceIds } = reqBody;
 
         if (!notebookId || !message) {
             return NextResponse.json({ error: 'Notebook ID and message are required' }, { status: 400 });
@@ -45,7 +45,10 @@ export async function POST(req: NextRequest) {
         console.log(`[Chat API] User message saved. History length: ${chat.messages.length}`);
 
         // Context Retrieval Strategy
-        let context = notebook.pdfContent || '';
+        // Context Retrieval Strategy
+        // Use helper to fetch from R2 or Mongo
+        const { getNotebookContent } = await import('@/lib/notebook-context');
+        let context = await getNotebookContent(notebook, sourceIds);
 
         // Truncate context for Nebula 3 (Phi 3.5) and Ollama as requested
         if (modelProvider === 'phi3.5:3.8b' || modelProvider === 'ollama') {
@@ -102,6 +105,7 @@ export async function POST(req: NextRequest) {
                             model: "gpt-4o",
                             messages: messages,
                             stream: true,
+                            stream_options: { include_usage: true },
                         });
 
                         for await (const chunk of completion) {
@@ -115,6 +119,14 @@ export async function POST(req: NextRequest) {
                                     isStreamClosed = true;
                                     break;
                                 }
+                            }
+                            if (chunk.usage) {
+                                const { logTokenUsage } = await import('@/lib/token-cost');
+                                logTokenUsage('Chat API (OpenAI)', "gpt-4o", {
+                                    promptTokenCount: chunk.usage.prompt_tokens,
+                                    candidatesTokenCount: chunk.usage.completion_tokens,
+                                    totalTokenCount: chunk.usage.total_tokens
+                                });
                             }
                         }
                     } else if (modelProvider === 'ollama' || modelProvider === 'phi3.5:3.8b') {
@@ -182,6 +194,8 @@ export async function POST(req: NextRequest) {
                             const { done, value } = await reader.read();
                             if (done) {
                                 console.log('[Chat API] Ollama stream finished.');
+                                // Log partial metrics if available on done (Ollama sometimes sends them in the last chunk or done chunk)
+                                // JSON parsing below handles the final chunk content, checking logic there.
                                 break;
                             }
                             // console.log('[Chat API] Received chunk'); // Too noisy
@@ -197,7 +211,16 @@ export async function POST(req: NextRequest) {
                                         fullAiResponse += content;
                                         controller.enqueue(encoder.encode(content));
                                     }
-                                    if (json.done) break;
+                                    if (json.done) {
+                                        if (json.prompt_eval_count || json.eval_count) {
+                                            const { logTokenUsage } = await import('@/lib/token-cost');
+                                            logTokenUsage('Chat API (Ollama)', modelName, {
+                                                promptTokenCount: json.prompt_eval_count,
+                                                candidatesTokenCount: json.eval_count
+                                            });
+                                        }
+                                        break;
+                                    }
                                 } catch (e: any) {
                                     console.error('Error parsing Ollama chunk:', e);
                                     if (e.message && e.message.includes('closed')) {
@@ -233,6 +256,7 @@ export async function POST(req: NextRequest) {
                             return await chat.sendMessageStream(message);
                         };
 
+                        let activeModel = 'gemini-2.5-flash';
                         let result;
                         try {
                             // Try verified model first
@@ -242,12 +266,14 @@ export async function POST(req: NextRequest) {
                             // Try preview model
                             try {
                                 console.log('[Chat API] Falling back to gemini-2.5-flash-preview-001...');
+                                activeModel = 'gemini-2.5-flash-preview-001';
                                 result = await runChatStream("gemini-2.5-flash-preview-001");
                             } catch (previewError: any) {
                                 console.warn(`[Chat API] Failed with gemini-2.5-flash-preview-001: ${previewError.message}`);
                                 // Fallback to 1.5 Flash
                                 if (error.message?.includes('404') || error.message?.includes('NOT_FOUND') || previewError.message?.includes('404')) {
                                     console.log('[Chat API] Falling back to gemini-1.5-flash-001...');
+                                    activeModel = 'gemini-1.5-flash-001';
                                     result = await runChatStream("gemini-1.5-flash-001");
                                 } else {
                                     throw error;
@@ -270,7 +296,7 @@ export async function POST(req: NextRequest) {
                             // Vertex AI sends usage metadata in the last chunk (or cumulatively)
                             if (chunk.usageMetadata) {
                                 const { logTokenUsage } = await import('@/lib/token-cost');
-                                logTokenUsage('Chat API', chunk.usageMetadata);
+                                logTokenUsage('Chat API', activeModel, chunk.usageMetadata);
                             }
                         }
                     }

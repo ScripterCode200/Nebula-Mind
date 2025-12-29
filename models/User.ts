@@ -45,6 +45,8 @@ const UserSchema: Schema = new Schema({
         topic: { type: String },
         isTimeBound: { type: Boolean, default: true }
     }],
+    profileImage: { type: String, default: '' },
+    imageKitFileId: { type: String, default: '' },
     // Account Deletion
     deletionScheduledAt: { type: Date },
     role: {

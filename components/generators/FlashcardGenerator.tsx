@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 interface FlashcardGeneratorProps {
     notebookId: string;
     modelProvider: string;
+    sourceIds?: string[];
 }
 
 interface Flashcard {
@@ -20,7 +21,7 @@ interface Flashcard {
 
 import FuturisticLoader from '@/components/ui/FuturisticLoader';
 
-const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorProps) => {
+const FlashcardGenerator = ({ notebookId, modelProvider, sourceIds }: FlashcardGeneratorProps) => {
     const [count, setCount] = useState(5);
     const [cards, setCards] = useState<Flashcard[]>([]);
     const [loading, setLoading] = useState(false);
@@ -75,7 +76,10 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
                 body: JSON.stringify({
                     notebookId,
                     type: 'flashcards',
-                    config: { count },
+                    config: {
+                        count,
+                        sourceIds // Pass selected sources
+                    },
                     modelProvider,
                 }),
             });
@@ -130,26 +134,26 @@ const FlashcardGenerator = ({ notebookId, modelProvider }: FlashcardGeneratorPro
     const currentCard = cards[currentIndex];
 
     return (
-        <div className="h-full p-6 overflow-y-auto flex flex-col overscroll-contain" data-lenis-prevent>
-            <div className="shrink-0 mb-6">
-                <h2 className="text-2xl font-bold mb-2 text-glow">Flashcards</h2>
-                <p className="text-muted mb-6">Master key concepts with AI-generated cards.</p>
+        <div className="h-full p-4 overflow-y-auto flex flex-col overscroll-contain" data-lenis-prevent>
+            <div className="shrink-0 mb-4">
+                <h2 className="text-lg font-bold mb-1 text-glow">Flashcards</h2>
+                <p className="text-muted text-xs mb-3">Master key concepts with AI-generated cards.</p>
 
                 {!cards.length && !loading && (
-                    <div className="flex items-end gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-2 text-muted">Number of Cards</label>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs font-medium text-muted whitespace-nowrap">Count:</label>
                             <input
                                 type="number"
                                 min="1"
                                 max="20"
                                 value={count}
                                 onChange={(e) => setCount(parseInt(e.target.value))}
-                                className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 w-24 text-center focus:outline-none focus:border-primary"
+                                className="bg-white/5 border border-white/10 rounded-md px-2 py-1 w-14 text-center text-xs focus:outline-none focus:border-primary"
                             />
                         </div>
-                        <NeonButton onClick={generateCards} isLoading={loading}>
-                            <Layers size={18} />
+                        <NeonButton onClick={generateCards} isLoading={loading} size="sm" className="h-8 text-xs px-3">
+                            <Layers size={14} className="mr-1.5" />
                             Generate Deck
                         </NeonButton>
                     </div>

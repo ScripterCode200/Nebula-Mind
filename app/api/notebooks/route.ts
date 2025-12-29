@@ -20,6 +20,10 @@ async function getUserId(req: NextRequest) {
     }
 }
 
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { r2Client, R2_BUCKET_NAME } from '@/lib/r2';
+import { v4 as uuidv4 } from 'uuid';
+
 export async function POST(req: NextRequest) {
     try {
         const userId = await getUserId(req);
@@ -49,24 +53,20 @@ export async function POST(req: NextRequest) {
         }
 
         let buffer: Buffer;
-        let finalPdfUrl: string;
         let fileType: 'pdf' | 'docx' = 'pdf';
         let contentHtml = '';
         let pdfContent = '';
 
+        // 1. Get File Buffer
         if (file) {
             const arrayBuffer = await file.arrayBuffer();
             buffer = Buffer.from(arrayBuffer);
-            const base64 = buffer.toString('base64');
 
             const isDocx = file.name.toLowerCase().endsWith('.docx') ||
                 file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
             if (isDocx) {
                 fileType = 'docx';
-                finalPdfUrl = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${base64}`;
-            } else {
-                finalPdfUrl = `data:application/pdf;base64,${base64}`;
             }
         } else {
             // Fetch from URL
@@ -76,52 +76,75 @@ export async function POST(req: NextRequest) {
             }
             const arrayBuffer = await response.arrayBuffer();
             buffer = Buffer.from(arrayBuffer);
-            const base64 = buffer.toString('base64');
-            finalPdfUrl = `data:application/pdf;base64,${base64}`;
         }
 
+        // 2. Parse Content (Text Extraction)
         if (fileType === 'docx') {
             console.log('Parsing DOCX...');
             try {
                 const result = await mammoth.convertToHtml({ buffer });
-                contentHtml = result.value; // The generated HTML
-                const messages = result.messages; // Any messages, such as warnings during conversion
-                messages.forEach(msg => console.log('Mammoth msg:', msg));
-
+                contentHtml = result.value;
                 const textResult = await mammoth.extractRawText({ buffer });
                 pdfContent = textResult.value;
-                console.log('DOCX parsed, text length:', pdfContent.length);
             } catch (err) {
                 console.error('Error parsing DOCX:', err);
                 pdfContent = 'Error extracting text from Word document.';
                 contentHtml = '<p>Error loading document preview.</p>';
             }
         } else if (fileType === 'pdf') {
-            // Extract text from PDF
             console.log('Starting PDF parsing...');
             let clientPdfContent = formData.get('pdfContent') as string || '';
 
             if (clientPdfContent) {
-                console.log('Using client-provided PDF content, length:', clientPdfContent.length);
                 pdfContent = clientPdfContent;
             } else {
-                // Server-side fallback
                 try {
                     pdfContent = await parsePDF(buffer);
-                    console.log('PDF parsed successfully on server, length:', pdfContent.length);
                 } catch (pdfError: unknown) {
                     console.error('PDF Parse Error:', pdfError);
-                    // Don't fail, just log
                     pdfContent = '';
                 }
             }
         }
 
+        // 3. Upload to Cloudflare R2
+        const uniqueId = uuidv4();
+        const pdfKey = `${userId}/${uniqueId}.${fileType}`;
+        const contentKey = `${userId}/${uniqueId}.txt`;
+
+        console.log('Uploading file to R2:', pdfKey);
+
+        // Upload Original File
+        await r2Client.send(new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: pdfKey,
+            Body: buffer,
+            ContentType: fileType === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf',
+        }));
+
+        // Upload Extracted Text
+        if (pdfContent) {
+            console.log('Uploading text content to R2:', contentKey);
+            await r2Client.send(new PutObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: contentKey,
+                Body: pdfContent,
+                ContentType: 'text/plain',
+            }));
+        }
+
+        // 4. Save to MongoDB
+        // Note: contentHtml is still stored in Mongo for DOCX preview ease (usually smaller)
+        // unless it's huge, but for now we keep it simple.
+
         const notebook = await Notebook.create({
             title,
-            userId, // Save with userId
-            pdfUrl: finalPdfUrl,
-            pdfContent,
+            userId,
+            pdfUrl: 'R2_STORAGE', // Placeholder or use public URL if enabled
+            pdfContent: '', // Stored in R2 now
+            storageProvider: 'r2',
+            pdfKey,
+            contentKey: pdfContent ? contentKey : undefined,
             fileType,
             contentHtml
         });
