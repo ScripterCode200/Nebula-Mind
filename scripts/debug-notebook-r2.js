@@ -66,7 +66,6 @@ async function debugNotebook() {
         console.log('URL:', url);
 
         console.log('\nTesting URL...');
-        const fetch = (await import('node-fetch')).default;
         const res = await fetch(url);
         console.log('Status:', res.status);
         console.log('Content-Type:', res.headers.get('content-type'));

@@ -151,17 +151,18 @@ export async function POST(request: Request) {
         const prefsToUse = activePrefs.length > 0 ? activePrefs : DEFAULT_PREFERENCES;
 
         const systemSetting = await SystemSetting.findOne({ key: 'global' });
-        // Use 1.5 Flash 002 as the most stable current Vertex model
-        const DEFAULT_MODEL = 'gemini-1.5-flash-002';
+        // Use Gemini 2.5 Flash as the default stable model
+        const DEFAULT_MODEL = 'gemini-2.5-flash';
         let aiModel = systemSetting?.aiModel || DEFAULT_MODEL;
 
         // Map older/simpler names to valid Vertex AI IDs
         const modelMap: Record<string, string> = {
-            'gemini-2.5-flash': 'gemini-1.5-flash-002',
-            'gemini-2.0-flash': 'gemini-1.5-flash-002',
-            'gemini-2.0-flash-001': 'gemini-1.5-flash-002',
-            'gemini-1.5-flash': 'gemini-1.5-flash-002',
-            'gemini-1.5-flash-001': 'gemini-1.5-flash-002',
+            'gemini-2.5-flash': 'gemini-2.5-flash',
+            'gemini-2.0-flash': 'gemini-2.5-flash',
+            'gemini-2.0-flash-001': 'gemini-2.5-flash',
+            'gemini-1.5-flash': 'gemini-2.5-flash',
+            'gemini-1.5-flash-001': 'gemini-2.5-flash',
+            'gemini-1.5-flash-002': 'gemini-2.5-flash',
         };
         if (modelMap[aiModel]) aiModel = modelMap[aiModel];
 

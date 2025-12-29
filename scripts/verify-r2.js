@@ -58,7 +58,6 @@ async function verifyR2() {
 
         // 4. Fetch URL
         console.log('\nStep 4: Fetching URL to verify access...');
-        const fetch = (await import('node-fetch')).default;
         const res = await fetch(url);
         console.log('Status:', res.status);
         console.log('Content-Type:', res.headers.get('content-type'));

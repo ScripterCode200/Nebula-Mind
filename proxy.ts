@@ -4,7 +4,7 @@ import { jwtVerify } from 'jose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
     const token = req.cookies.get('token')?.value;
     const { pathname } = req.nextUrl;
 
@@ -33,8 +33,6 @@ export async function middleware(req: NextRequest) {
 
     // Also allow static assets if needed, but _next usually covers it.
     // If it's the root path '/', we might want to allow it as a landing page?
-    // User said "protect all routes from users which is not logged in".
-    // Usually landing page is public. I'll assume '/' is public.
     const isLandingPage = pathname === '/';
 
     // Helper to add header to next() response

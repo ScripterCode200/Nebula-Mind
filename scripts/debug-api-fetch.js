@@ -1,5 +1,5 @@
 
-const fetch = require('node-fetch');
+
 
 async function testApi() {
     const id = '6952ae647eb97df8be734783';

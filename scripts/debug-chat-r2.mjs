@@ -1,6 +1,4 @@
-
-import fetch from 'node-fetch';
-
+// Use native fetch
 async function testChatApi() {
     const notebookId = '6952ae647eb97df8be734783';
     const url = 'http://localhost:3000/api/chat';
@@ -30,16 +28,17 @@ async function testChatApi() {
 
         console.log('Response Status:', res.status);
 
-        // The response is a stream, so we read it
-        const reader = res.body;
-        // node-fetch v3 returns a Node.js Readable stream
-        reader.on('data', (chunk) => {
-            console.log('Chunk:', chunk.toString());
-        });
+        // The response is a stream, so we read it using the web standard API
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
 
-        reader.on('end', () => {
-            console.log('Stream finished.');
-        });
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            console.log('Chunk:', decoder.decode(value, { stream: true }));
+        }
+
+        console.log('Stream finished.');
 
     } catch (err) {
         console.error('Fetch failed:', err);

@@ -1,5 +1,6 @@
 
-import fetch from 'node-fetch';
+
+// Use native fetch
 
 async function testApi() {
     const id = '6952ae647eb97df8be734783';
