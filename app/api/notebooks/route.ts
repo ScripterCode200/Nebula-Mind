@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        let buffer: Buffer;
+        let buffer: Buffer | undefined;
         let fileType: 'pdf' | 'docx' = 'pdf';
         let contentHtml = '';
         let pdfContent = '';
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
             if (isDocx) {
                 fileType = 'docx';
             }
-        } else {
+        } else if (pdfUrlInput) {
             // Fetch from URL
             const response = await fetch(pdfUrlInput);
             if (!response.ok) {
@@ -79,40 +79,51 @@ export async function POST(req: NextRequest) {
             }
             const arrayBuffer = await response.arrayBuffer();
             buffer = Buffer.from(arrayBuffer);
+        } else if (fileKeyInput) {
+            // Pre-uploaded file. 
+            // Try to deduce fileType from key
+            if (fileKeyInput.toLowerCase().endsWith('.docx')) {
+                fileType = 'docx';
+            }
         }
 
-        // 2. Parse Content (Text Extraction)
-        if (fileType === 'docx') {
-            console.log('Parsing DOCX...');
-            try {
-                const result = await mammoth.convertToHtml({ buffer });
-                contentHtml = result.value;
-                const textResult = await mammoth.extractRawText({ buffer });
-                pdfContent = textResult.value;
-            } catch (err) {
-                console.error('Error parsing DOCX:', err);
-                pdfContent = 'Error extracting text from Word document.';
-                contentHtml = '<p>Error loading document preview.</p>';
-            }
-        } else if (fileType === 'pdf') {
-            console.log('Starting PDF parsing...');
-            let clientPdfContent = formData.get('pdfContent') as string || '';
+        let finalContentKey = formData.get('contentKey') as string | undefined;
 
-            if (clientPdfContent) {
-                pdfContent = clientPdfContent;
-            } else {
+        // 2. Parse Content (Text Extraction)
+        // Skip if we already have a content key (client uploaded text)
+        if (!finalContentKey) {
+            if (fileType === 'docx' && buffer) {
+                console.log('Parsing DOCX...');
                 try {
-                    pdfContent = await parsePDF(buffer);
-                } catch (pdfError: unknown) {
-                    console.error('PDF Parse Error:', pdfError);
-                    pdfContent = '';
+                    const result = await mammoth.convertToHtml({ buffer });
+                    contentHtml = result.value;
+                    const textResult = await mammoth.extractRawText({ buffer });
+                    pdfContent = textResult.value;
+                } catch (err) {
+                    console.error('Error parsing DOCX:', err);
+                    pdfContent = 'Error extracting text from Word document.';
+                    contentHtml = '<p>Error loading document preview.</p>';
+                }
+            } else if (fileType === 'pdf') {
+                console.log('Starting PDF parsing...');
+                let clientPdfContent = formData.get('pdfContent') as string || '';
+
+                if (clientPdfContent) {
+                    pdfContent = clientPdfContent;
+                } else if (buffer) {
+                    try {
+                        pdfContent = await parsePDF(buffer);
+                    } catch (pdfError: unknown) {
+                        console.error('PDF Parse Error:', pdfError);
+                        pdfContent = '';
+                    }
                 }
             }
         }
 
         let pdfKey = fileKeyInput;
 
-        if (!pdfKey) {
+        if (!pdfKey && buffer) {
             const uniqueId = uuidv4();
             pdfKey = `${userId}/${uniqueId}.${fileType}`;
             console.log('Uploading file to R2:', pdfKey);
@@ -121,16 +132,14 @@ export async function POST(req: NextRequest) {
             await r2Client.send(new PutObjectCommand({
                 Bucket: R2_BUCKET_NAME,
                 Key: pdfKey,
-                Body: buffer,
+                Body: buffer!,
                 ContentType: fileType === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf',
             }));
-        } else {
+        } else if (pdfKey) {
             console.log('File already uploaded to R2 with key:', pdfKey);
         }
 
-        // Upload Extracted Text
-        let finalContentKey = formData.get('contentKey') as string | undefined;
-
+        // Upload Extracted Text (only if not already uploaded)
         if (!finalContentKey && pdfContent) {
             // Use same ID as pdfKey if possible, cleaning up extension
             const baseId = pdfKey.substring(0, pdfKey.lastIndexOf('.')) || pdfKey;
