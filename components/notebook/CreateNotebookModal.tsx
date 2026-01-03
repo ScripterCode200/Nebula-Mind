@@ -144,8 +144,16 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
         }
 
         if (extractedText) {
-            formData.append('pdfContent', extractedText);
-            console.log('Client-side extraction successful, length:', extractedText.length);
+            try {
+                setLoadingStep('Uploading extracted text...');
+                const textFile = new File([extractedText], `${title.replace(/[^a-z0-9]/gi, '_')}_content.txt`, { type: 'text/plain' });
+                const contentKey = await uploadFileToR2(textFile);
+                formData.append('contentKey', contentKey);
+                console.log('Client-side extraction uploaded to R2, key:', contentKey);
+            } catch (err) {
+                console.error('Failed to upload extracted text, falling back to direct send (risk of 413)', err);
+                formData.append('pdfContent', extractedText);
+            }
         }
 
         try {

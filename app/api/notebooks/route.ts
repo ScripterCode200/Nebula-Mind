@@ -24,6 +24,8 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { r2Client, R2_BUCKET_NAME } from '@/lib/r2';
 import { v4 as uuidv4 } from 'uuid';
 
+export const maxDuration = 60; // Set timeout to 60 seconds (Vercel limit for Pro)
+
 export async function POST(req: NextRequest) {
     try {
         const userId = await getUserId(req);
@@ -127,8 +129,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Upload Extracted Text
-        let finalContentKey = undefined;
-        if (pdfContent) {
+        let finalContentKey = formData.get('contentKey') as string | undefined;
+
+        if (!finalContentKey && pdfContent) {
             // Use same ID as pdfKey if possible, cleaning up extension
             const baseId = pdfKey.substring(0, pdfKey.lastIndexOf('.')) || pdfKey;
             const contentKey = `${baseId}.txt`;
