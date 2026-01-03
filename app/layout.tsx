@@ -71,6 +71,7 @@ import SmoothScroll from "@/components/ui/SmoothScroll";
 import AuthGuard from "@/components/AuthGuard";
 import MaintenanceListener from "@/components/MaintenanceListener";
 import ActivityTracker from "@/components/ActivityTracker";
+import NetworkStatusHandler from "@/components/NetworkStatusHandler";
 import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -92,6 +93,7 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <AuthGuard>
+          <NetworkStatusHandler />
           <MaintenanceListener />
           <ActivityTracker />
           <SmoothScroll>

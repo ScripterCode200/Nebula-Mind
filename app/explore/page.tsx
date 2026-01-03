@@ -75,9 +75,11 @@ export default function ExplorePage() {
 
     // Fetch Daily Goals with Iterative Generation
     useEffect(() => {
+        const generationController = new AbortController();
+
         const fetchAndGenerate = async () => {
             try {
-                // 1. Check Cache First
+                // Check Cache First
                 const today = new Date().toDateString();
                 const cachedData = localStorage.getItem('dailyGoalsCache');
                 let currentGoals: DailyGoal[] = [];
@@ -88,7 +90,6 @@ export default function ExplorePage() {
                         if (parsed.date === today) {
                             currentGoals = parsed.goals;
                             setDailyGoals(currentGoals);
-                            // If we have full set, we still fetch later but we can stop initial spinner
                             if (currentGoals.length >= 7) {
                                 setIsLoadingGoals(false);
                             }
@@ -98,64 +99,61 @@ export default function ExplorePage() {
                     }
                 }
 
-                // 2. ALWAYS Fetch Existing from API to ensure consistency with DB (especially after Admin Reset)
                 try {
-                    const res = await fetch('/api/daily-goals');
+                    const res = await fetch('/api/daily-goals', { signal: generationController.signal });
                     if (res.ok) {
                         const data = await res.json();
                         if (data.goals) {
                             const mapped = data.goals.map((g: any) => ({ ...g, id: g._id, duration: g.estimatedTime }));
-
-                            // If the API goals differ from our current goals (e.g. after reset, API returns []), update state
                             if (JSON.stringify(mapped) !== JSON.stringify(currentGoals)) {
-                                console.log("[Explore] API data differs from cache. Updating...");
                                 currentGoals = mapped;
                                 setDailyGoals(currentGoals);
-
-                                // Update cache immediately
-                                localStorage.setItem('dailyGoalsCache', JSON.stringify({
-                                    date: today,
-                                    goals: currentGoals
-                                }));
+                                localStorage.setItem('dailyGoalsCache', JSON.stringify({ date: today, goals: currentGoals }));
                             }
                         }
                     }
                 } catch (fetchErr) {
+                    if (fetchErr instanceof Error && fetchErr.name === 'AbortError') return;
                     console.error("Initial fetch failed:", fetchErr);
                 }
 
-                // 3. Generate Missing Slots iteratively
                 const needed = 7 - currentGoals.length;
-
-                // If we have at least getting started, we can stop the big spinner 
                 if (currentGoals.length > 0) setIsLoadingGoals(false);
 
                 if (needed > 0) {
-                    console.log(`[Explore] Needs ${needed} more goals. triggering...`);
-                    // Fire requests for missing slots
-                    // Sequential Generation Loop to prevent 429/500 errors
                     console.log(`[Explore] Needs ${needed} more goals. triggering sequential generation...`);
 
                     for (let i = 0; i < needed; i++) {
-                        // Add delay to prevent rate limiting
+                        if (generationController.signal.aborted) break;
+
+                        // Wait 1s between requests to be gentle with the AI service
                         if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
+                        if (generationController.signal.aborted) break;
+
+                        const offset = currentGoals.length + i;
+                        const requestController = new AbortController();
+                        let timeoutId: NodeJS.Timeout | null = null;
+
+                        // Handler for component unmount
+                        const onUnmount = () => requestController.abort('unmount');
 
                         try {
-                            const offset = currentGoals.length + i;
-                            console.log(`[Explore] Requesting slot index: ${offset}`);
+                            // Link component unmount to this specific request
+                            generationController.signal.addEventListener('abort', onUnmount);
 
-                            // Add a 45s timeout to prevent infinite "generating" state
-                            const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 45000);
+                            // Set a 10-minute timeout for the AI generation
+                            timeoutId = setTimeout(() => requestController.abort('timeout'), 600000);
 
                             const genRes = await fetch('/api/daily-goals', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ index: offset }),
-                                signal: controller.signal
+                                signal: requestController.signal
                             });
 
-                            clearTimeout(timeoutId);
+                            // Cleanup timeout and listener immediately after request completes
+                            if (timeoutId) clearTimeout(timeoutId);
+                            generationController.signal.removeEventListener('abort', onUnmount);
 
                             if (!genRes.ok) {
                                 console.error(`[Explore] Slot ${offset} failed with status: ${genRes.status}`);
@@ -163,47 +161,48 @@ export default function ExplorePage() {
                             }
 
                             const genData = await genRes.json();
-
                             if (genData.goal) {
-                                console.log(`[Explore] Received goal for slot ${offset}: ${genData.goal.title}`);
                                 const newGoal = { ...genData.goal, id: genData.goal._id, duration: genData.goal.estimatedTime };
-
-                                // Update State Immediately
                                 setDailyGoals(prev => {
                                     if (prev.some(g => g.id === newGoal.id)) return prev;
                                     const updated = [...prev, newGoal];
-
-                                    // Update Cache
-                                    localStorage.setItem('dailyGoalsCache', JSON.stringify({
-                                        date: today,
-                                        goals: updated
-                                    }));
-
+                                    localStorage.setItem('dailyGoalsCache', JSON.stringify({ date: today, goals: updated }));
                                     return updated;
                                 });
-
-                                // Hide loader after first successful generation if getting started
                                 if (i === 0) setIsLoadingGoals(false);
                             }
-                        } catch (err) {
-                            console.error(`Failed to generate slot with index ${currentGoals.length + i}`, err);
+                        } catch (err: unknown) {
+                            // Cleanup in catch block as well
+                            if (timeoutId) clearTimeout(timeoutId);
+                            generationController.signal.removeEventListener('abort', onUnmount);
+
+                            if (err instanceof Error && err.name === 'AbortError') {
+                                // Check the reason from the request signal
+                                const reason = requestController.signal.reason;
+                                if (reason === 'unmount' || generationController.signal.aborted) {
+                                    console.log("[Explore] Generation aborted (component unmounted)");
+                                    break;
+                                } else {
+                                    console.warn(`[Explore] Slot ${offset} timed out after 10 minutes`);
+                                }
+                            } else {
+                                console.error(`Failed to generate slot with index ${offset}`, err);
+                            }
                         }
                     }
-
                     setIsLoadingGoals(false);
-                    console.log("[Explore] All slots processed.");
                 } else {
-                    console.log("[Explore] No additional slots needed.");
                     setIsLoadingGoals(false);
                 }
-
             } catch (error) {
+                if (error instanceof Error && error.name === 'AbortError') return;
                 console.error("Failed to fetch daily goals:", error);
                 setIsLoadingGoals(false);
             }
         };
 
         fetchAndGenerate();
+        return () => generationController.abort('unmount');
     }, []);
 
     // Timer Logic for IST Midnight
@@ -503,7 +502,7 @@ export default function ExplorePage() {
                                 </div>
                                 <p className="text-lg font-medium text-white">No exams found</p>
                                 <p className="text-sm opacity-60 max-w-xs mx-auto mt-1">
-                                    We couldn't find any exams matching your current filters.
+                                    We couldn&apos;t find any exams matching your current filters.
                                 </p>
                                 <button
                                     onClick={() => {

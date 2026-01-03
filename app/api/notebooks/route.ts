@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         if (existingNotebook) {
             return NextResponse.json({
                 success: true,
-                notebookId: existingNotebook._id,
+                notebookId: (existingNotebook as { _id: string })._id,
                 message: 'Notebook already exists'
             });
         }

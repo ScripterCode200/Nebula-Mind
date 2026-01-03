@@ -49,7 +49,7 @@ export async function proxy(req: NextRequest) {
 
     if (isPublic || isLandingPage) {
         // Redirect logged-in users away from auth pages
-        if ((pathname === '/login' || pathname === '/signup') && token) {
+        if ((pathname === '/login' || pathname === '/signup' || pathname === '/') && token) {
             try {
                 const secret = new TextEncoder().encode(JWT_SECRET);
                 await jwtVerify(token, secret);

@@ -6,14 +6,13 @@ import { Plus, Book, Calendar, Search, Sparkles, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
+import DeleteConfirmationModal from '@/components/notebook/DeleteConfirmationModal';
+import Link from 'next/link';
 
 const CreateNotebookModal = dynamic<{ isOpen: boolean; onClose: () => void }>(
     () => import('@/components/notebook/CreateNotebookModal'),
     { ssr: false }
 );
-
-import DeleteConfirmationModal from '@/components/notebook/DeleteConfirmationModal';
-import Link from 'next/link';
 
 interface Notebook {
     _id: string;
