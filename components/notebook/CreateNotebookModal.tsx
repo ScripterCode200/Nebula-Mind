@@ -42,6 +42,38 @@ const extractPdfText = async (fileOrUrl: File | string): Promise<string> => {
     }
 };
 
+const uploadFileToR2 = async (file: File) => {
+    try {
+        // 1. Get Presigned URL
+        const presignRes = await fetch('/api/upload/presign', {
+            method: 'POST',
+            body: JSON.stringify({
+                filename: file.name,
+                contentType: file.type
+            }),
+        });
+
+        if (!presignRes.ok) throw new Error('Failed to get upload URL');
+        const { url, key } = await presignRes.json();
+
+        // 2. Upload File directly to R2
+        const uploadRes = await fetch(url, {
+            method: 'PUT',
+            body: file,
+            headers: {
+                'Content-Type': file.type
+            }
+        });
+
+        if (!uploadRes.ok) throw new Error('Failed to upload file to storage');
+
+        return key;
+    } catch (error) {
+        console.error('Direct upload failed:', error);
+        throw error;
+    }
+};
+
 interface CreateNotebookModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -83,18 +115,32 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
         formData.append('title', title);
 
         // Extract text on client side (PDF only)
+        // Extract text on client side (PDF only)
         let extractedText = '';
-        if (file && file.type === 'application/pdf') {
-            formData.append('file', file);
-            extractedText = await extractPdfText(file);
-        } else if (file) {
-            // DOCX or other
-            formData.append('file', file);
-        } else if (pdfUrl) {
-            formData.append('pdfUrl', pdfUrl);
-            if (pdfUrl.toLowerCase().endsWith('.pdf')) {
-                extractedText = await extractPdfText(pdfUrl);
+        let fileKey = '';
+
+        try {
+            if (file) {
+                // Upload file first
+                fileKey = await uploadFileToR2(file);
+                formData.append('fileKey', fileKey);
+
+                if (file.type === 'application/pdf') {
+                    // Extract text in parallel or after?
+                    // doing it here to be safe
+                    extractedText = await extractPdfText(file);
+                }
+            } else if (pdfUrl) {
+                formData.append('pdfUrl', pdfUrl);
+                if (pdfUrl.toLowerCase().endsWith('.pdf')) {
+                    extractedText = await extractPdfText(pdfUrl);
+                }
             }
+        } catch (err: any) {
+            console.error(err);
+            setLoadingStep(`Error: ${err.message || 'Upload failed'}`);
+            setTimeout(() => setIsUploading(false), 2000);
+            return;
         }
 
         if (extractedText) {

@@ -37,9 +37,10 @@ export async function POST(req: NextRequest) {
         const file = formData.get('file') as File;
         const title = formData.get('title') as string;
         const pdfUrlInput = formData.get('pdfUrl') as string;
+        const fileKeyInput = formData.get('fileKey') as string;
 
-        if (!title || (!file && !pdfUrlInput)) {
-            return NextResponse.json({ error: 'Title and either File or URL are required' }, { status: 400 });
+        if (!title || (!file && !pdfUrlInput && !fileKeyInput)) {
+            return NextResponse.json({ error: 'Title and either File, URL, or FileKey are required' }, { status: 400 });
         }
 
         // Check for duplicate title
@@ -107,23 +108,31 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 3. Upload to Cloudflare R2
-        const uniqueId = uuidv4();
-        const pdfKey = `${userId}/${uniqueId}.${fileType}`;
-        const contentKey = `${userId}/${uniqueId}.txt`;
+        let pdfKey = fileKeyInput;
 
-        console.log('Uploading file to R2:', pdfKey);
+        if (!pdfKey) {
+            const uniqueId = uuidv4();
+            pdfKey = `${userId}/${uniqueId}.${fileType}`;
+            console.log('Uploading file to R2:', pdfKey);
 
-        // Upload Original File
-        await r2Client.send(new PutObjectCommand({
-            Bucket: R2_BUCKET_NAME,
-            Key: pdfKey,
-            Body: buffer,
-            ContentType: fileType === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf',
-        }));
+            // Upload Original File
+            await r2Client.send(new PutObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: pdfKey,
+                Body: buffer,
+                ContentType: fileType === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf',
+            }));
+        } else {
+            console.log('File already uploaded to R2 with key:', pdfKey);
+        }
 
         // Upload Extracted Text
+        let finalContentKey = undefined;
         if (pdfContent) {
+            // Use same ID as pdfKey if possible, cleaning up extension
+            const baseId = pdfKey.substring(0, pdfKey.lastIndexOf('.')) || pdfKey;
+            const contentKey = `${baseId}.txt`;
+
             console.log('Uploading text content to R2:', contentKey);
             await r2Client.send(new PutObjectCommand({
                 Bucket: R2_BUCKET_NAME,
@@ -131,6 +140,7 @@ export async function POST(req: NextRequest) {
                 Body: pdfContent,
                 ContentType: 'text/plain',
             }));
+            finalContentKey = contentKey;
         }
 
         // 4. Save to MongoDB
@@ -144,7 +154,7 @@ export async function POST(req: NextRequest) {
             pdfContent: '', // Stored in R2 now
             storageProvider: 'r2',
             pdfKey,
-            contentKey: pdfContent ? contentKey : undefined,
+            contentKey: finalContentKey,
             fileType,
             contentHtml
         });
