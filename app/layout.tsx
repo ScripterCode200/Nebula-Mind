@@ -71,6 +71,8 @@ import SmoothScroll from "@/components/ui/SmoothScroll";
 import AuthGuard from "@/components/AuthGuard";
 import MaintenanceListener from "@/components/MaintenanceListener";
 import ActivityTracker from "@/components/ActivityTracker";
+import GlobalGoalManager from "@/components/GlobalGoalManager";
+
 import NetworkStatusHandler from "@/components/NetworkStatusHandler";
 import { headers } from 'next/headers';
 
@@ -81,10 +83,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const headersList = await headers();
-  const pathname = headersList.get('x-current-path') || '';
-  // Hide global nav on special pages and inside notebooks
-  const isSpecialPage = ['/maintenance', '/blocked'].includes(pathname) || pathname.startsWith('/notebook/');
+  //   const headersList = await headers();
+  //   const pathname = headersList.get('x-current-path') || '';
+  //   // Hide global nav on special pages and inside notebooks
+  //   const isSpecialPage = ['/maintenance', '/blocked'].includes(pathname) || pathname.startsWith('/notebook/');
 
   return (
     <html lang="en">
@@ -96,15 +98,16 @@ export default async function RootLayout({
           <NetworkStatusHandler />
           <MaintenanceListener />
           <ActivityTracker />
-          <SmoothScroll>
-            {!isSpecialPage && <AppSidebar />}
+          <GlobalGoalManager />
+          <div className="flex min-h-screen">
+            <AppSidebar />
 
             <LayoutWrapper>
-              {!isSpecialPage && <Navbar />}
+              <Navbar />
               {children}
-              {!isSpecialPage && <Footer />}
+              <Footer />
             </LayoutWrapper>
-          </SmoothScroll>
+          </div>
         </AuthGuard>
         <Toaster position="top-center" theme="dark" />
       </body>

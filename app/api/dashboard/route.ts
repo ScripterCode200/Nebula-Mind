@@ -78,7 +78,8 @@ export async function GET(req: NextRequest) {
             rarityStats: user.stats?.rarityStats || { uncommon: 0, rare: 0, epic: 0, legendary: 0 },
             recentActivity,
             chartData,
-            achievements: user.achievements
+            achievements: user.achievements,
+            user: { _id: user._id, name: user.name, email: user.email }
         });
 
     } catch (error) {

@@ -2,12 +2,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ISource {
     _id?: string;
-    type: 'pdf';
+    type: 'pdf' | 'youtube';
     name: string;
-    fileKey: string;
+    fileKey?: string;
     contentKey: string;
     addedAt: Date;
     size?: number;
+    url?: string;
 }
 
 export interface INotebook extends Document {
@@ -24,26 +25,32 @@ export interface INotebook extends Document {
         timestamp: Date;
     }[];
     annotations: Record<number, any[]>; // Page number -> Array of paths
-    fileType: 'pdf' | 'docx';
+    fileType: 'pdf' | 'docx' | 'text';
     contentHtml?: string;
     createdAt: Date;
+    sharedWith: {
+        userId: string;
+        sharedAt: Date;
+        permission: string;
+    }[];
 }
 
 const NotebookSchema: Schema = new Schema({
     title: { type: String, required: true },
     userId: { type: String, required: true, index: true }, // Linked to User._id
-    pdfUrl: { type: String, required: true },
+    pdfUrl: { type: String, default: '' }, // Could be empty if created from YouTube/text content directly
     pdfContent: { type: String, default: '' },
     storageProvider: { type: String, enum: ['mongo', 'r2'], default: 'mongo' },
     pdfKey: { type: String },
     contentKey: { type: String },
     sources: [{
-        type: { type: String, enum: ['pdf'], default: 'pdf' },
+        type: { type: String, enum: ['pdf', 'youtube'], default: 'pdf' },
         name: { type: String, required: true },
-        fileKey: { type: String, required: true }, // R2 Key for the PDF
+        fileKey: { type: String }, // R2 Key for the PDF (Optional for YouTube)
         contentKey: { type: String, required: true }, // R2 Key for the extracted text
         addedAt: { type: Date, default: Date.now },
-        size: Number
+        size: Number,
+        url: String // External URL (e.g. YouTube link)
     }],
     // chatHistory moved to separate Chat model
     // chatHistory: [{
@@ -52,9 +59,14 @@ const NotebookSchema: Schema = new Schema({
     //     timestamp: { type: Date, default: Date.now }
     // }],
     annotations: { type: Map, of: [Object], default: {} },
-    fileType: { type: String, enum: ['pdf', 'docx'], default: 'pdf' },
+    fileType: { type: String, enum: ['pdf', 'docx', 'text'], default: 'pdf' },
     contentHtml: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },
+    sharedWith: [{
+        userId: { type: String, required: true },
+        sharedAt: { type: Date, default: Date.now },
+        permission: { type: String, default: 'view' }
+    }]
 });
 
 export default mongoose.models.Notebook || mongoose.model<INotebook>('Notebook', NotebookSchema);

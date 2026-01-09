@@ -4,6 +4,8 @@ import { jwtVerify } from 'jose';
 import connectToDatabase from '@/lib/db';
 import User from '@/models/User';
 import ActivityLog from '@/models/ActivityLog';
+import { calculateLevel } from '@/lib/levelUtils';
+
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
 
@@ -55,8 +57,13 @@ export async function POST(req: NextRequest) {
 
         // Increment Time
         user.stats.totalTimeSpent += 1;
-        user.stats.xp += 5; // 5 XP per minute
+        user.stats.xp += 1; // NERFED: 1 XP per minute (was 5)
+
+        // Recalculate Level
+        user.stats.level = calculateLevel(user.stats.xp);
+
         user.lastActiveAt = new Date();
+
 
         // 4. Update Daily Stats
         // Calculate "Today" based on User's Timezone
@@ -72,10 +79,10 @@ export async function POST(req: NextRequest) {
         const dailyStatIndex = user.dailyStats.findIndex((s: any) => s.date === todayStr);
         if (dailyStatIndex > -1) {
             user.dailyStats[dailyStatIndex].timeSpent += 1;
-            user.dailyStats[dailyStatIndex].xpGained += 5;
+            user.dailyStats[dailyStatIndex].xpGained += 1; // NERFED
         } else {
             // Push new day and slice to keep last 30
-            user.dailyStats.push({ date: todayStr, timeSpent: 1, xpGained: 5 });
+            user.dailyStats.push({ date: todayStr, timeSpent: 1, xpGained: 1 }); // NERFED
             if (user.dailyStats.length > 30) {
                 user.dailyStats.shift(); // Remove oldest
             }

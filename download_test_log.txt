@@ -1,0 +1,6 @@
+STARTING TEST PART 2
+
+--- Testing Download with client: IOS ---
+Fetching info for qJZ1Ez28C-A...
+FAILED with IOS:
+Request to https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json failed with status code 404

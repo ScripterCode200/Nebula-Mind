@@ -7,6 +7,8 @@ import Exam from '@/models/Exam';
 import vertex_ai from '@/lib/gemini';
 import User from '@/models/User';
 import TestResult from '@/models/TestResult';
+import { calculateLevel } from '@/lib/levelUtils';
+
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
 
@@ -193,8 +195,12 @@ export async function POST(request: Request) {
 
                     rewardType = 'XP';
                     rewardValue = xpToAdd;
+
+                    // Update Level
+                    user.stats.level = calculateLevel(user.stats.xp);
                 }
                 await user.save();
+
             }
         }
 

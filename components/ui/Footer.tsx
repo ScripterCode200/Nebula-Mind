@@ -57,9 +57,7 @@ const SocialLink = ({ href, icon: Icon }: { href: string, icon: any }) => (
 export default function Footer() {
     const pathname = usePathname();
 
-    if (pathname?.startsWith('/notebook')) {
-        return null;
-    }
+
 
     const { user, setUser } = useUserStore();
     const [isLoading, setIsLoading] = useState(false);
@@ -89,10 +87,14 @@ export default function Footer() {
         }
     };
 
+    if (pathname?.startsWith('/notebook') || pathname === '/maintenance' || pathname === '/blocked') {
+        return null;
+    }
+
     return (
         <footer className="relative z-10 border-t border-white/5 bg-[#050505] pt-20 pb-10 overflow-hidden">
             {/* Background Glow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-px bg-linear-to-r from-transparent via-primary/50 to-transparent" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
 
             <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
@@ -101,7 +103,7 @@ export default function Footer() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-20">
                     <div className="space-y-6">
                         <Link href="/" className="flex items-center gap-3 group">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-black font-bold shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all duration-300">
+                            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-secondary flex items-center justify-center text-black font-bold shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all duration-300">
                                 <Brain size={22} />
                             </div>
                             <span className="font-bold text-2xl tracking-tight text-white">Nebula Mind</span>
@@ -119,7 +121,7 @@ export default function Footer() {
 
                     <div className="lg:pl-12">
                         <div className="p-6 md:p-8 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
+                            <div className="absolute inset-0 bg-linear-to-r from-primary/20 via-blue-400/20 to-primary/20 animate-pulse" />
                             <div className="relative z-10">
                                 <h3 className="text-xl font-bold mb-2 text-white">Stay ahead of the curve</h3>
                                 <p className="text-muted-foreground mb-6">Join 50,000+ learners getting the latest AI study tips and feature updates.</p>

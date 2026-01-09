@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+interface SavedAccount {
+    userId: string;
+    name: string;
+    email: string;
+    token: string;
+    avatar?: string;
+}
+
 interface UserState {
     user: any | null;
     name: string;
@@ -10,6 +18,7 @@ interface UserState {
     university: string;
     deletionScheduledAt: Date | null;
     isAuthenticated: boolean;
+    savedAccounts: SavedAccount[]; // List of logged-in accounts
     setUser: (user: any) => void;
     updateProfile: (data: Partial<UserState>) => Promise<void>;
     updateStats: (stats: any) => void;
@@ -17,6 +26,9 @@ interface UserState {
     logout: () => void;
     scheduleDeletion: () => Promise<void>;
     cancelDeletion: () => Promise<void>;
+    saveAccount: (account: SavedAccount) => void;
+    removeAccount: (userId: string) => void;
+    switchAccount: (token: string) => Promise<void>;
 }
 
 export const useUserStore = create<UserState>()(
@@ -30,7 +42,41 @@ export const useUserStore = create<UserState>()(
             university: '',
             deletionScheduledAt: null,
             isAuthenticated: false,
+            savedAccounts: [],
             setUser: (user) => set({ user }),
+            saveAccount: (account) => set((state) => {
+                const exists = state.savedAccounts.some(a => a.userId === account.userId);
+                if (exists) {
+                    // Update token if already exists
+                    return {
+                        savedAccounts: state.savedAccounts.map(a =>
+                            a.userId === account.userId ? account : a
+                        )
+                    };
+                }
+                return { savedAccounts: [...state.savedAccounts, account] };
+            }),
+            removeAccount: (userId) => set((state) => ({
+                savedAccounts: state.savedAccounts.filter(a => a.userId !== userId)
+            })),
+            switchAccount: async (token) => {
+                try {
+                    const res = await fetch('/api/auth/switch-account', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token })
+                    });
+
+                    if (res.ok) {
+                        window.location.reload();
+                    } else {
+                        console.error('Failed to switch account');
+                        // Optional: remove invalid account?
+                    }
+                } catch (error) {
+                    console.error('Switch account error', error);
+                }
+            },
             updateProfile: async (data) => {
                 // Optimistic update
                 set((state) => ({ ...state, ...data }));

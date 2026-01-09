@@ -11,12 +11,19 @@ import {
 import { useUserStore } from '@/store/useUserStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useEffect, useState } from 'react';
+import SwitchAccountModal from '../auth/SwitchAccountModal';
 
 export default function AppSidebar() {
     const pathname = usePathname();
-    const { user, logout } = useUserStore();
+    const { user, logout, savedAccounts, switchAccount, removeAccount } = useUserStore();
     const { isSidebarOpen, closeSidebar, toggleSidebar } = useUIStore();
     const [isMobile, setIsMobile] = useState(false);
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
+    const [isSwitching, setIsSwitching] = useState(false);
+
+    console.log('Current User:', user);
+    console.log('Saved Accounts:', savedAccounts);
 
     // Handle responsiveness
     useEffect(() => {
@@ -39,22 +46,22 @@ export default function AppSidebar() {
     }, [pathname, isMobile, closeSidebar]);
 
     // Don't render if on a notebook page (focused workspace) or not logged in
-    const isNotebookPage = pathname?.startsWith('/notebook/');
-    if (!user || isNotebookPage) return null;
+
 
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: Layout },
         { name: 'My Notebooks', href: '/notebook', icon: BookOpen },
         { name: 'Explore', href: '/explore', icon: Compass },
         { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
+        { name: 'Profile', href: '/profile', icon: User },
     ];
 
     // Role-based items
-    if (user.role === 'admin' || user.role === 'editor') {
+    if (user?.role === 'admin' || user?.role === 'editor') {
         navItems.push({ name: 'Editor', href: '/editor', icon: FileEdit });
     }
 
-    if (user.role === 'admin') {
+    if (user?.role === 'admin') {
         navItems.push({ name: 'Admin Panel', href: '/admin', icon: Shield });
     }
 
@@ -81,8 +88,13 @@ export default function AppSidebar() {
         }
     };
 
+    const isNotebookPage = pathname?.startsWith('/notebook/') || pathname === '/maintenance' || pathname === '/blocked';
+    if (!user || isNotebookPage) return null;
+
     return (
         <>
+            <SwitchAccountModal isOpen={isSwitchModalOpen} onClose={() => setIsSwitchModalOpen(false)} />
+
             {/* Backdrop for mobile */}
             <AnimatePresence>
                 {isSidebarOpen && isMobile && (
@@ -179,13 +191,69 @@ export default function AppSidebar() {
                             </Link>
                         ))}
 
-                        <button
-                            onClick={logout}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                        {/* User Profile & Menu */}
+                        <div
+                            className="relative mt-2"
+                            onMouseEnter={() => setIsUserMenuOpen(true)}
+                            onMouseLeave={() => setIsUserMenuOpen(false)}
                         >
-                            <LogOut size={18} />
-                            <span className="text-sm font-medium">Log out</span>
-                        </button>
+                            <AnimatePresence>
+                                {isUserMenuOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute bottom-full left-0 w-full mb-2 bg-[#111] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20"
+                                    >
+                                        <div className="p-1 space-y-1">
+                                            <button
+                                                onClick={() => {
+                                                    setIsSwitchModalOpen(true);
+                                                    setIsUserMenuOpen(false);
+                                                }}
+                                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5 text-muted hover:text-white transition-colors text-sm"
+                                            >
+                                                <div className="p-1.5 rounded-md bg-blue-500/10 text-blue-400">
+                                                    <User size={14} />
+                                                </div>
+                                                Switch Account
+                                            </button>
+                                            <button
+                                                onClick={logout}
+                                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-500/10 text-muted hover:text-red-400 transition-colors text-sm"
+                                            >
+                                                <div className="p-1.5 rounded-md bg-red-500/10 text-red-400">
+                                                    <LogOut size={14} />
+                                                </div>
+                                                Log out
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            <button
+                                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                                className={cn(
+                                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all border border-transparent",
+                                    isUserMenuOpen ? "bg-white/5 border-white/5" : "hover:bg-white/5"
+                                )}
+                            >
+                                <div className="h-9 w-9 rounded-full bg-linear-to-br from-primary/20 to-secondary/20 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                    {user?.profileImage ? (
+                                        <img src={user.profileImage} alt={user.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="font-bold text-primary text-xs">
+                                            {user?.name?.charAt(0).toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex-1 text-left overflow-hidden">
+                                    <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                                    <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
+                                </div>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </motion.aside>

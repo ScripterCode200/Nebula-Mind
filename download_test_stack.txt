@@ -1,0 +1,11 @@
+STARTING STACK TRACE TEST
+
+--- Testing Download with client: ANDROID ---
+Fetching info for qJZ1Ez28C-A...
+FAILED with ANDROID:
+TypeError: Cannot read properties of null (reading 'as')
+    at new VideoInfo (file:///C:/Users/ASUST/.gemini/antigravity/scratch/notebook_lm_app2/node_modules/youtubei.js/dist/src/parser/youtube/VideoInfo.js:66:47)
+    at Innertube.getInfo (file:///C:/Users/ASUST/.gemini/antigravity/scratch/notebook_lm_app2/node_modules/youtubei.js/dist/src/Innertube.js:67:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async testDownload (C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app2\scripts\test-stack.js:19:22)
+    at async C:\Users\ASUST\.gemini\antigravity\scratch\notebook_lm_app2\scripts\test-stack.js:33:5

@@ -16,15 +16,15 @@ const vertex_ai = new VertexAI({
 });
 
 const getModel = (modelName: string): GenerativeModel => {
-    // Standardize model name for Vertex AI - using Gemini 2.5 Flash
+    // Standardize model name for Vertex AI - using Gemini 2.0 Flash
     let sanitizedModel = modelName;
-    if (modelName.includes('flash')) sanitizedModel = 'gemini-2.5-flash';
+    if (modelName.includes('flash')) sanitizedModel = 'gemini-2.0-flash';
 
     return vertex_ai.getGenerativeModel({ model: sanitizedModel });
 };
 
-export const model = getModel("gemini-2.5-flash");
-export const visionModel = getModel("gemini-2.5-flash");
+export const model = getModel("gemini-2.0-flash");
+export const visionModel = getModel("gemini-2.0-flash");
 
 export default vertex_ai;
 

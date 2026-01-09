@@ -12,10 +12,10 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     const [isMobile, setIsMobile] = useState(false);
     const pathname = usePathname();
 
-    // Check for special pages where we might NOT want this behavior (like maintenance)
-    // But this component is used inside layout where that check is already done mostly.
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         const checkMobile = () => {
             setIsMobile(window.innerWidth < 768);
         };
@@ -24,15 +24,14 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // If no user, or mobile, or sidebar text-closed, normal layout (0 margin).
-    // If user AND desktop AND sidebar open, add margin.
+    // Check for special pages where we might NOT want this behavior (like maintenance)
+    // But this component is used inside layout where that check is already done mostly.
 
-    // We use padding-left instead of margin to keep the background continuous if needed, 
-    // or margin-left to push the layout. Usually margin-left is better for flow.
-    // Sidebar width is 18rem (288px) or 20rem. Let's match AppSidebar (18rem).
-
+    // Prevent hydration mismatch by only applying dynamic styles after mount
     const isNotebookPage = pathname?.startsWith('/notebook/');
-    const shouldPush = user && isSidebarOpen && !isMobile && !isNotebookPage;
+
+    // Default to closed state (server-side match) until mounted
+    const shouldPush = mounted && user && isSidebarOpen && !isMobile && !isNotebookPage;
     const sidebarWidth = "16rem";
 
     return (

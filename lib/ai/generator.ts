@@ -86,8 +86,24 @@ export async function generateSingleGoal(preference: GoalPreference, aiModelName
 
         const jsonString = cleanText.substring(start, end + 1);
 
+        // Sanitize string: replace control characters (0-31) which are invalid in JSON string literals
+        // We replace them with a space to preserve separation if they were used as whitespace,
+        // and to prevent breaking the string if they were inside one.
+        // Sanitize string: 
+        // 1. Replace control characters (0-31)
+        // 2. Fix invalid backslash escapes (commonly caused by LaTeX or paths in LLM output)
+        const sanitizedJsonString = jsonString
+            .replace(/[\x00-\x1F]+/g, " ")
+            .replace(/\\(?:["\\/bfnrtu]|u[0-9a-fA-F]{4})|\\/g, (match) => {
+                // If it looks like a valid escape sequence (length > 1), keep it
+                if (match.length > 1) return match;
+                // Otherwise it's an invalid/orphan backslash, double-escape it
+                return "\\\\";
+            });
+
         try {
-            const goal = JSON.parse(jsonString) as GeneratedGoal;
+            const goal = JSON.parse(sanitizedJsonString) as GeneratedGoal;
+
             // Basic validation
             if (!goal.title || !goal.questions || !Array.isArray(goal.questions)) {
                 throw new Error("Missing required fields in generated goal");

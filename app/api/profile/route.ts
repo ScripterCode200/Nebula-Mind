@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
         await connectToDatabase();
 
-        const user = await User.findById(userId).select('name email bio dob university stats achievements createdAt deletionScheduledAt');
+        const user = await User.findById(userId).select('name email bio dob university stats achievements createdAt deletionScheduledAt profileImage');
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
         // Define all possible achievements
@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
                 university: user.university,
                 joinedAt: user.createdAt,
                 deletionScheduledAt: user.deletionScheduledAt,
+                profileImage: user.profileImage,
                 stats: user.stats || { streak: { current: 0 }, totalTimeSpent: 0, xp: 0, level: 1 }
             },
             achievements: userAchievements
@@ -91,7 +92,7 @@ export async function PUT(req: NextRequest) {
                 university
             },
             { new: true }
-        ).select('name email bio dob university stats achievements createdAt deletionScheduledAt');
+        ).select('name email bio dob university stats achievements createdAt deletionScheduledAt profileImage');
 
         if (!updatedUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -106,6 +107,7 @@ export async function PUT(req: NextRequest) {
                 university: updatedUser.university,
                 joinedAt: updatedUser.createdAt,
                 deletionScheduledAt: updatedUser.deletionScheduledAt,
+                profileImage: updatedUser.profileImage,
                 stats: updatedUser.stats
             }
         });

@@ -1,10 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface INotification extends Document {
-    recipient: mongoose.Types.ObjectId; // User ID
+    recipientId: string; // User ID (String from Clerk/Auth)
+    senderId?: string;
     title: string;
     message: string;
-    type: 'info' | 'success' | 'warning' | 'error';
+    type: 'info' | 'success' | 'warning' | 'error' | 'SHARE_NOTEBOOK';
+    notebookId?: string;
     link?: string;
     isRead: boolean;
     scheduledFor?: Date;
@@ -12,19 +14,16 @@ export interface INotification extends Document {
 }
 
 const NotificationSchema: Schema = new Schema({
-    recipient: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-        index: true
-    },
+    recipientId: { type: String, required: true, index: true },
+    senderId: { type: String },
     title: { type: String, required: true },
     message: { type: String, required: true },
     type: {
         type: String,
-        enum: ['info', 'success', 'warning', 'error'],
+        enum: ['info', 'success', 'warning', 'error', 'SHARE_NOTEBOOK'],
         default: 'info'
     },
+    notebookId: { type: String },
     link: { type: String },
     isRead: { type: Boolean, default: false },
     scheduledFor: { type: Date, default: Date.now },
@@ -32,6 +31,6 @@ const NotificationSchema: Schema = new Schema({
 });
 
 // Index for efficient querying of user's notifications
-NotificationSchema.index({ recipient: 1, scheduledFor: -1 });
+NotificationSchema.index({ recipientId: 1, scheduledFor: -1 });
 
 export default mongoose.models.Notification || mongoose.model<INotification>('Notification', NotificationSchema);

@@ -38,11 +38,12 @@ export async function GET() {
             completedExamIds = results.map((r: any) => r.goalId.toString());
         }
 
-        const uncompletedExams = exams.filter((exam: any) =>
-            !completedExamIds.includes(exam._id.toString())
-        );
+        const allExams = exams.map((exam: any) => ({
+            ...exam,
+            completed: completedExamIds.includes(exam._id.toString())
+        }));
 
-        return NextResponse.json({ exams: uncompletedExams });
+        return NextResponse.json({ exams: allExams });
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch exams' }, { status: 500 });
     }

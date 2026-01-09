@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, AlertCircle, ArrowRight, Trophy, Clock, Brain, Shield, CheckCircle, Zap, Timer, FileQuestion, ChevronRight, Play, Calculator } from 'lucide-react';
+import { X, Check, AlertCircle, ArrowRight, Trophy, Clock, Brain, Shield, CheckCircle, Zap, Timer, FileQuestion, ChevronRight, Play, Calculator, Star } from 'lucide-react';
 import { DailyGoal } from '@/app/explore/types';
 import Confetti from 'react-confetti';
 import NeonButton from '../ui/NeonButton';
@@ -10,6 +10,11 @@ import GlassCard from '../ui/GlassCard';
 import ScientificSymbolsToolbar from './ScientificSymbolsToolbar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { safeFetch } from '@/lib/api-client';
+
+
+import { useGoalStore } from '@/store/useGoalStore';
+
 
 interface TestRunnerProps {
     goal: DailyGoal;
@@ -18,10 +23,19 @@ interface TestRunnerProps {
 }
 
 export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProps) {
+    const setIsTestActive = useGoalStore(state => state.setIsTestActive);
     const [testState, setTestState] = useState<'intro' | 'active' | 'results'>('intro');
+
+    // Manage global test active state for UI components (like Navbar)
+    useEffect(() => {
+        setIsTestActive(true);
+        return () => setIsTestActive(false);
+    }, [setIsTestActive]);
 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
+    const [markedForReview, setMarkedForReview] = useState<Record<number, boolean>>({});
+    const [isIndexOpen, setIsIndexOpen] = useState(false);
     const [evaluations, setEvaluations] = useState<Record<number, any>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [timeElapsed, setTimeElapsed] = useState(0);
@@ -38,29 +52,36 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     const [isDisqualified, setIsDisqualified] = useState(false);
     const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
+    // Synchronize current text to global state whenever it changes 
+    // This makes jumping safer, though handleNext/Prev still do it explicitly
+    useEffect(() => {
+        if (testState === 'active') {
+            setUserAnswers(prev => ({ ...prev, [currentIndex]: currentText }));
+        }
+    }, [currentText, currentIndex, testState]);
+
     // Initialize text area when index changes
     useEffect(() => {
         const text = userAnswers[currentIndex] || '';
-        if (currentText !== text) {
-            setCurrentText(text);
-        }
-    }, [currentIndex, userAnswers, currentText]);
+        setCurrentText(text);
+        // We strictly only want to update this when the index changes or initial data loads
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentIndex]);
+
 
     // Fetch Anti-Cheat Setting
     useEffect(() => {
         const fetchSettings = async () => {
             try {
-                const res = await fetch('/api/admin/settings');
-                if (res.ok) {
-                    const data = await res.json();
-                    setAntiCheatEnabled(data.antiCheatEnabled);
-                }
+                const data = await safeFetch<{ antiCheatEnabled: boolean }>('/api/admin/settings');
+                setAntiCheatEnabled(data.antiCheatEnabled);
             } catch (err) {
-                console.error("Failed to fetch settings");
+                console.error("Failed to fetch settings", err);
             }
         };
         fetchSettings();
     }, []);
+
 
     // Timer
     useEffect(() => {
@@ -76,17 +97,14 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
 
         const checkStatus = async () => {
             try {
-                const res = await fetch(`/api/daily-goals/status?goalId=${goal.id}`, {
+                const data = await safeFetch<{ status: string }>(`/api/daily-goals/status?goalId=${goal.id}`, {
                     signal: controller.signal
                 });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.status === 'disqualified') {
-                        setIsDisqualified(true);
-                    }
+                if (data.status === 'disqualified') {
+                    setIsDisqualified(true);
                 }
             } catch (e: any) {
-                if (e.name === 'AbortError') {
+                if (e.name === 'AbortError' || e.code === 'TIMEOUT') {
                     console.warn("Status check timed out - allowing start by default");
                     // toast.warning("Network slow, status check skipped.");
                 } else {
@@ -98,6 +116,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             }
         };
         checkStatus();
+
 
         return () => {
             controller.abort();
@@ -117,7 +136,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
 
         const reportDisqualification = async (reason: string) => {
             try {
-                await fetch('/api/daily-goals/evaluate', {
+                await safeFetch('/api/daily-goals/evaluate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -126,9 +145,10 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                     })
                 });
             } catch (e) {
-                console.error("Failed to report disqualification");
+                console.error("Failed to report disqualification", e);
             }
         };
+
 
         const failTest = (reason: string) => {
             // Check if stabilization period has passed
@@ -194,7 +214,6 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     }, [testState, antiCheatEnabled, isDisqualified, goal.id]);
 
     const handleNext = () => {
-        setUserAnswers(prev => ({ ...prev, [currentIndex]: currentText }));
         if (currentIndex < questions.length - 1) {
             setCurrentIndex(prev => prev + 1);
         } else {
@@ -205,8 +224,20 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     const handlePrev = () => {
         if (currentIndex > 0) {
             setCurrentIndex(currentIndex - 1);
-            setCurrentText(userAnswers[currentIndex - 1] || '');
         }
+    };
+
+    const jumpToQuestion = (index: number) => {
+        if (index >= 0 && index < questions.length) {
+            setCurrentIndex(index);
+        }
+    };
+
+    const toggleMarkForReview = () => {
+        setMarkedForReview(prev => ({
+            ...prev,
+            [currentIndex]: !prev[currentIndex]
+        }));
     };
 
     const handleInsertSymbol = (symbol: string) => {
@@ -239,7 +270,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                 userAnswer: finalAnswers[parseInt(index)]
             }));
 
-            const res = await fetch('/api/daily-goals/evaluate', {
+            const data = await safeFetch<any>('/api/daily-goals/evaluate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -248,7 +279,6 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                 })
             });
 
-            const data = await res.json();
             if (data.evaluations) {
                 const evalMap: Record<number, any> = {};
                 data.evaluations.forEach((evalItem: any) => {
@@ -260,12 +290,15 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             } else {
                 toast.error("Failed to evaluate answers.");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast.error("An error occurred during evaluation.");
+            const msg = error?.message || "An error occurred during evaluation.";
+            toast.error(msg);
         } finally {
             setIsSubmitting(false);
         }
+
+
     };
 
     const closeTest = () => {
@@ -555,8 +588,19 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                     <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
                         <X size={20} className="text-muted-foreground" />
                     </button>
-                    <div>
-                        <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">
+                    <div className="w-px h-8 bg-white/10 hidden md:block" />
+                    <button
+                        onClick={() => setIsIndexOpen(!isIndexOpen)}
+                        className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all",
+                            isIndexOpen ? "bg-primary text-black" : "bg-white/5 text-white hover:bg-white/10"
+                        )}
+                    >
+                        <FileQuestion size={18} />
+                        <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Index</span>
+                    </button>
+                    <div className="hidden lg:block">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
                             {goal.isExam ? "Exam Session" : "Daily Goal Test"}
                         </div>
                         <div className="font-bold text-sm md:text-base">{goal.title}</div>
@@ -572,158 +616,254 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                             <span className="text-sm font-mono font-bold tracking-wider">{formatTime(timeElapsed)}</span>
                         </div>
                     </div>
-                    <div className="flex flex-col items-end">
-                        <div className="text-[10px] text-purple-400 font-bold uppercase tracking-[0.2em] mb-0.5 opacity-80">
-                            Milestone
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-1.5 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-300">
-                            <Brain size={14} />
-                            <span className="text-sm font-bold">{currentIndex + 1} <span className="opacity-40">/</span> {questions.length}</span>
-                        </div>
-                    </div>
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto relative z-10 py-12 px-4 md:px-8 no-scrollbar" data-lenis-prevent>
-                <div className="max-w-5xl mx-auto">
-                    {/* Question */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        key={`q-title-${currentIndex}`}
-                        className="mb-12 text-center md:text-left"
-                    >
-                        <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest mb-4">
-                            Question {currentIndex + 1}
-                        </div>
-                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold leading-[1.2] tracking-tight bg-linear-to-b from-white to-white/70 bg-clip-text text-transparent">
-                            {currentQuestion.question}
-                        </h2>
-                    </motion.div>
+            <div className="flex-1 flex overflow-hidden relative">
+                {/* Side Index Panel */}
+                <AnimatePresence>
+                    {isIndexOpen && (
+                        <motion.aside
+                            initial={{ x: -300, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: -300, opacity: 0 }}
+                            className="absolute lg:relative z-40 w-[280px] h-full bg-[#0A0A0A] border-r border-white/10 flex flex-col"
+                        >
+                            <div className="p-6 border-b border-white/5">
+                                <h3 className="text-xs font-black text-primary uppercase tracking-[0.3em] mb-4">Question Navigator</h3>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {questions.map((_, idx) => {
+                                        const isCurrent = currentIndex === idx;
+                                        const isAnswered = !!userAnswers[idx]?.trim();
+                                        const isMarked = !!markedForReview[idx];
 
-                    {/* Answer Input Area: MCQ or Textarea */}
-                    <motion.div
-                        key={`input-${currentIndex}`} // Force re-render on question change
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mb-8"
-                    >
-                        {currentQuestion.type === 'MCQ' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {(currentQuestion.options || []).map((option: string, idx: number) => {
-                                    const isSelected = currentText === option;
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={() => !isSubmitting && setCurrentText(option)}
-                                            disabled={isSubmitting}
-                                            className={cn(
-                                                "p-6 rounded-2xl border-2 text-left transition-all duration-200 group relative overflow-hidden",
-                                                isSelected
-                                                    ? "bg-blue-600/20 border-blue-500 text-white shadow-[0_0_30px_rgba(59,130,246,0.2)]"
-                                                    : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10 text-gray-300"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-4 relative z-10">
-                                                <div className={cn(
-                                                    "w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-bold transition-colors",
-                                                    isSelected
-                                                        ? "bg-blue-500 border-blue-500 text-white"
-                                                        : "border-white/20 text-muted-foreground group-hover:border-white/40"
-                                                )}>
-                                                    {['A', 'B', 'C', 'D'][idx]}
-                                                </div>
-                                                <span className="text-lg font-medium">{option}</span>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-primary">
-                                        <Calculator size={18} />
-                                    </div>
-                                    <h5 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                                        Scientific Tool
-                                    </h5>
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => jumpToQuestion(idx)}
+                                                className={cn(
+                                                    "h-10 rounded-lg flex items-center justify-center text-xs font-bold transition-all relative border",
+                                                    isCurrent ? "border-primary bg-primary/20 text-white shadow-[0_0_15px_rgba(0,240,255,0.3)]" : "border-white/10",
+                                                    !isCurrent && isMarked && "bg-purple-500/10 border-purple-500/30 text-purple-400",
+                                                    !isCurrent && !isMarked && isAnswered && "bg-green-500/10 border-green-500/30 text-green-400",
+                                                    !isCurrent && !isMarked && !isAnswered && "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
+                                                )}
+                                            >
+                                                {idx + 1}
+                                                {isMarked && !isCurrent && <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-purple-500" />}
+                                                {isAnswered && !isCurrent && !isMarked && <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-green-500" />}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                                <ScientificSymbolsToolbar onInsert={handleInsertSymbol} className="mb-6 shadow-2xl border-white/5 hover:border-white/10 transition-colors" />
+                            </div>
 
-                                <div className="relative group/textarea">
-                                    <div className="absolute -inset-1 bg-linear-to-r from-primary/30 to-purple-500/30 rounded-4xl blur-2xl opacity-0 group-focus-within/textarea:opacity-100 transition duration-700" />
-                                    <div className="relative">
-                                        <textarea
-                                            ref={textareaRef}
-                                            value={currentText}
-                                            onChange={(e) => setCurrentText(e.target.value)}
-                                            placeholder="Synthesize your comprehensive response here..."
-                                            className="w-full h-72 sm:h-96 bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-10 text-lg sm:text-xl font-light focus:border-primary/40 focus:bg-black/60 focus:ring-4 focus:ring-primary/5 transition-all resize-none outline-none leading-relaxed placeholder:text-white/10 custom-scrollbar"
-                                            disabled={isSubmitting}
-                                        />
-                                        <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 flex items-center gap-4 text-xs font-mono text-muted-foreground bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-primary">{currentText.split(/\s+/).filter(Boolean).length}</span>
-                                                <span>WORDS</span>
-                                            </div>
-                                            <div className="w-px h-3 bg-white/20" />
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-secondary">{currentText.length}</span>
-                                                <span>CHARS</span>
-                                            </div>
+                            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-4">
+                                <div className="space-y-2">
+                                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Question Status</div>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-white/60">
+                                            <div className="w-2.5 h-2.5 rounded bg-primary" /> Current Question
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-white/60">
+                                            <div className="w-2.5 h-2.5 rounded bg-green-500" /> Answered
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-white/60">
+                                            <div className="w-2.5 h-2.5 rounded bg-purple-500" /> Marked for Review
+                                        </div>
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-white/60">
+                                            <div className="w-2.5 h-2.5 rounded bg-white/10" /> Not Answered
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        )}
-                    </motion.div>
 
-                </div>
-            </main>
+                            <div className="p-4 bg-white/5 m-4 rounded-xl border border-white/10">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Progress</span>
+                                    <span className="text-[10px] font-bold text-primary">{Math.round((Object.values(userAnswers).filter(a => !!a.trim()).length / questions.length) * 100)}%</span>
+                                </div>
+                                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary"
+                                        style={{ width: `${(Object.values(userAnswers).filter(a => !!a.trim()).length / questions.length) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </motion.aside>
+                    )}
+                </AnimatePresence>
 
-            {/* Footer */}
-            <footer className="h-auto min-h-24 border-t border-white/5 bg-black/40 backdrop-blur-2xl flex items-center justify-center px-6 md:px-12 relative z-10 py-6 md:py-0">
-                <div className="max-w-5xl w-full flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <button
-                        onClick={handlePrev}
-                        disabled={currentIndex === 0 || isSubmitting}
-                        className={cn(
-                            "flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-all px-6 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 w-full sm:w-auto justify-center",
-                            (currentIndex === 0 || isSubmitting) ? "hidden sm:flex opacity-0 pointer-events-none" : "text-muted-foreground hover:text-white"
-                        )}
-                    >
-                        Previous Challenge
-                    </button>
-
-                    <div className="flex gap-4 w-full sm:w-auto">
-                        <button
-                            onClick={currentIndex === questions.length - 1 ? handleSubmitTest : handleNext}
-                            disabled={!currentText.trim() || isSubmitting}
-                            className={cn(
-                                "flex items-center gap-3 px-10 py-3 rounded-xl font-black uppercase tracking-widest text-sm transition-all duration-500 shadow-lg w-full sm:w-auto justify-center",
-                                currentIndex === questions.length - 1
-                                    ? "bg-linear-to-r from-primary to-blue-500 text-black shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5"
-                                    : "bg-white text-black hover:bg-white/90 shadow-white/10 hover:-translate-y-0.5",
-                                (!currentText.trim() || isSubmitting) && "opacity-20 grayscale pointer-events-none"
-                            )}
-                        >
-                            {currentIndex === questions.length - 1 ? (
-                                <>
-                                    Complete Session
-                                    <Zap size={16} fill="currentColor" />
-                                </>
-                            ) : (
-                                <>
-                                    Analyze & Proceed
-                                    <ChevronRight size={18} />
-                                </>
-                            )}
-                        </button>
+                {/* Main Content Area */}
+                <div className="flex-1 flex flex-col relative overflow-hidden">
+                    {/* Progress Bar Top */}
+                    <div className="absolute top-0 left-0 w-full h-[3px] bg-white/5 z-20">
+                        <motion.div
+                            className="h-full bg-linear-to-r from-primary via-blue-400 to-primary shadow-[0_0_10px_rgba(0,240,255,0.5)]"
+                            initial={{ width: 0 }}
+                            animate={{ width: questions.length > 0 ? `${((currentIndex + 1) / questions.length) * 100}%` : '100%' }}
+                            transition={{ type: "spring", stiffness: 50, damping: 20 }}
+                        />
                     </div>
+
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-y-auto relative z-10 py-12 px-4 md:px-8 no-scrollbar scroll-smooth" data-lenis-prevent>
+                        <div className="max-w-5xl mx-auto">
+                            {/* Question */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                key={`q-title-${currentIndex}`}
+                                className="mb-8 flex flex-col md:flex-row md:items-start justify-between gap-6"
+                            >
+                                <div className="flex-1 text-center md:text-left">
+                                    <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest mb-4">
+                                        Question {currentIndex + 1}
+                                    </div>
+                                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold leading-[1.2] tracking-tight bg-linear-to-b from-white to-white/70 bg-clip-text text-transparent">
+                                        {currentQuestion.question}
+                                    </h2>
+                                </div>
+                                <div className="flex shrink-0 gap-2 justify-center">
+                                    <button
+                                        onClick={toggleMarkForReview}
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all",
+                                            markedForReview[currentIndex]
+                                                ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+                                                : "bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10"
+                                        )}
+                                    >
+                                        <Star size={14} fill={markedForReview[currentIndex] ? "currentColor" : "none"} />
+                                        {markedForReview[currentIndex] ? "Marked for Review" : "Mark for Review"}
+                                    </button>
+                                </div>
+                            </motion.div>
+
+                            {/* Answer Input Area: MCQ or Textarea */}
+                            <motion.div
+                                key={`input-${currentIndex}`} // Force re-render on question change
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="mb-8"
+                            >
+                                {currentQuestion.type === 'MCQ' ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {(currentQuestion.options || []).map((option: string, idx: number) => {
+                                            const isSelected = currentText === option;
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => !isSubmitting && setCurrentText(option)}
+                                                    disabled={isSubmitting}
+                                                    className={cn(
+                                                        "p-6 rounded-2xl border-2 text-left transition-all duration-200 group relative overflow-hidden",
+                                                        isSelected
+                                                            ? "bg-blue-600/20 border-blue-500 text-white shadow-[0_0_30px_rgba(59,130,246,0.2)]"
+                                                            : "bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10 text-gray-300"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center gap-4 relative z-10">
+                                                        <div className={cn(
+                                                            "w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm font-bold transition-colors",
+                                                            isSelected
+                                                                ? "bg-blue-500 border-blue-500 text-white"
+                                                                : "border-white/20 text-muted-foreground group-hover:border-white/40"
+                                                        )}>
+                                                            {['A', 'B', 'C', 'D'][idx]}
+                                                        </div>
+                                                        <span className="text-lg font-medium">{option}</span>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-primary">
+                                                <Calculator size={18} />
+                                            </div>
+                                            <h5 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                                Scientific Tool
+                                            </h5>
+                                        </div>
+                                        <ScientificSymbolsToolbar onInsert={handleInsertSymbol} className="mb-6 shadow-2xl border-white/5 hover:border-white/10 transition-colors" />
+
+                                        <div className="relative group/textarea">
+                                            <div className="absolute -inset-1 bg-linear-to-r from-primary/30 to-purple-500/30 rounded-4xl blur-2xl opacity-0 group-focus-within/textarea:opacity-100 transition duration-700" />
+                                            <div className="relative">
+                                                <textarea
+                                                    ref={textareaRef}
+                                                    value={currentText}
+                                                    onChange={(e) => setCurrentText(e.target.value)}
+                                                    placeholder="Synthesize your comprehensive response here..."
+                                                    className="w-full h-72 sm:h-96 bg-black/40 border border-white/10 rounded-3xl p-6 sm:p-10 text-lg sm:text-xl font-light focus:border-primary/40 focus:bg-black/60 focus:ring-4 focus:ring-primary/5 transition-all resize-none outline-none leading-relaxed placeholder:text-white/10 custom-scrollbar"
+                                                    disabled={isSubmitting}
+                                                />
+                                                <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 flex items-center gap-4 text-xs font-mono text-muted-foreground bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-primary">{currentText.split(/\s+/).filter(Boolean).length}</span>
+                                                        <span>WORDS</span>
+                                                    </div>
+                                                    <div className="w-px h-3 bg-white/20" />
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-secondary">{currentText.length}</span>
+                                                        <span>CHARS</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="h-auto min-h-24 border-t border-white/5 bg-black/40 backdrop-blur-2xl flex items-center justify-center px-6 md:px-12 relative z-10 py-6 md:py-0">
+                        <div className="max-w-5xl w-full flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div className="flex gap-3 w-full sm:w-auto">
+                                <button
+                                    onClick={handlePrev}
+                                    disabled={currentIndex === 0 || isSubmitting}
+                                    className={cn(
+                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 w-full sm:w-auto justify-center",
+                                        (currentIndex === 0 || isSubmitting) ? "opacity-20 pointer-events-none" : "text-muted-foreground hover:text-white"
+                                    )}
+                                >
+                                    Prev
+                                </button>
+                                <button
+                                    onClick={handleNext}
+                                    disabled={currentIndex === questions.length - 1 || isSubmitting}
+                                    className={cn(
+                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 w-full sm:w-auto justify-center",
+                                        (currentIndex === questions.length - 1 || isSubmitting) ? "opacity-20 pointer-events-none" : "text-muted-foreground hover:text-white"
+                                    )}
+                                >
+                                    Next
+                                </button>
+                            </div>
+
+                            <div className="flex gap-4 w-full sm:w-auto">
+                                <button
+                                    onClick={handleSubmitTest}
+                                    disabled={isSubmitting || Object.values(userAnswers).filter(a => !!a.trim()).length === 0}
+                                    className={cn(
+                                        "flex items-center gap-3 px-10 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all duration-500 shadow-lg w-full sm:w-auto justify-center",
+                                        "bg-linear-to-r from-primary to-blue-500 text-black shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5",
+                                        (isSubmitting || Object.values(userAnswers).filter(a => !!a.trim()).length === 0) && "opacity-20 grayscale pointer-events-none"
+                                    )}
+                                >
+                                    Complete Session
+                                    <Zap size={14} fill="currentColor" />
+                                </button>
+                            </div>
+                        </div>
+                    </footer>
                 </div>
-            </footer>
+            </div>
         </div>
     );
 }

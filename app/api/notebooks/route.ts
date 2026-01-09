@@ -2,36 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Notebook from '@/models/Notebook';
 import { parsePDF } from '@/lib/pdf-parser';
-import { jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
+import { verifyAuth } from '@/lib/auth';
+import User from '@/models/User';
 import mammoth from 'mammoth';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
-
-async function getUserId(req: NextRequest) {
-    const token = (await cookies()).get('token')?.value;
-    if (!token) return null;
-    try {
-        const secret = new TextEncoder().encode(JWT_SECRET);
-        const { payload } = await jwtVerify(token, secret);
-        return payload.userId as string;
-    } catch {
-        return null;
-    }
-}
 
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { r2Client, R2_BUCKET_NAME } from '@/lib/r2';
 import { v4 as uuidv4 } from 'uuid';
 
 export const maxDuration = 60; // Set timeout to 60 seconds (Vercel limit for Pro)
+import fs from 'fs';
+import path from 'path';
 
 export async function POST(req: NextRequest) {
     try {
-        const userId = await getUserId(req);
-        if (!userId) {
+        const auth = await verifyAuth(req);
+        if (!auth || !auth.userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const userId = auth.userId;
 
         await connectToDatabase();
 
@@ -40,9 +29,10 @@ export async function POST(req: NextRequest) {
         const title = formData.get('title') as string;
         const pdfUrlInput = formData.get('pdfUrl') as string;
         const fileKeyInput = formData.get('fileKey') as string;
+        let finalContentKey = formData.get('contentKey') as string;
 
-        if (!title || (!file && !pdfUrlInput && !fileKeyInput)) {
-            return NextResponse.json({ error: 'Title and either File, URL, or FileKey are required' }, { status: 400 });
+        if (!title || (!file && !pdfUrlInput && !fileKeyInput && !finalContentKey)) {
+            return NextResponse.json({ error: 'Title and either File, URL, FileKey, or ContentKey are required' }, { status: 400 });
         }
 
         // Check for duplicate title
@@ -56,7 +46,7 @@ export async function POST(req: NextRequest) {
         }
 
         let buffer: Buffer | undefined;
-        let fileType: 'pdf' | 'docx' = 'pdf';
+        let fileType: 'pdf' | 'docx' | 'text' = finalContentKey ? 'text' : 'pdf';
         let contentHtml = '';
         let pdfContent = '';
 
@@ -87,7 +77,8 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        let finalContentKey = formData.get('contentKey') as string | undefined;
+        // We already extracted finalContentKey from formData at the top
+        // let finalContentKey = formData.get('contentKey') as string | undefined;
 
         // 2. Parse Content (Text Extraction)
         // Skip if we already have a content key (client uploaded text)
@@ -182,17 +173,72 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     try {
-        const userId = await getUserId(req);
-        if (!userId) {
+        const auth = await verifyAuth(req);
+        if (!auth || !auth.userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const userId = auth.userId;
+
+        // Get Pagination Query Params
+        const { searchParams } = new URL(req.url);
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '9');
+        const skip = (page - 1) * limit;
 
         await connectToDatabase();
-        const notebooks = await Notebook.find({ userId })
+
+        console.log(`Fetching notebooks for user: ${userId}, Page: ${page}, Limit: ${limit}`);
+
+        const query = {
+            $or: [
+                { userId: userId },
+                { 'sharedWith.userId': userId }
+            ]
+        };
+
+        // Get Total Count
+        const total = await Notebook.countDocuments(query);
+
+        // Fetch Paginated Notebooks
+        const notebooks = await Notebook.find(query)
             .select('-pdfContent -contentHtml') // Exclude heavy fields
-            .sort({ createdAt: -1 });
-        return NextResponse.json(notebooks);
-    } catch {
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean(); // Use lean for performance
+
+        // Enhance shared notebooks with owner name
+        const sharedNotebooks = notebooks.filter((n: any) => n.userId !== userId);
+
+        if (sharedNotebooks.length > 0) {
+            const ownerIds = [...new Set(sharedNotebooks.map((n: any) => n.userId))];
+
+            if (ownerIds.length > 0) {
+                const owners = await User.find({ _id: { $in: ownerIds } }).select('name _id profileImage').lean();
+                if (owners) {
+                    const ownerMap = new Map(owners.map((o: any) => [o._id.toString(), { name: o.name, profileImage: o.profileImage }]));
+                    notebooks.forEach((n: any) => {
+                        if (n.userId && n.userId !== userId) {
+                            const ownerData = ownerMap.get(String(n.userId));
+                            n.ownerName = ownerData?.name || 'Unknown User';
+                            n.ownerImage = ownerData?.profileImage || '';
+                        }
+                    });
+                }
+            }
+        }
+
+        const hasMore = skip + notebooks.length < total;
+
+        return NextResponse.json({
+            notebooks,
+            hasMore,
+            total,
+            currentPage: page
+        });
+
+    } catch (error) {
+        console.error('Error fetching notebooks:', error);
         return NextResponse.json({ error: 'Failed to fetch notebooks' }, { status: 500 });
     }
 }

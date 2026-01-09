@@ -1,0 +1,12 @@
+STARTING TEST PART 3
+
+--- Testing Download with client: WEB_CREATOR ---
+Fetching info for qJZ1Ez28C-A...
+Choosing format...
+FAILED with WEB_CREATOR:
+Streaming data not available
+
+--- Testing Download with client: TV ---
+Fetching info for qJZ1Ez28C-A...
+FAILED with TV:
+Request to https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json failed with status code 400

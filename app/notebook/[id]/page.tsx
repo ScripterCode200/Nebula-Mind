@@ -65,11 +65,14 @@ export default async function NotebookPage({ params }: PageProps) {
     const serializedSources = await Promise.all(sources.map(async (source: any) => {
         let sourceUrl = '';
         try {
-            const command = new GetObjectCommand({
-                Bucket: R2_BUCKET_NAME,
-                Key: source.fileKey,
-            });
-            sourceUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
+            const keyToSign = source.fileKey || source.contentKey;
+            if (keyToSign) {
+                const command = new GetObjectCommand({
+                    Bucket: R2_BUCKET_NAME,
+                    Key: keyToSign,
+                });
+                sourceUrl = await getSignedUrl(r2Client, command, { expiresIn: 3600 });
+            }
         } catch (e) {
             console.error(`Failed to sign URL for source ${source.name}`, e);
         }

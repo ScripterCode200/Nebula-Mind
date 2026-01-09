@@ -12,7 +12,7 @@ import { Trash2, Plus, Save, Eye, X } from 'lucide-react';
 
 export default function EditorPage() {
     const [isGenerating, setIsGenerating] = useState(false);
-    const [aiModel, setAiModel] = useState('gemini-2.5-flash');
+    const [aiModel, setAiModel] = useState('gemini-2.0-flash');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [examForm, setExamForm] = useState({
         title: '',
@@ -206,9 +206,8 @@ export default function EditorPage() {
                                                 }
                                             }}
                                             options={[
-                                                { value: 'gemini-3.0-pro', label: 'Gemini 3.0 Pro' },
-                                                { value: 'gemini-3.0-flash', label: 'Gemini 3.0 Flash' },
-                                                { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+                                                { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+                                                { value: 'gemini-2.0-flash-001', label: 'Gemini 2.0 Flash (v1)' },
                                                 { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
                                                 { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
                                             ]}

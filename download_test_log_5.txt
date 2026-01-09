@@ -1,0 +1,14 @@
+STARTING TEST PART 5 (RickRoll)
+
+--- Testing Download with client: DEFAULT ---
+Fetching info for dQw4w9WgXcQ...
+Choosing format...
+Format found: 140
+Attempting download...
+FAILED with DEFAULT:
+No valid URL to decipher
+
+--- Testing Download with client: ANDROID ---
+Fetching info for dQw4w9WgXcQ...
+FAILED with ANDROID:
+Cannot read properties of null (reading 'as')

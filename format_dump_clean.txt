@@ -1,0 +1,45 @@
+Fetching info...
+Keys: itag, url, width, height, last_modified, last_modified_ms, content_length, quality, xtags, drm_families, fps, quality_label, projection_type, average_bitrate, bitrate, spatial_audio_type, target_duration_dec, fair_play_key_uri, stereo_layout, max_dvr_duration_sec, high_replication, audio_quality, approx_duration_ms, audio_sample_rate, audio_channels, loudness_db, signature_cipher, is_drc, drm_track_type, distinct_params, track_absolute_loudness_lkfs, mime_type, is_type_otf, init_range, index_range, cipher, audio_track, has_audio, has_video, has_text, language, is_dubbed, is_auto_dubbed, is_descriptive, is_secondary, is_original, color_info, caption_track
+{
+  "itag": 140,
+  "last_modified": "2025-10-27T07:22:50.020Z",
+  "last_modified_ms": "1761549770020768",
+  "content_length": 32047371,
+  "quality": "tiny",
+  "xtags": "Cg8KBWFjb250EgZkdWJiZWQKCgoEbGFuZxICYXI",
+  "projection_type": "RECTANGULAR",
+  "average_bitrate": 129474,
+  "bitrate": 132384,
+  "high_replication": true,
+  "audio_quality": "AUDIO_QUALITY_MEDIUM",
+  "approx_duration_ms": 1980151,
+  "audio_sample_rate": 44100,
+  "audio_channels": 2,
+  "loudness_db": -0.029999733,
+  "is_drc": false,
+  "track_absolute_loudness_lkfs": -14.03,
+  "mime_type": "audio/mp4; codecs=\"mp4a.40.2\"",
+  "is_type_otf": false,
+  "init_range": {
+    "start": 0,
+    "end": 722
+  },
+  "index_range": {
+    "start": 723,
+    "end": 3142
+  },
+  "audio_track": {
+    "audio_is_default": false,
+    "display_name": "Arabic",
+    "id": "ar.3"
+  },
+  "has_audio": true,
+  "has_video": false,
+  "has_text": false,
+  "language": "ar",
+  "is_dubbed": true,
+  "is_auto_dubbed": false,
+  "is_descriptive": false,
+  "is_secondary": false,
+  "is_original": false
+}

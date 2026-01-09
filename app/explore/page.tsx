@@ -10,6 +10,8 @@ import { Exam, DailyGoal, Rarity } from './types';
 import { cn } from '@/lib/utils';
 import { toZonedTime } from 'date-fns-tz';
 import { endOfDay, differenceInSeconds } from 'date-fns';
+import { useGoalStore } from '@/store/useGoalStore';
+
 
 // ... (Exams Mock Data - Keeping existing data)
 // Exams Mock Data Removed
@@ -33,14 +35,12 @@ const rarities: Rarity[] = ['Uncommon', 'Rare', 'Epic', 'Legendary'];
 const IST_TIMEZONE = 'Asia/Kolkata';
 
 export default function ExplorePage() {
-    const [dailyGoals, setDailyGoals] = useState<DailyGoal[]>([]);
+    // Global Store
+    const { dailyGoals, isLoading: isLoadingGoals } = useGoalStore();
     const [dbExams, setDbExams] = useState<Exam[]>([]); // New state for manual exams
     const [activeTab, setActiveTab] = useState<'daily' | 'exams'>('daily');
 
-
-    const [isLoadingGoals, setIsLoadingGoals] = useState(true);
     const [timeLeft, setTimeLeft] = useState('');
-
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
     const [selectedRarity, setSelectedRarity] = useState<Rarity | null>(null);
@@ -62,7 +62,8 @@ export default function ExplorePage() {
                             duration: e.duration,
                             xp: e.rarity === 'Legendary' ? 5000 : e.rarity === 'Epic' ? 2500 : e.rarity === 'Rare' ? 1200 : 500, // XP Logic
                             rarity: e.rarity,
-                            rarityPoints: 100 // Default or logic
+                            rarityPoints: 100, // Default or logic
+                            completed: e.completed
                         })));
                     }
                 }
@@ -71,138 +72,6 @@ export default function ExplorePage() {
             }
         };
         fetchExams();
-    }, []);
-
-    // Fetch Daily Goals with Iterative Generation
-    useEffect(() => {
-        const generationController = new AbortController();
-
-        const fetchAndGenerate = async () => {
-            try {
-                // Check Cache First
-                const today = new Date().toDateString();
-                const cachedData = localStorage.getItem('dailyGoalsCache');
-                let currentGoals: DailyGoal[] = [];
-
-                if (cachedData) {
-                    try {
-                        const parsed = JSON.parse(cachedData);
-                        if (parsed.date === today) {
-                            currentGoals = parsed.goals;
-                            setDailyGoals(currentGoals);
-                            if (currentGoals.length >= 7) {
-                                setIsLoadingGoals(false);
-                            }
-                        }
-                    } catch (e) {
-                        console.warn("Invalid cache ignored");
-                    }
-                }
-
-                try {
-                    const res = await fetch('/api/daily-goals', { signal: generationController.signal });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.goals) {
-                            const mapped = data.goals.map((g: any) => ({ ...g, id: g._id, duration: g.estimatedTime }));
-                            if (JSON.stringify(mapped) !== JSON.stringify(currentGoals)) {
-                                currentGoals = mapped;
-                                setDailyGoals(currentGoals);
-                                localStorage.setItem('dailyGoalsCache', JSON.stringify({ date: today, goals: currentGoals }));
-                            }
-                        }
-                    }
-                } catch (fetchErr) {
-                    if (fetchErr instanceof Error && fetchErr.name === 'AbortError') return;
-                    console.error("Initial fetch failed:", fetchErr);
-                }
-
-                const needed = 7 - currentGoals.length;
-                if (currentGoals.length > 0) setIsLoadingGoals(false);
-
-                if (needed > 0) {
-                    console.log(`[Explore] Needs ${needed} more goals. triggering sequential generation...`);
-
-                    for (let i = 0; i < needed; i++) {
-                        if (generationController.signal.aborted) break;
-
-                        // Wait 1s between requests to be gentle with the AI service
-                        if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
-                        if (generationController.signal.aborted) break;
-
-                        const offset = currentGoals.length + i;
-                        const requestController = new AbortController();
-                        let timeoutId: NodeJS.Timeout | null = null;
-
-                        // Handler for component unmount
-                        const onUnmount = () => requestController.abort('unmount');
-
-                        try {
-                            // Link component unmount to this specific request
-                            generationController.signal.addEventListener('abort', onUnmount);
-
-                            // Set a 10-minute timeout for the AI generation
-                            timeoutId = setTimeout(() => requestController.abort('timeout'), 600000);
-
-                            const genRes = await fetch('/api/daily-goals', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ index: offset }),
-                                signal: requestController.signal
-                            });
-
-                            // Cleanup timeout and listener immediately after request completes
-                            if (timeoutId) clearTimeout(timeoutId);
-                            generationController.signal.removeEventListener('abort', onUnmount);
-
-                            if (!genRes.ok) {
-                                console.error(`[Explore] Slot ${offset} failed with status: ${genRes.status}`);
-                                continue;
-                            }
-
-                            const genData = await genRes.json();
-                            if (genData.goal) {
-                                const newGoal = { ...genData.goal, id: genData.goal._id, duration: genData.goal.estimatedTime };
-                                setDailyGoals(prev => {
-                                    if (prev.some(g => g.id === newGoal.id)) return prev;
-                                    const updated = [...prev, newGoal];
-                                    localStorage.setItem('dailyGoalsCache', JSON.stringify({ date: today, goals: updated }));
-                                    return updated;
-                                });
-                                if (i === 0) setIsLoadingGoals(false);
-                            }
-                        } catch (err: unknown) {
-                            // Cleanup in catch block as well
-                            if (timeoutId) clearTimeout(timeoutId);
-                            generationController.signal.removeEventListener('abort', onUnmount);
-
-                            if (err instanceof Error && err.name === 'AbortError') {
-                                // Check the reason from the request signal
-                                const reason = requestController.signal.reason;
-                                if (reason === 'unmount' || generationController.signal.aborted) {
-                                    console.log("[Explore] Generation aborted (component unmounted)");
-                                    break;
-                                } else {
-                                    console.warn(`[Explore] Slot ${offset} timed out after 10 minutes`);
-                                }
-                            } else {
-                                console.error(`Failed to generate slot with index ${offset}`, err);
-                            }
-                        }
-                    }
-                    setIsLoadingGoals(false);
-                } else {
-                    setIsLoadingGoals(false);
-                }
-            } catch (error) {
-                if (error instanceof Error && error.name === 'AbortError') return;
-                console.error("Failed to fetch daily goals:", error);
-                setIsLoadingGoals(false);
-            }
-        };
-
-        fetchAndGenerate();
-        return () => generationController.abort('unmount');
     }, []);
 
     // Timer Logic for IST Midnight

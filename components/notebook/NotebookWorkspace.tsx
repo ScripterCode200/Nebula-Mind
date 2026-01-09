@@ -3,9 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Sparkles, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeft, Sparkles, PanelLeftClose, PanelLeftOpen, Share2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import AIToolsPanel from './AIToolsPanel';
+import ShareNotebookModal from './ShareNotebookModal';
 
 const PDFViewer = dynamic(() => import('./PDFViewer'), {
     ssr: false,
@@ -19,6 +20,7 @@ const PDFViewer = dynamic(() => import('./PDFViewer'), {
     ),
 });
 const WordViewer = dynamic(() => import('./WordViewer'), { ssr: false });
+const TextViewer = dynamic(() => import('./TextViewer'), { ssr: false });
 
 import SourceSidebar from './SourceSidebar';
 
@@ -42,6 +44,7 @@ interface NotebookWorkspaceProps {
 const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
     const [isPdfVisible, setIsPdfVisible] = React.useState(true);
     const [isMobile, setIsMobile] = React.useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
 
     // Multi-source State
     const [sources, setSources] = React.useState<any[]>(() => {
@@ -83,15 +86,20 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
         return [];
     });
     const [isAddingSource, setIsAddingSource] = React.useState(false);
+    const [loadingStep, setLoadingStep] = React.useState('');
+    const [transcribeProgress, setTranscribeProgress] = React.useState(0);
+    const [videoInfo, setVideoInfo] = React.useState<{ title: string; duration: number } | null>(null);
 
-    // Derived active PDF URL
-    const activePdfUrl = React.useMemo(() => {
+    // Derived active Source Data
+    const activeSource = React.useMemo(() => {
         if (activeSourceId && sources.length > 0) {
-            const source = sources.find(s => s._id === activeSourceId);
-            return source ? source.url : notebook.pdfUrl;
+            return sources.find(s => s._id === activeSourceId);
         }
-        return notebook.pdfUrl;
-    }, [activeSourceId, sources, notebook.pdfUrl]);
+        return null;
+    }, [activeSourceId, sources]);
+
+    const activePdfUrl = activeSource?.url || notebook.pdfUrl;
+    const activeSourceType = activeSource?.type || notebook.fileType || 'pdf';
 
     React.useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -112,25 +120,102 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    const handleAddYoutube = async (url: string) => {
+        setIsAddingSource(true);
+        setTranscribeProgress(0);
+        setVideoInfo(null);
+
+        try {
+            // 1. Get Metadata
+            setLoadingStep('Fetching Video Info...');
+            const infoRes = await fetch('/api/transcribe/info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            const infoData = await infoRes.json();
+            if (!infoRes.ok) throw new Error(infoData.error || 'Failed to get video info');
+
+            setVideoInfo({ title: infoData.title, duration: infoData.durationSeconds });
+
+            // 2. Transcribe with Simulation
+            setLoadingStep('Transcribing Video...');
+
+            // Simulation
+            const estimatedTimeMs = Math.min(60000, (infoData.durationSeconds * 1000) / 10);
+            const startTime = Date.now();
+            const progressInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(95, Math.floor((elapsed / estimatedTimeMs) * 100));
+                setTranscribeProgress(progress);
+            }, 500);
+
+            const transcribeRes = await fetch('/api/transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+
+            clearInterval(progressInterval);
+            setTranscribeProgress(100);
+
+            const transcribeData = await transcribeRes.json();
+
+            if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Transcription failed');
+
+            // 3. Add Source to Notebook
+            setLoadingStep('Saving Source...');
+            const formData = new FormData();
+            formData.append('type', 'youtube');
+            formData.append('name', videoInfo?.title || `YouTube Video`);
+            formData.append('url', url);
+
+            if (transcribeData.r2Key) {
+                formData.append('contentKey', transcribeData.r2Key);
+            } else if (transcribeData.text) {
+                // Should not happen for lightweight, but fallback:
+                formData.append('textContent', transcribeData.text);
+            }
+
+            const sourceRes = await fetch(`/api/notebooks/${notebook._id}/sources`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!sourceRes.ok) {
+                throw new Error('Failed to save source to notebook');
+            }
+
+            // Reload to show new source
+            window.location.reload();
+
+        } catch (error) {
+            console.error("Failed to add YouTube source", error);
+            // Ideally show a toast here
+            alert("Failed to add video: " + (error as Error).message);
+        } finally {
+            setIsAddingSource(false);
+        }
+    };
+
     const handleAddSource = async (file: File) => {
         setIsAddingSource(true);
         const formData = new FormData();
         formData.append('file', file);
+        // ... (rest of existing logic)
         formData.append('textContent', 'Extracting text on client is hard, ideally backend does it or we use pdfjs here.');
-        // NOTE: For now, we are sending dummy text. 
-        // In a real implementation with R2, we need to extract text here or on server.
-        // Given constraints, we'll try to extract text on client if possible, or send file to server to parse.
-        // Server route 'POST /api/notebooks/[id]/sources' expects 'textContent'.
 
         try {
-            // Quick text extraction using pdfjs on client (simplified)
+            // ... (existing PDF logic)
             // Or better: Let's assume the user just wants the PDF for now and we'll fix text parsing later
             // But the backend REQUIREMENTS say 'textContent' is needed.
             // Let's implement a quick extract using the existing utility we have in CreateNotebookModal?
             // Actually, we can't easily reuse that hook here without refactoring.
             // For this iteration, we'll send a placeholder and maybe trigger a server-side parse if we had one.
             // Or better, we import pdfjs dynamically here.
+            // ...
 
+            // Re-using existing simplified logic from original file for now to minimize diff risk
             let text = "";
             try {
                 const pdfjs = await import('pdfjs-dist');
@@ -155,12 +240,6 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
             });
 
             if (res.ok) {
-                const data = await res.json();
-                // We need the signed URL for the new source to display it immediately.
-                // The API returns the source object but NOT the signed URL usually (unless we updated it).
-                // Let's just reload the page for now to get the signed URL from server props?
-                // Or better, ask the API to return a signed URL?
-                // For a smooth UX, we can optimistically add it, but we can't display R2 key directly.
                 window.location.reload();
             }
         } catch (error) {
@@ -170,9 +249,9 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
         }
     };
 
-    const handleSourceToggle = (id: string, checked: boolean) => {
+    const handleSourceToggle = (id: string) => {
         setSelectedSourceIds(prev =>
-            checked ? [...prev, id] : prev.filter(p => p !== id)
+            prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
         );
     };
 
@@ -214,8 +293,23 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     <div className="hidden md:block px-3 py-1.5 rounded-full bg-linear-to-r from-primary/10 to-secondary/10 border border-white/5 text-[10px] font-bold text-primary tracking-wider uppercase">
                         Nebula Workspace
                     </div>
+
+                    <button
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-primary"
+                        title="Share Notebook"
+                    >
+                        <Share2 size={18} />
+                    </button>
                 </div>
             </header>
+
+            <ShareNotebookModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                notebookId={notebook._id}
+                notebookTitle={notebook.title}
+            />
 
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden relative">
@@ -232,7 +326,11 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     onSourceClick={setActiveSourceId}
                     onToggledSource={handleSourceToggle}
                     onAddSource={handleAddSource}
+                    onAddYoutube={handleAddYoutube}
                     isAddingSource={isAddingSource}
+                    loadingStep={loadingStep}
+                    transcribeProgress={transcribeProgress}
+                    videoInfo={videoInfo}
                 />
 
                 {/* Left Panel: Viewer (PDF or Word) */}
@@ -247,8 +345,10 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     className="shrink-0 border-r border-white/5 overflow-hidden bg-black/20 relative z-30"
                 >
                     <div className="h-full w-full min-w-0">
-                        {notebook.fileType === 'docx' ? (
+                        {activeSourceType === 'docx' ? (
                             <WordViewer contentHtml={notebook.contentHtml || ''} notebookId={notebook._id} />
+                        ) : activeSourceType === 'youtube' || activeSourceType === 'text' ? (
+                            <TextViewer url={activePdfUrl} />
                         ) : (
                             <PDFViewer url={activePdfUrl} />
                         )}

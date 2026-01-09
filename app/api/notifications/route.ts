@@ -1,65 +1,63 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { jwtVerify } from 'jose';
-import dbConnect from '@/lib/db';
+
+import { NextRequest, NextResponse } from 'next/server';
+import connectToDatabase from '@/lib/db';
 import Notification from '@/models/Notification';
+import { verifyAuth } from '@/lib/auth';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
+export const dynamic = 'force-dynamic';
 
-async function getUser() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get('token')?.value;
-    if (!token) return null;
-
+export async function GET(req: NextRequest) {
     try {
-        const secret = new TextEncoder().encode(JWT_SECRET);
-        const { payload } = await jwtVerify(token, secret);
-        return payload;
-    } catch {
-        return null;
+        await connectToDatabase();
+        const auth = await verifyAuth(req);
+
+        if (!auth || !auth.userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = auth.userId;
+
+        const notifications = await Notification.find({ recipientId: userId })
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+
+        return NextResponse.json(notifications);
+
+    } catch (error) {
+        console.error('Notification Fetch Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
-export async function GET() {
-    const user = await getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function PATCH(req: NextRequest) {
+    try {
+        await connectToDatabase();
+        const auth = await verifyAuth(req);
 
-    await dbConnect();
+        if (!auth || !auth.userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = auth.userId;
 
-    // Fetch notifications that are scheduled for now or in the past
-    const notifications = await Notification.find({
-        recipient: user.userId,
-        scheduledFor: { $lte: new Date() }
-    })
-        .sort({ scheduledFor: -1, createdAt: -1 }) // Newest first
-        .limit(50); // Limit to 50
+        const { notificationIds } = await req.json();
 
-    return NextResponse.json(notifications);
-}
+        if (notificationIds && Array.isArray(notificationIds) && notificationIds.length > 0) {
+            await Notification.updateMany(
+                { _id: { $in: notificationIds }, recipientId: userId },
+                { $set: { isRead: true } }
+            );
+        } else {
+            // Mark all as read if no specific IDs provided (optional 'Mark All Read' feature)
+            await Notification.updateMany(
+                { recipientId: userId, isRead: false },
+                { $set: { isRead: true } }
+            );
+        }
 
-// Clear all or Mark all read
-export async function POST(req: Request) {
-    const user = await getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        return NextResponse.json({ success: true });
 
-    const { action } = await req.json();
-    await dbConnect();
-
-    if (action === 'mark_all_read') {
-        await Notification.updateMany(
-            { recipient: user.userId, isRead: false, scheduledFor: { $lte: new Date() } },
-            { isRead: true }
-        );
-        return NextResponse.json({ message: 'All marked as read' });
+    } catch (error) {
+        console.error('Notification Update Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
-
-    if (action === 'clear_all') {
-        await Notification.deleteMany({
-            recipient: user.userId,
-            scheduledFor: { $lte: new Date() }
-        });
-        return NextResponse.json({ message: 'All cleared' });
-    }
-
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 }

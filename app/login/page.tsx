@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import AuthBackground from '@/components/auth/AuthBackground';
 import AuthInput from '@/components/auth/AuthInput';
+import { useUserStore } from '@/store/useUserStore';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -72,6 +73,17 @@ export default function LoginPage() {
             }
 
             if (res.ok) {
+                // Save account for easy switching
+                if (data.token) {
+                    useUserStore.getState().saveAccount({
+                        userId: data.user.id,
+                        name: data.user.name,
+                        email: data.user.email,
+                        token: data.token,
+                        avatar: data.user.profileImage
+                    });
+                }
+
                 toast.success('Welcome back!');
                 window.location.href = '/dashboard';
             } else {
@@ -101,11 +113,11 @@ export default function LoginPage() {
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
                                 transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.1 }}
-                                className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(0,240,255,0.2)]"
+                                className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-linear-to-br from-primary/20 to-secondary/20 border border-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(0,240,255,0.2)]"
                             >
                                 {step === 'credentials' ? <KeyRound size={32} className="text-primary" /> : <ShieldCheck size={32} className="text-secondary" />}
                             </motion.div>
-                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400 mb-2 tracking-tight">
+                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white via-gray-200 to-gray-400 mb-2 tracking-tight">
                                 {step === 'credentials' ? 'Welcome Back' : 'Security Check'}
                             </h1>
                             <p className="text-muted text-sm">

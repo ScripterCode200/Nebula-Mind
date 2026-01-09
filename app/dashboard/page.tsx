@@ -6,7 +6,7 @@ import {
     Activity, Clock, Zap, BookOpen,
     TrendingUp, Calendar, ArrowRight,
     MoreHorizontal, Star, PieChart,
-    BarChart2, Target, Award, MessageSquare
+    BarChart2, Target, Award, MessageSquare, Copy
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
@@ -91,9 +91,31 @@ export default function DashboardPage() {
                         <h1 className="text-4xl md:text-5xl font-bold mb-2">
                             Welcome back, <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-secondary">{name}</span>
                         </h1>
-                        <p className="text-muted-foreground text-lg">
+                        <p className="text-muted-foreground text-lg mb-4">
                             You're on a roll! Keep up the momentum.
                         </p>
+
+                        {/* Nebula ID Display */}
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground bg-white/5 px-3 py-1.5 rounded-lg border border-white/5 flex items-center gap-2">
+                                <span className="font-semibold text-white">Nebula ID:</span>
+                                <span className="font-mono text-xs">{data?.user?._id || 'Loading...'}</span>
+                            </span>
+                            <button
+                                onClick={() => {
+                                    if (data?.user?._id) {
+                                        navigator.clipboard.writeText(data.user._id);
+                                        // Ideally show a toast here, but for now simple feedback
+                                        alert('Nebula ID copied to clipboard!');
+                                    }
+                                }}
+                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-primary"
+                                title="Copy Nebula ID"
+                            >
+                                <Copy size={16} />
+                            </button>
+                        </div>
+
                     </motion.div>
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}

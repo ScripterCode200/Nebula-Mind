@@ -1,31 +1,45 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { Plus, Book, Calendar, Search, Sparkles, Trash2 } from 'lucide-react';
+import ShareNotebookModal from '@/components/notebook/ShareNotebookModal';
+import { Plus, Book, Calendar, Search, Sparkles, Trash2, Share2, Users, Loader2, ArrowDown, User as UserIcon } from 'lucide-react';
+import { useUserStore } from '@/store/useUserStore';
+import { useNotebookStore, Notebook } from '@/store/useNotebookStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
 import DeleteConfirmationModal from '@/components/notebook/DeleteConfirmationModal';
 import Link from 'next/link';
 
+
 const CreateNotebookModal = dynamic<{ isOpen: boolean; onClose: () => void }>(
     () => import('@/components/notebook/CreateNotebookModal'),
     { ssr: false }
 );
 
-interface Notebook {
-    _id: string;
-    title: string;
-    createdAt: string;
-    pdfUrl: string;
-}
+
 
 export default function Dashboard() {
+    const { name } = useUserStore();
+    const router = useRouter();
+    const {
+        notebooks,
+        fetchNotebooks,
+        removeNotebook,
+        addNotebook,
+        isLoading,
+        hasMore,
+        isInitialized
+    } = useNotebookStore();
+
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [notebooks, setNotebooks] = useState<Notebook[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Share State
+    const [shareModalOpen, setShareModalOpen] = useState(false);
+    const [notebookToShare, setNotebookToShare] = useState<Notebook | null>(null);
 
     // Delete State
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -33,21 +47,17 @@ export default function Dashboard() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
-        fetchNotebooks();
-    }, []);
-
-    const fetchNotebooks = async () => {
-        try {
-            const res = await fetch('/api/notebooks');
-            if (res.ok) {
-                const data = await res.json();
-                setNotebooks(data);
-            }
-        } catch {
-            console.error('Failed to fetch notebooks');
-        } finally {
-            setLoading(false);
+        // Only fetch if not initialized to implement caching
+        if (!isInitialized) {
+            fetchNotebooks();
         }
+    }, [isInitialized, fetchNotebooks]);
+
+    const handleShareClick = (e: React.MouseEvent, notebook: Notebook) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setNotebookToShare(notebook);
+        setShareModalOpen(true);
     };
 
     const handleDeleteClick = (e: React.MouseEvent, notebook: Notebook) => {
@@ -67,7 +77,7 @@ export default function Dashboard() {
             });
 
             if (res.ok) {
-                setNotebooks(prev => prev.filter(n => n._id !== notebookToDelete._id));
+                removeNotebook(notebookToDelete._id);
                 setDeleteModalOpen(false);
                 setNotebookToDelete(null);
             }
@@ -147,118 +157,171 @@ export default function Dashboard() {
                 </div>
 
                 {/* Grid Section */}
-                {loading ? (
+                {/* Show Loading Skeleton only on FIRST load when store is empty */}
+                {isLoading && !isInitialized ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                             <div key={i} className="h-64 rounded-2xl bg-white/5 animate-pulse border border-white/5" />
                         ))}
                     </div>
                 ) : (
-                    <motion.div
-                        layout
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    >
-                        <AnimatePresence mode='popLayout'>
-                            {filteredNotebooks.map((notebook, index) => (
-                                <motion.div
-                                    layout
-                                    key={notebook._id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    transition={{ duration: 0.4, delay: index * 0.05 }}
-                                >
-                                    <Link href={`/notebook/${notebook._id}`}>
-                                        <GlassCard
-                                            hoverEffect
-                                            className="h-full flex flex-col justify-between group cursor-pointer! border-white/5 hover:border-primary/30 bg-black/40 backdrop-blur-xl! min-h-[240px] relative overflow-hidden"
-                                        >
-                                            <div>
-                                                <div className="flex justify-between items-start mb-6">
-                                                    <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-primary/10 to-blue-500/10 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(0,240,255,0.2)] transition-all duration-500 border border-primary/20">
-                                                        <Book size={28} />
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                                                            PDF
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => handleDeleteClick(e, notebook)}
-                                                            className="p-1.5 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-colors z-20"
-                                                            title="Delete Notebook"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2">
-                                                    {notebook.title}
-                                                </h3>
-                                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                                                    AI-generated insights and study materials from your uploaded document.
-                                                </p>
-                                            </div>
-
-                                            <div className="pt-4 border-t border-white/5 flex items-center justify-between text-xs text-muted-foreground group-hover:text-white/70 transition-colors">
-                                                <div className="flex items-center">
-                                                    <Calendar size={12} className="mr-2" />
-                                                    {new Date(notebook.createdAt).toLocaleDateString(undefined, {
-                                                        year: 'numeric',
-                                                        month: 'short',
-                                                        day: 'numeric'
-                                                    })}
-                                                </div>
-                                                <span className="group-hover:translate-x-1 transition-transform duration-300">
-                                                    Open →
-                                                </span>
-                                            </div>
-                                        </GlassCard>
-                                    </Link>
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
-
-                        {/* Empty State */}
-                        {!loading && filteredNotebooks.length === 0 && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="col-span-full flex flex-col items-center justify-center py-32 text-center"
-                            >
-                                <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6 relative">
-                                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
-                                    <Search size={40} className="text-muted-foreground relative z-10" />
-                                </div>
-                                <h3 className="text-2xl font-bold mb-2">No notebooks found</h3>
-                                <p className="text-muted-foreground max-w-md mb-8">
-                                    {searchQuery
-                                        ? `We couldn't find any notebooks matching "${searchQuery}".`
-                                        : "Get started by creating your first AI notebook from any PDF document."}
-                                </p>
-                                {!searchQuery && (
-                                    <NeonButton onClick={() => setIsModalOpen(true)}>
-                                        Create Notebook
-                                    </NeonButton>
-                                )}
-                                {searchQuery && (
-                                    <button
-                                        onClick={() => setSearchQuery('')}
-                                        className="text-primary hover:underline underline-offset-4"
+                    <>
+                        <motion.div
+                            layout
+                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                        >
+                            <AnimatePresence mode='popLayout'>
+                                {filteredNotebooks.map((notebook, index) => (
+                                    <motion.div
+                                        layout
+                                        key={notebook._id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        transition={{ duration: 0.4, delay: index * 0.05 }}
                                     >
-                                        Clear search
-                                    </button>
-                                )}
-                            </motion.div>
+                                        <div onClick={() => router.push(`/notebook/${notebook._id}`)} role="button" tabIndex={0} className="h-full block">
+                                            <GlassCard
+                                                hoverEffect
+                                                className="h-full flex flex-col justify-between group cursor-pointer! border-white/5 hover:border-primary/30 bg-black/40 backdrop-blur-xl! min-h-[240px] relative overflow-hidden"
+                                            >
+
+
+                                                <div>
+                                                    <div className="flex justify-between items-start mb-6">
+                                                        <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-primary/10 to-blue-500/10 flex items-center justify-center text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(0,240,255,0.2)] transition-all duration-500 border border-primary/20">
+                                                            <Book size={28} />
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {notebook.ownerName && (
+                                                                <Link href={`/user/${notebook.userId}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 px-2 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[10px] font-bold uppercase tracking-wider hover:bg-purple-500/20 transition-colors z-20">
+                                                                    {notebook.ownerImage ? (
+                                                                        <img src={notebook.ownerImage} alt={notebook.ownerName} className="w-3.5 h-3.5 rounded-full object-cover border border-purple-500/30" />
+                                                                    ) : (
+                                                                        <UserIcon size={10} />
+                                                                    )}
+                                                                    <span className="max-w-[80px] truncate">{notebook.ownerName}</span>
+                                                                </Link>
+                                                            )}
+                                                            <div className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                                                                PDF
+                                                            </div>
+
+                                                            {/* Actions: Share & Delete */}
+                                                            {/* Only Show Share button if NOT shared with me (cannot reshare easily yet) */}
+                                                            {!notebook.ownerName && (
+                                                                <button
+                                                                    onClick={(e) => handleShareClick(e, notebook)}
+                                                                    className="p-1.5 rounded-lg hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors z-20"
+                                                                    title="Share Notebook"
+                                                                >
+                                                                    <Share2 size={16} />
+                                                                </button>
+                                                            )}
+
+                                                            <button
+                                                                onClick={(e) => handleDeleteClick(e, notebook)}
+                                                                className="p-1.5 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-500 transition-colors z-20"
+                                                                title={notebook.ownerName ? "Remove Shared Notebook" : "Delete Notebook"}
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2">
+                                                        {notebook.title}
+                                                    </h3>
+                                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                                                        AI-generated insights and study materials from your uploaded document.
+                                                    </p>
+                                                </div>
+
+                                                <div className="pt-4 border-t border-white/5 flex items-center justify-between text-xs text-muted-foreground group-hover:text-white/70 transition-colors">
+                                                    <div className="flex items-center">
+                                                        <Calendar size={12} className="mr-2" />
+                                                        {new Date(notebook.createdAt).toLocaleDateString(undefined, {
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                            day: 'numeric'
+                                                        })}
+                                                    </div>
+                                                    <span className="group-hover:translate-x-1 transition-transform duration-300">
+                                                        Open →
+                                                    </span>
+                                                </div>
+                                            </GlassCard>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+
+
+                            {/* Empty State */}
+                            {!isLoading && filteredNotebooks.length === 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="col-span-full flex flex-col items-center justify-center py-32 text-center"
+                                >
+                                    <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6 relative">
+                                        <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+                                        <Search size={40} className="text-muted-foreground relative z-10" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold mb-2">No notebooks found</h3>
+                                    <p className="text-muted-foreground max-w-md mb-8">
+                                        {searchQuery
+                                            ? `We couldn't find any notebooks matching "${searchQuery}".`
+                                            : "Get started by creating your first AI notebook from any PDF document."}
+                                    </p>
+                                    {!searchQuery && (
+                                        <NeonButton onClick={() => setIsModalOpen(true)}>
+                                            Create Notebook
+                                        </NeonButton>
+                                    )}
+                                    {searchQuery && (
+                                        <button
+                                            onClick={() => setSearchQuery('')}
+                                            className="text-primary hover:underline underline-offset-4"
+                                        >
+                                            Clear search
+                                        </button>
+                                    )}
+                                </motion.div>
+                            )}
+                        </motion.div>
+
+                        {/* Load More Button */}
+                        {hasMore && !searchQuery && (
+                            <div className="flex justify-center mt-12">
+                                <NeonButton
+                                    onClick={() => fetchNotebooks()}
+                                    variant="secondary"
+                                    className="min-w-[200px]"
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin mr-2" />
+                                            Loading more...
+                                        </>
+                                    ) : (
+                                        <>
+                                            Load More
+                                            <ArrowDown size={16} className="ml-2" />
+                                        </>
+                                    )}
+                                </NeonButton>
+                            </div>
                         )}
-                    </motion.div>
+                    </>
                 )}
 
                 <CreateNotebookModal
                     isOpen={isModalOpen}
                     onClose={() => {
                         setIsModalOpen(false);
-                        fetchNotebooks();
+                        fetchNotebooks(true);
                     }}
                 />
 
@@ -268,6 +331,13 @@ export default function Dashboard() {
                     onConfirm={confirmDelete}
                     title={notebookToDelete?.title || ''}
                     isDeleting={isDeleting}
+                />
+
+                <ShareNotebookModal
+                    isOpen={shareModalOpen}
+                    onClose={() => setShareModalOpen(false)}
+                    notebookId={notebookToShare?._id || ''}
+                    notebookTitle={notebookToShare?.title || ''}
                 />
             </div>
         </main>

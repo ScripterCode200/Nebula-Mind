@@ -89,8 +89,8 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
 
         // Determine which model to use
         // If modelProvider is a specific Gemini model (e.g. gemini-3.0-flash), use it.
-        // If it's the generic 'gemini', check options.modelName or default to 2.5.
-        let targetModel = "gemini-2.5-flash";
+        // If it's the generic 'gemini', check options.modelName or default to 2.0.
+        let targetModel = "gemini-2.0-flash";
 
         if (modelProvider.startsWith('gemini-') && modelProvider !== 'gemini') {
             targetModel = modelProvider;
@@ -111,24 +111,24 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
             console.warn(`[Generate API Helper] Failed with ${targetModel}: ${error.message}`);
 
             // Fallback Strategy
-            // 1. If we tried 3.0, fallback to 2.5
+            // 1. If we tried 3.0, fallback to 2.0
             if (targetModel.includes('3.0')) {
                 try {
-                    console.log('[Generate API Helper] Falling back to gemini-2.5-flash...');
-                    result = await runGenerate("gemini-2.5-flash");
+                    console.log('[Generate API Helper] Falling back to gemini-2.0-flash...');
+                    result = await runGenerate("gemini-2.0-flash");
                 } catch (e) {
-                    // 2. If 2.5 fails, try 1.5
-                    console.log('[Generate API Helper] Falling back to gemini-1.5-flash-001...');
-                    result = await runGenerate("gemini-1.5-flash-001");
+                    // 2. If 2.0 fails, try 1.5-flash-002 as last resort
+                    console.log('[Generate API Helper] Falling back to gemini-1.5-flash-002...');
+                    result = await runGenerate("gemini-1.5-flash-002");
                 }
             } else {
-                // Legacy fallback for 2.5
+                // Legacy fallback for 2.0
                 try {
-                    console.log('[Generate API Helper] Falling back to gemini-2.5-flash-preview-001...');
-                    result = await runGenerate("gemini-2.5-flash-preview-001");
+                    console.log('[Generate API Helper] Falling back to gemini-2.0-flash-001...');
+                    result = await runGenerate("gemini-2.0-flash-001");
                 } catch (previewError: any) {
-                    console.log('[Generate API Helper] Falling back to gemini-1.5-flash-001...');
-                    result = await runGenerate("gemini-1.5-flash-001");
+                    console.log('[Generate API Helper] Falling back to gemini-1.5-flash-002...');
+                    result = await runGenerate("gemini-1.5-flash-002");
                 }
             }
         }
@@ -307,13 +307,13 @@ export async function POST(req: NextRequest) {
                                 const { getVertexModel } = await import('@/lib/vertex-client');
 
                                 // Determine Target Model
-                                let targetModel = "gemini-2.5-flash";
+                                let targetModel = "gemini-2.0-flash";
                                 // If specific gemini model name is passed, use it.
                                 if (modelProvider.startsWith('gemini-') && modelProvider !== 'gemini') {
                                     targetModel = modelProvider;
                                 } else {
                                     // Otherwise fallback to whatever is default
-                                    targetModel = "gemini-2.5-flash";
+                                    targetModel = "gemini-2.0-flash";
                                 }
 
                                 const runStream = async (modelName: string) => {
@@ -330,20 +330,20 @@ export async function POST(req: NextRequest) {
                                     // Fallback
                                     if (targetModel.includes('3.0')) {
                                         try {
-                                            console.log('[Generate API] Falling back to gemini-2.5-flash...');
-                                            result = await runStream("gemini-2.5-flash");
+                                            console.log('[Generate API] Falling back to gemini-2.0-flash...');
+                                            result = await runStream("gemini-2.0-flash");
                                         } catch (e) {
-                                            console.log('[Generate API] Falling back to gemini-1.5-flash-001...');
-                                            result = await runStream("gemini-1.5-flash-001");
+                                            console.log('[Generate API] Falling back to gemini-1.5-flash-002...');
+                                            result = await runStream("gemini-1.5-flash-002");
                                         }
                                     } else {
                                         // Legacy fallback
                                         try {
-                                            console.log('[Generate API] Falling back to gemini-2.5-flash-preview-001...');
-                                            result = await runStream("gemini-2.5-flash-preview-001");
+                                            console.log('[Generate API] Falling back to gemini-2.0-flash-001...');
+                                            result = await runStream("gemini-2.0-flash-001");
                                         } catch (previewError: any) {
-                                            console.log('[Generate API] Falling back to gemini-1.5-flash-001...');
-                                            result = await runStream("gemini-1.5-flash-001");
+                                            console.log('[Generate API] Falling back to gemini-1.5-flash-002...');
+                                            result = await runStream("gemini-1.5-flash-002");
                                         }
                                     }
                                 }

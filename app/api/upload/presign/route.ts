@@ -45,8 +45,9 @@ export async function POST(req: NextRequest) {
 
         // Generate Presigned URL (valid for 5 minutes)
         const url = await getSignedUrl(r2Client, command, { expiresIn: 300 });
+        const publicDomain = process.env.R2_PUBLIC_DOMAIN;
 
-        return NextResponse.json({ url, key });
+        return NextResponse.json({ url, key, publicDomain });
     } catch (error) {
         console.error('Error generating presigned URL:', error);
         return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 });

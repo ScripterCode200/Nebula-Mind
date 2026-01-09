@@ -1,16 +1,16 @@
-
 'use client';
 
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, FileText, Check, Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, FileText, Check, Loader2, X, ChevronLeft, ChevronRight, Youtube, Upload } from 'lucide-react';
 import NeonButton from '@/components/ui/NeonButton';
 
 interface Source {
     _id: string;
-    type: 'pdf';
+    type: 'pdf' | 'youtube';
     name: string;
     addedAt: string;
+    url?: string;
 }
 
 interface SourceSidebarProps {
@@ -18,27 +18,44 @@ interface SourceSidebarProps {
     activeSourceId: string | null;
     selectedSourceIds: string[];
     onSourceClick: (id: string) => void;
-    onToggledSource: (id: string, checked: boolean) => void;
-    onAddSource: (file: File) => Promise<void>;
-    isAddingSource: boolean;
+    onToggledSource: (id: string) => void;
+    onAddSource: (file: File) => void;
+    onAddYoutube: (url: string) => Promise<void>;
+    isAddingSource?: boolean;
+    loadingStep?: string;
+    transcribeProgress?: number;
+    videoInfo?: { title: string; duration: number } | null;
 }
 
-export default function SourceSidebar({
+const SourceSidebar = ({
     sources,
     activeSourceId,
     selectedSourceIds,
     onSourceClick,
     onToggledSource,
     onAddSource,
-    isAddingSource
-}: SourceSidebarProps) {
+    onAddYoutube,
+    isAddingSource = false,
+    loadingStep = '',
+    transcribeProgress = 0,
+    videoInfo = null
+}: SourceSidebarProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [collapsed, setCollapsed] = useState(false);
+    const [addMode, setAddMode] = useState<'none' | 'upload' | 'youtube'>('none');
+    const [youtubeUrl, setYoutubeUrl] = useState('');
+
+    const handleAddYoutube = async () => {
+        if (!youtubeUrl) return;
+        await onAddYoutube(youtubeUrl);
+        setYoutubeUrl('');
+        setAddMode('none');
+    };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        await onAddSource(file);
+        onAddSource(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -61,31 +78,25 @@ export default function SourceSidebar({
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2 custom-scrollbar">
-                {sources.map(source => {
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                {sources.map((source) => {
                     const isActive = activeSourceId === source._id;
                     const isChecked = selectedSourceIds.includes(source._id);
 
                     return (
                         <motion.div
                             key={source._id}
-                            layout
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className={`group relative rounded-xl border transition-all duration-200 overflow-hidden ${isActive
-                                ? 'bg-primary/5 border-primary/20 shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]'
-                                : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.07]'
-                                }`}
+                            className={`group relative rounded-xl transition-all duration-200 ${isActive ? 'bg-primary/10' : 'hover:bg-white/5'}`}
                         >
-                            {/* Selection Checkbox (Absolute Left) */}
                             {!collapsed && (
                                 <div
-                                    className="absolute left-0 top-0 bottom-0 w-9 flex items-center justify-center cursor-pointer z-10 hover:bg-white/5 transition-colors border-r border-white/5"
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-1 cursor-pointer"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onToggledSource(source._id, !isChecked);
+                                        onToggledSource(source._id);
                                     }}
-                                    title={isChecked ? "Remove from AI Context" : "Add to AI Context"}
                                 >
                                     <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${isChecked ? 'bg-primary border-primary text-black scale-100' : 'border-white/30 scale-90 opacity-50 hover:opacity-100'}`}>
                                         {isChecked && <Check size={10} strokeWidth={4} />}
@@ -93,7 +104,6 @@ export default function SourceSidebar({
                                 </div>
                             )}
 
-                            {/* Main Click Area */}
                             <div
                                 className={`flex items-center gap-3 cursor-pointer ${collapsed ? 'justify-center py-3 px-1' : 'py-3 pl-12 pr-3'}`}
                                 onClick={() => onSourceClick(source._id)}
@@ -120,7 +130,6 @@ export default function SourceSidebar({
                                     </div>
                                 )}
 
-                                {/* Active Indicator (Right Edge) */}
                                 {isActive && !collapsed && (
                                     <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-primary shadow-[0_0_10px_var(--primary-color)]" />
                                 )}
@@ -129,7 +138,6 @@ export default function SourceSidebar({
                     );
                 })}
 
-                {/* Empty State */}
                 {sources.length === 0 && !collapsed && (
                     <div className="text-center py-8 px-4 text-muted-foreground border border-dashed border-white/10 rounded-xl">
                         <p className="text-xs">No sources added yet.</p>
@@ -141,7 +149,7 @@ export default function SourceSidebar({
             <div className="p-4 border-t border-white/5 bg-[#050505]">
                 {collapsed ? (
                     <button
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => setAddMode('upload')}
                         disabled={isAddingSource}
                         className="w-full flex items-center justify-center p-3 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all hover:scale-105 active:scale-95"
                         title="Add Source"
@@ -149,15 +157,79 @@ export default function SourceSidebar({
                         {isAddingSource ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
                     </button>
                 ) : (
-                    <NeonButton
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isAddingSource}
-                        className="w-full justify-center group"
-                        variant="secondary"
-                    >
-                        {isAddingSource ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} className="group-hover:rotate-90 transition-transform" />}
-                        <span className="ml-2">Add New Source</span>
-                    </NeonButton>
+                    <div className="space-y-4">
+                        {isAddingSource && videoInfo && (
+                            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2 animate-in fade-in duration-300">
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest leading-none mb-1">Processing</p>
+                                        <p className="text-xs font-medium text-primary truncate leading-tight">{videoInfo.title}</p>
+                                    </div>
+                                    <span className="text-xs font-bold text-glow">{transcribeProgress}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                                    <motion.div
+                                        className="h-full bg-linear-to-r from-primary to-secondary"
+                                        animate={{ width: `${transcribeProgress}%` }}
+                                        transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+                                    />
+                                </div>
+                                <div className="flex justify-between text-[8px] text-muted-foreground uppercase tracking-tighter">
+                                    <span>{loadingStep}</span>
+                                    <span>~{Math.round(videoInfo.duration / 10)}s est.</span>
+                                </div>
+                            </div>
+                        )}
+                        <div className="space-y-3">
+                            {addMode === 'none' ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <NeonButton
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isAddingSource}
+                                        className="justify-center text-xs px-2"
+                                        variant="secondary"
+                                    >
+                                        <Upload size={14} className="mr-2" />
+                                        Upload
+                                    </NeonButton>
+                                    <NeonButton
+                                        onClick={() => setAddMode('youtube')}
+                                        disabled={isAddingSource}
+                                        className="justify-center text-xs px-2 bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+                                        variant="ghost"
+                                    >
+                                        <Youtube size={14} className="mr-2" />
+                                        YouTube
+                                    </NeonButton>
+                                </div>
+                            ) : addMode === 'youtube' ? (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-red-400 flex items-center gap-1">
+                                            <Youtube size={12} /> YouTube
+                                        </span>
+                                        <button onClick={() => setAddMode('none')} className="text-muted-foreground hover:text-white"><X size={12} /></button>
+                                    </div>
+                                    <input
+                                        type="url"
+                                        value={youtubeUrl}
+                                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                                        placeholder="Paste video URL..."
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500/50 transition-colors"
+                                        autoFocus
+                                    />
+                                    <NeonButton
+                                        onClick={handleAddYoutube}
+                                        disabled={!youtubeUrl || isAddingSource}
+                                        className="w-full justify-center text-xs"
+                                        isLoading={isAddingSource}
+                                    >
+                                        Add Video
+                                    </NeonButton>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
                 )}
                 <input
                     type="file"
@@ -169,7 +241,9 @@ export default function SourceSidebar({
             </div>
         </div>
     );
-}
+};
+
+export default SourceSidebar;
 
 function ClientDate({ date }: { date: string }) {
     const [mounted, setMounted] = useState(false);
@@ -178,6 +252,5 @@ function ClientDate({ date }: { date: string }) {
     }, []);
 
     if (!mounted) return <span className="opacity-0">Loading...</span>;
-
     return <>{new Date(date).toLocaleDateString()}</>;
 }
