@@ -3,9 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
-    ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
-    RotateCw, RefreshCw, Pen, Eraser, Highlighter,
-    Trash2, MousePointer2, Palette
+    RotateCw, Trash2, ChevronLeft, ChevronRight, Maximize2, Minimize2,
+    Download, Settings, Share2, ZoomIn, ZoomOut, MousePointer2, Pen,
+    Highlighter, Eraser, Palette, Droplets, Sun,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ResetAnnotationsModal from '@/components/modals/ResetAnnotationsModal';
@@ -20,6 +20,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface PDFViewerProps {
     url: string;
+    isMobile?: boolean;
 }
 
 type Tool = 'cursor' | 'pen' | 'highlighter' | 'eraser';
@@ -46,7 +47,7 @@ const COLORS = [
     '#000000', // Black
 ];
 
-const PDFViewer = ({ url }: PDFViewerProps) => {
+const PDFViewer = ({ url, isMobile = false }: PDFViewerProps) => {
     const [numPages, setNumPages] = useState<number>(0);
     // Removed pageNumber state for vertical scrolling
     const [scale, setScale] = useState<number>(1.0);
@@ -212,7 +213,7 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
 
             {/* Viewer Area */}
             <div
-                className="flex-1 overflow-auto flex justify-center p-8 relative"
+                className={`flex-1 overflow-auto flex justify-center relative ${isMobile ? 'p-2' : 'p-8'}`}
                 data-lenis-prevent
                 ref={containerRef}
             >
@@ -257,31 +258,44 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
             <AnimatePresence>
                 {isToolbarVisible && (
                     <motion.div
-                        initial={{ y: 100, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 100, opacity: 0 }}
-                        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-[95vw]"
+                        initial={isMobile ? { y: 100 } : { y: 100, opacity: 0 }}
+                        animate={isMobile ? { y: 0 } : { y: 0, opacity: 1 }}
+                        className={`absolute z-50 ${isMobile ? 'left-0 right-0 bottom-0 w-full' : 'bottom-6 left-1/2 -translate-x-1/2 max-w-[95vw]'}`}
                     >
-                        <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#1e1e1e]/80 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden min-w-[300px] justify-center">
+                        <div className={`${isMobile ? 'flex flex-col gap-4 px-6 py-5 rounded-t-[32px] bg-[#0A0A0A] border-t border-white/10 w-full shadow-[0_-10px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl' : 'flex flex-row items-center gap-1.5 md:gap-2 p-1.5 md:p-2 rounded-2xl bg-[#1e1e1e]/80 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden min-w-fit justify-center'}`}>
+
+                            {/* Mobile Grids or Desktop Row */}
                             <AnimatePresence mode="wait" initial={false}>
                                 {isColorPickerOpen ? (
-                                    // ... Color Picker (Same)
                                     <motion.div
                                         key="color-palette"
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 20 }}
-                                        className="flex items-center gap-3 px-2"
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className={`flex items-center gap-4 ${isMobile ? 'flex-col w-full' : 'flex-row px-2'}`}
                                     >
-                                        <button
-                                            onClick={() => setIsColorPickerOpen(false)}
-                                            className="p-2 rounded-xl hover:bg-white/10 text-white transition-colors mr-2"
-                                            title="Back to Tools"
-                                        >
-                                            <ChevronLeft size={18} />
-                                        </button>
+                                        {isMobile && (
+                                            <div className="w-full flex items-center justify-between mb-2">
+                                                <span className="text-sm font-medium text-white/50 pl-2">Select Color</span>
+                                                <button
+                                                    onClick={() => setIsColorPickerOpen(false)}
+                                                    className="p-2 rounded-xl bg-white/5 text-white hover:bg-white/10"
+                                                >
+                                                    <ChevronLeft size={20} />
+                                                </button>
+                                            </div>
+                                        )}
 
-                                        <div className="flex items-center gap-2">
+                                        <div className={`flex flex-wrap items-center justify-center gap-3 ${isMobile ? 'w-full' : ''}`}>
+                                            {!isMobile && (
+                                                <button
+                                                    onClick={() => setIsColorPickerOpen(false)}
+                                                    className="p-2 rounded-xl hover:bg-white/10 text-white transition-colors mr-2"
+                                                >
+                                                    <ChevronLeft size={18} />
+                                                </button>
+                                            )}
+
                                             {COLORS.map(c => (
                                                 <button
                                                     key={c}
@@ -289,110 +303,277 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
                                                         setActiveColor(c);
                                                         setIsColorPickerOpen(false);
                                                     }}
-                                                    className={`w-8 h-8 rounded-full border border-white/10 transition-transform hover:scale-110 ${activeColor === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1e1e1e] scale-110' : ''}`}
+                                                    className={`rounded-full border border-white/10 transition-transform ${isMobile ? 'w-10 h-10' : 'w-8 h-8 hover:scale-110'} ${activeColor === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1e1e1e] scale-110 shadow-[0_0_15px_rgba(255,255,255,0.3)]' : ''}`}
                                                     style={{ backgroundColor: c }}
                                                 />
                                             ))}
-                                        </div>
 
-                                        <div className="w-px h-6 bg-white/10 mx-1" />
+                                            {/* Custom Color Trigger & Sliders */}
+                                            <div className={`flex flex-col gap-4 ${isMobile ? 'bg-white/5 p-5 rounded-[28px] w-full mt-2' : 'px-6 py-3 border-l border-white/10 min-w-[280px]'}`}>
+                                                <div className="flex items-center gap-4">
+                                                    <div
+                                                        className={`rounded-full border-2 border-white/30 shadow-[0_0_20px_rgba(255,255,255,0.1)] shrink-0 transition-all duration-300 ${isMobile ? 'w-16 h-16' : 'w-12 h-12'}`}
+                                                        style={{ backgroundColor: activeColor }}
+                                                    />
+                                                    <div className="flex flex-col gap-5 flex-1">
+                                                        {
+                                                            (() => {
+                                                                // Helper to get HSL values reliably from HEX or HSL
+                                                                const getHsl = (color: string) => {
+                                                                    if (color.startsWith('hsl')) {
+                                                                        const m = color.match(/\d+/g);
+                                                                        if (m) return { h: parseInt(m[0]), s: parseInt(m[1]), l: parseInt(m[2]) };
+                                                                    }
+                                                                    // Simple Hex to HSL
+                                                                    let r = 0, g = 0, b = 0;
+                                                                    if (color.startsWith('#')) {
+                                                                        r = parseInt(color.slice(1, 3), 16) / 255;
+                                                                        g = parseInt(color.slice(3, 5), 16) / 255;
+                                                                        b = parseInt(color.slice(5, 7), 16) / 255;
+                                                                    }
+                                                                    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                                                                    let h, s, l = (max + min) / 2;
+                                                                    if (max === min) h = s = 0;
+                                                                    else {
+                                                                        const d = max - min;
+                                                                        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                                                                        if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+                                                                        else if (max === g) h = (b - r) / d + 2;
+                                                                        else h = (r - g) / d + 4;
+                                                                        h /= 6;
+                                                                    }
+                                                                    return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+                                                                };
 
-                                        <div className="relative flex items-center justify-center">
-                                            <input
-                                                type="color"
-                                                value={activeColor}
-                                                onChange={(e) => setActiveColor(e.target.value)}
-                                                className="w-8 h-8 rounded-full overflow-hidden cursor-pointer border-0 p-0 absolute opacity-0"
-                                            />
-                                            <div
-                                                className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center bg-[conic-gradient(from_180deg_at_50%_50%,#FF0000_0deg,#00FF00_120deg,#0000FF_240deg,#FF0000_360deg)]"
-                                                title="Custom Color"
-                                            >
-                                                <div className="w-6 h-6 rounded-full bg-[#1e1e1e]" />
+                                                                const { h, s, l } = getHsl(activeColor);
+
+                                                                return (
+                                                                    <>
+                                                                        {/* Hue Slider */}
+                                                                        <div className="flex items-center gap-3">
+                                                                            <Palette size={14} className="text-white/40 shrink-0" />
+                                                                            <div
+                                                                                className="group relative h-3 flex-1 rounded-full shadow-inner px-2"
+                                                                                style={{ background: 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }}
+                                                                            >
+                                                                                <input
+                                                                                    type="range"
+                                                                                    min="0"
+                                                                                    max="360"
+                                                                                    step="1"
+                                                                                    value={h}
+                                                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                                                    onChange={(e) => setActiveColor(`hsl(${e.target.value}, ${s}%, ${l}%)`)}
+                                                                                />
+                                                                                <motion.div
+                                                                                    className="absolute top-1/2 w-5 h-5 rounded-full bg-white border-2 border-black/10 shadow-[0_2px_10px_rgba(0,0,0,0.5)] group-hover:scale-110 pointer-events-none z-20"
+                                                                                    animate={{
+                                                                                        left: `calc(8px + ${(h / 360) * 100}% - ${(h / 360) * 16}px)`,
+                                                                                        y: '-50%',
+                                                                                        x: '-50%'
+                                                                                    }}
+                                                                                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Saturation Slider */}
+                                                                        <div className="flex items-center gap-3">
+                                                                            <Droplets size={14} className="text-white/40 shrink-0" />
+                                                                            <div className="group relative h-3 flex-1 rounded-full bg-white/5 px-2">
+                                                                                <div
+                                                                                    className="absolute inset-0 rounded-full transition-colors duration-300"
+                                                                                    style={{
+                                                                                        background: `linear-gradient(to right, hsl(${h}, 0%, 50%), hsl(${h}, 100%, 50%))`
+                                                                                    }}
+                                                                                />
+                                                                                <input
+                                                                                    type="range"
+                                                                                    min="0"
+                                                                                    max="100"
+                                                                                    step="1"
+                                                                                    value={s}
+                                                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                                                    onChange={(e) => setActiveColor(`hsl(${h}, ${e.target.value}%, ${l}%)`)}
+                                                                                />
+                                                                                <motion.div
+                                                                                    className="absolute top-1/2 w-5 h-5 rounded-full bg-white border-2 border-black/10 shadow-[0_2px_10px_rgba(0,0,0,0.5)] group-hover:scale-110 pointer-events-none z-20"
+                                                                                    animate={{
+                                                                                        left: `calc(8px + ${(s / 100) * 100}% - ${(s / 100) * 16}px)`,
+                                                                                        y: '-50%',
+                                                                                        x: '-50%'
+                                                                                    }}
+                                                                                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Lightness Slider */}
+                                                                        <div className="flex items-center gap-3">
+                                                                            <Sun size={14} className="text-white/40 shrink-0" />
+                                                                            <div className="group relative h-3 flex-1 rounded-full bg-white/5 px-2">
+                                                                                <div
+                                                                                    className="absolute inset-0 rounded-full transition-colors duration-300"
+                                                                                    style={{
+                                                                                        background: `linear-gradient(to right, #000, hsl(${h}, ${s}%, 50%), #fff)`
+                                                                                    }}
+                                                                                />
+                                                                                <input
+                                                                                    type="range"
+                                                                                    min="0"
+                                                                                    max="100"
+                                                                                    step="1"
+                                                                                    value={l}
+                                                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                                                    onChange={(e) => setActiveColor(`hsl(${h}, ${s}%, ${e.target.value}%)`)}
+                                                                                />
+                                                                                <motion.div
+                                                                                    className="absolute top-1/2 w-5 h-5 rounded-full bg-white border-2 border-black/10 shadow-[0_2px_10px_rgba(0,0,0,0.5)] group-hover:scale-110 pointer-events-none z-20"
+                                                                                    animate={{
+                                                                                        left: `calc(8px + ${(l / 100) * 100}% - ${(l / 100) * 16}px)`,
+                                                                                        y: '-50%',
+                                                                                        x: '-50%'
+                                                                                    }}
+                                                                                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()
+                                                        }
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </motion.div>
                                 ) : (
                                     <motion.div
                                         key="tools"
-                                        initial={{ opacity: 0, y: -20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -20 }}
-                                        className="flex items-center gap-2 overflow-x-auto no-scrollbar"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className={isMobile ? 'flex flex-col gap-6 w-full' : 'flex items-center gap-2 overflow-x-auto no-scrollbar'}
                                     >
-                                        {/* REMOVED: Page Nav */}
+                                        {isMobile ? (
+                                            // MOBILE LAYOUT
+                                            <>
+                                                {/* Top Row: Primary Tools */}
+                                                <div className="flex items-center justify-between px-2">
+                                                    {[
+                                                        { id: 'cursor', icon: MousePointer2, label: 'Cursor' },
+                                                        { id: 'pen', icon: Pen, label: 'Pen' },
+                                                        { id: 'highlighter', icon: Highlighter, label: 'Highlighter' },
+                                                        { id: 'eraser', icon: Eraser, label: 'Eraser' },
+                                                    ].map((tool) => (
+                                                        <button
+                                                            key={tool.id}
+                                                            onClick={() => setActiveTool(tool.id as Tool)}
+                                                            className={`p-3.5 rounded-2xl transition-all relative group ${activeTool === tool.id ? 'bg-primary text-black shadow-[0_0_20px_rgba(var(--primary-rgb),0.4)] scale-110' : 'bg-white/5 text-white/70'}`}
+                                                        >
+                                                            <tool.icon size={22} className={activeTool === tool.id ? "fill-current" : ""} />
+                                                        </button>
+                                                    ))}
 
-                                        {/* Zoom */}
-                                        <div className="flex items-center gap-1 px-2 border-r border-white/10 shrink-0">
-                                            <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 rounded-xl hover:bg-white/10 text-white transition-colors">
-                                                <ZoomOut size={18} />
-                                            </button>
-                                            <span className="text-xs font-bold text-white min-w-12 text-center font-mono">{Math.round(scale * 100)}%</span>
-                                            <button onClick={() => setScale(s => Math.min(3.0, s + 0.1))} className="p-2 rounded-xl hover:bg-white/10 text-white transition-colors">
-                                                <ZoomIn size={18} />
-                                            </button>
-                                        </div>
-
-                                        {/* Tools */}
-                                        <div className="flex items-center gap-1 px-2 border-r border-white/10 shrink-0">
-                                            {[
-                                                { id: 'cursor', icon: MousePointer2, label: 'Cursor' },
-                                                { id: 'pen', icon: Pen, label: 'Pen' },
-                                                { id: 'highlighter', icon: Highlighter, label: 'Highlighter' },
-                                                { id: 'eraser', icon: Eraser, label: 'Eraser' },
-                                            ].map((tool) => (
-                                                <button
-                                                    key={tool.id}
-                                                    onClick={() => setActiveTool(tool.id as Tool)}
-                                                    className={`p-2 rounded-xl transition-all relative group ${activeTool === tool.id ? 'bg-primary text-black shadow-[0_0_15px_rgba(var(--primary-rgb),0.5)]' : 'hover:bg-white/10 text-white'}`}
-                                                    title={tool.label}
-                                                >
-                                                    <tool.icon size={18} />
-                                                    {activeTool === tool.id && (
-                                                        <motion.div
-                                                            layoutId="activeToolGlow"
-                                                            className="absolute inset-0 rounded-xl bg-white/20 blur-sm -z-10"
-                                                        />
+                                                    {/* Color Trigger (if needed next to tools) */}
+                                                    {(activeTool === 'pen' || activeTool === 'highlighter') && (
+                                                        <button
+                                                            onClick={() => setIsColorPickerOpen(true)}
+                                                            className="w-[50px] h-[50px] rounded-2xl border-2 border-white/20 flex items-center justify-center shadow-lg"
+                                                            style={{ backgroundColor: activeColor }}
+                                                        >
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-white mix-blend-difference" />
+                                                        </button>
                                                     )}
-                                                </button>
-                                            ))}
-                                        </div>
+                                                </div>
 
-                                        {/* Color Picker Toggle (Conditional) */}
-                                        <AnimatePresence>
-                                            {(activeTool === 'pen' || activeTool === 'highlighter') && (
-                                                <motion.div
-                                                    initial={{ width: 0, opacity: 0, scale: 0 }}
-                                                    animate={{ width: 'auto', opacity: 1, scale: 1 }}
-                                                    exit={{ width: 0, opacity: 0, scale: 0 }}
-                                                    className="flex items-center gap-1 px-2 border-r border-white/10 shrink-0 overflow-hidden"
-                                                >
-                                                    <button
-                                                        onClick={() => setIsColorPickerOpen(true)}
-                                                        className="w-9 h-9 rounded-full border-2 border-white/20 flex items-center justify-center hover:scale-110 transition-transform shadow-lg"
-                                                        style={{ backgroundColor: activeColor }}
-                                                        title="Color"
-                                                    />
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
+                                                {/* Bottom Row: Utilities */}
+                                                <div className="flex items-center justify-between px-2 pt-2 border-t border-white/5">
+                                                    {/* Zoom Group */}
+                                                    <div className="flex items-center gap-3 bg-white/5 p-1.5 rounded-xl">
+                                                        <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 rounded-lg hover:bg-white/10 text-white"><ZoomOut size={18} /></button>
+                                                        <span className="text-xs font-mono font-bold min-w-[3ch] text-center">{Math.round(scale * 100)}%</span>
+                                                        <button onClick={() => setScale(s => Math.min(3.0, s + 0.1))} className="p-2 rounded-lg hover:bg-white/10 text-white"><ZoomIn size={18} /></button>
+                                                    </div>
 
-                                        {/* Actions */}
-                                        <div className="flex items-center gap-1 pl-2 shrink-0">
-                                            <button onClick={undo} disabled={(pageHistoryStep[activePage] ?? -1) < 0} className="p-2 rounded-xl hover:bg-white/10 text-white disabled:opacity-30 transition-colors">
-                                                <RotateCw size={18} className="-scale-x-100" />
-                                            </button>
-                                            <button onClick={redo} disabled={(pageHistoryStep[activePage] ?? -1) >= (pageHistory[activePage]?.length || 0) - 1} className="p-2 rounded-xl hover:bg-white/10 text-white disabled:opacity-30 transition-colors">
-                                                <RotateCw size={18} />
-                                            </button>
-                                            <div className="w-px h-6 bg-white/10 mx-1" />
-                                            <button onClick={() => setIsResetModalOpen(true)} className="p-2 rounded-xl hover:bg-red-500/20 text-red-400 transition-colors">
-                                                <Trash2 size={18} />
-                                            </button>
-                                            <button onClick={() => setIsToolbarVisible(false)} className="p-2 rounded-xl hover:bg-white/10 text-white transition-colors ml-1">
-                                                <ChevronLeft size={18} className="-rotate-90" />
-                                            </button>
-                                        </div>
+                                                    {/* History Group */}
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={undo} disabled={(pageHistoryStep[activePage] ?? -1) < 0} className="p-3 rounded-xl bg-white/5 text-white disabled:opacity-30"><RotateCw size={18} className="-scale-x-100" /></button>
+                                                        <button onClick={redo} disabled={(pageHistoryStep[activePage] ?? -1) >= (pageHistory[activePage]?.length || 0) - 1} className="p-3 rounded-xl bg-white/5 text-white disabled:opacity-30"><RotateCw size={18} /></button>
+                                                    </div>
+
+                                                    <button onClick={() => setIsResetModalOpen(true)} className="p-3 rounded-xl bg-red-500/10 text-red-400"><Trash2 size={18} /></button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            // DESKTOP LAYOUT (Original)
+                                            <>
+                                                {/* Zoom */}
+                                                <div className="flex items-center gap-0.5 md:gap-1 px-1 md:px-2 border-r border-white/10 shrink-0">
+                                                    <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-1.5 md:p-2 rounded-xl hover:bg-white/10 text-white transition-colors">
+                                                        <ZoomOut size={16} className="md:w-[18px] md:h-[18px]" />
+                                                    </button>
+                                                    <span className="text-[10px] md:text-xs font-bold text-white min-w-10 md:min-w-12 text-center font-mono">{Math.round(scale * 100)}%</span>
+                                                    <button onClick={() => setScale(s => Math.min(3.0, s + 0.1))} className="p-1.5 md:p-2 rounded-xl hover:bg-white/10 text-white transition-colors">
+                                                        <ZoomIn size={16} className="md:w-[18px] md:h-[18px]" />
+                                                    </button>
+                                                </div>
+
+                                                {/* Tools */}
+                                                <div className="flex items-center gap-0.5 md:gap-1 px-1 md:px-2 border-r border-white/10 shrink-0">
+                                                    {[
+                                                        { id: 'cursor', icon: MousePointer2, label: 'Cursor' },
+                                                        { id: 'pen', icon: Pen, label: 'Pen' },
+                                                        { id: 'highlighter', icon: Highlighter, label: 'Highlighter' },
+                                                        { id: 'eraser', icon: Eraser, label: 'Eraser' },
+                                                    ].map((tool) => (
+                                                        <button
+                                                            key={tool.id}
+                                                            onClick={() => setActiveTool(tool.id as Tool)}
+                                                            className={`p-1.5 md:p-2 rounded-xl transition-all relative group ${activeTool === tool.id ? 'bg-primary text-black shadow-[0_0_15px_rgba(var(--primary-rgb),0.5)]' : 'hover:bg-white/10 text-white'}`}
+                                                            title={tool.label}
+                                                        >
+                                                            <tool.icon size={16} className="md:w-[18px] md:h-[18px]" />
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {/* Desktop Color Trigger */}
+                                                <AnimatePresence>
+                                                    {(activeTool === 'pen' || activeTool === 'highlighter') && (
+                                                        <motion.div
+                                                            initial={{ width: 0, opacity: 0, scale: 0 }}
+                                                            animate={{ width: 'auto', opacity: 1, scale: 1 }}
+                                                            exit={{ width: 0, opacity: 0, scale: 0 }}
+                                                            className="flex items-center gap-1 px-1 md:px-2 border-r border-white/10 shrink-0 overflow-hidden"
+                                                        >
+                                                            <button
+                                                                onClick={() => setIsColorPickerOpen(true)}
+                                                                className="w-7 h-7 md:w-9 md:h-9 rounded-full border-2 border-white/20 flex items-center justify-center hover:scale-110 transition-transform shadow-lg"
+                                                                style={{ backgroundColor: activeColor }}
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+
+                                                {/* Actions */}
+                                                <div className="flex items-center gap-0.5 md:gap-1 pl-1 md:pl-2 shrink-0">
+                                                    <button onClick={undo} disabled={(pageHistoryStep[activePage] ?? -1) < 0} className="p-1.5 md:p-2 rounded-xl hover:bg-white/10 text-white disabled:opacity-30 transition-colors">
+                                                        <RotateCw size={16} className="-scale-x-100 md:w-[18px] md:h-[18px]" />
+                                                    </button>
+                                                    <button onClick={redo} disabled={(pageHistoryStep[activePage] ?? -1) >= (pageHistory[activePage]?.length || 0) - 1} className="p-1.5 md:p-2 rounded-xl hover:bg-white/10 text-white disabled:opacity-30 transition-colors">
+                                                        <RotateCw size={16} className="md:w-[18px] md:h-[18px]" />
+                                                    </button>
+                                                    <div className="w-px h-6 bg-white/10 mx-0.5 md:mx-1" />
+                                                    <button onClick={() => setIsResetModalOpen(true)} className="p-1.5 md:p-2 rounded-xl hover:bg-red-500/20 text-red-400 transition-colors">
+                                                        <Trash2 size={16} className="md:w-[18px] md:h-[18px]" />
+                                                    </button>
+                                                    <button onClick={() => setIsToolbarVisible(false)} className="p-1.5 md:p-2 rounded-xl hover:bg-white/10 text-white transition-colors ml-0.5 md:ml-1">
+                                                        <ChevronLeft size={16} className="-rotate-90 md:w-[18px] md:h-[18px]" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -410,9 +591,9 @@ const PDFViewer = ({ url }: PDFViewerProps) => {
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: 100, opacity: 0 }}
                         onClick={() => setIsToolbarVisible(true)}
-                        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-[#1e1e1e]/80 backdrop-blur-xl border border-white/10 text-white shadow-xl hover:bg-white/10 transition-colors flex items-center gap-2"
+                        className={`absolute left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-[#1e1e1e]/80 backdrop-blur-xl border border-white/10 text-white shadow-xl hover:bg-white/10 transition-colors flex items-center gap-2 ${isMobile ? 'bottom-6' : 'bottom-6'}`}
                     >
-                        <Palette size={16} />
+                        <Palette size={isMobile ? 20 : 16} />
                         <span className="text-xs font-bold">Show Tools</span>
                     </motion.button>
                 )}

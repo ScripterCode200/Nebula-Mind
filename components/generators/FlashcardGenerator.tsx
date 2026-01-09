@@ -140,19 +140,19 @@ const FlashcardGenerator = ({ notebookId, modelProvider, sourceIds }: FlashcardG
                 <p className="text-muted text-xs mb-3">Master key concepts with AI-generated cards.</p>
 
                 {!cards.length && !loading && (
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                            <label className="text-xs font-medium text-muted whitespace-nowrap">Count:</label>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
+                            <label className="text-[10px] font-bold text-muted uppercase tracking-wider whitespace-nowrap">Count</label>
                             <input
                                 type="number"
                                 min="1"
                                 max="20"
                                 value={count}
                                 onChange={(e) => setCount(parseInt(e.target.value))}
-                                className="bg-white/5 border border-white/10 rounded-md px-2 py-1 w-14 text-center text-xs focus:outline-none focus:border-primary"
+                                className="bg-transparent border-none w-10 text-center text-xs font-bold text-primary focus:outline-none"
                             />
                         </div>
-                        <NeonButton onClick={generateCards} isLoading={loading} size="sm" className="h-8 text-xs px-3">
+                        <NeonButton onClick={generateCards} isLoading={loading} size="sm" className="h-9 md:h-8 text-xs px-4 flex-1 md:flex-none">
                             <Layers size={14} className="mr-1.5" />
                             Generate Deck
                         </NeonButton>

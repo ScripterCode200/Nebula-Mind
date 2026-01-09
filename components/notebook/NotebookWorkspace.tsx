@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Sparkles, PanelLeftClose, PanelLeftOpen, Share2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, PanelLeftClose, PanelLeftOpen, Share2, Menu, X, FileText, MessageSquare, Layers } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import AIToolsPanel from './AIToolsPanel';
 import ShareNotebookModal from './ShareNotebookModal';
@@ -42,9 +42,11 @@ interface NotebookWorkspaceProps {
 }
 
 const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
-    const [isPdfVisible, setIsPdfVisible] = React.useState(true);
+    const [isPdfVisible, setIsPdfVisible] = React.useState(true); // Desktop split
+    const [mobileTab, setMobileTab] = React.useState<'document' | 'chat'>('document'); // Mobile tabs
     const [isMobile, setIsMobile] = React.useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = React.useState(false);
+    const [isSourceSidebarOpen, setIsSourceSidebarOpen] = React.useState(false);
 
     // Multi-source State
     const [sources, setSources] = React.useState<any[]>(() => {
@@ -256,7 +258,7 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-[#050505] overflow-hidden">
+        <div className="flex flex-col h-dvh bg-[#050505] overflow-hidden">
             {/* Header */}
             <header className="h-14 md:h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-black/40 backdrop-blur-xl z-50 relative">
                 <div className="flex items-center gap-4 md:gap-6 flex-1 min-w-0">
@@ -272,6 +274,15 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
 
                     <div className="h-6 w-px bg-white/10" />
 
+                    {isMobile && (
+                        <button
+                            onClick={() => setIsSourceSidebarOpen(true)}
+                            className="p-1.5 rounded-lg bg-white/5 text-muted-foreground hover:text-white transition-colors"
+                        >
+                            <Menu size={20} />
+                        </button>
+                    )}
+
                     <div className="flex items-center gap-3 min-w-0">
                         <div className="p-1.5 rounded-md bg-primary/10 text-primary hidden md:block">
                             <Sparkles size={16} />
@@ -283,11 +294,11 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                 <div className="flex items-center gap-3 md:gap-4">
                     <button
                         onClick={() => setIsPdfVisible(!isPdfVisible)}
-                        className="flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-muted-foreground hover:text-white transition-all border border-white/5 hover:border-white/10"
+                        className={`flex items-center gap-2 px-3 py-1.5 md:py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-muted-foreground hover:text-white transition-all border border-white/5 hover:border-white/10 ${isMobile ? 'hidden' : 'flex'}`}
                         title={isPdfVisible ? "Show AI Tools" : "Show PDF"}
                     >
                         {isPdfVisible ? <PanelLeftClose size={14} className="md:w-4 md:h-4" /> : <PanelLeftOpen size={14} className="md:w-4 md:h-4" />}
-                        <span className="inline">{isMobile ? (isPdfVisible ? 'Show Chat' : 'Show PDF') : (isPdfVisible ? 'Hide PDF' : 'Show PDF')}</span>
+                        <span className="inline">{isPdfVisible ? 'Hide PDF' : 'Show PDF'}</span>
                     </button>
 
                     <div className="hidden md:block px-3 py-1.5 rounded-full bg-linear-to-r from-primary/10 to-secondary/10 border border-white/5 text-[10px] font-bold text-primary tracking-wider uppercase">
@@ -331,15 +342,29 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     loadingStep={loadingStep}
                     transcribeProgress={transcribeProgress}
                     videoInfo={videoInfo}
+                    isMobile={isMobile}
+                    isOpen={isSourceSidebarOpen}
+                    onClose={() => setIsSourceSidebarOpen(false)}
                 />
+
+                {/* Mobile Sidebar Overlay */}
+                {isMobile && isSourceSidebarOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setIsSourceSidebarOpen(false)}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30"
+                    />
+                )}
 
                 {/* Left Panel: Viewer (PDF or Word) */}
                 <motion.div
                     initial={false}
                     animate={{
-                        width: isMobile ? (isPdfVisible ? '100%' : '0%') : (isPdfVisible ? '40%' : '0%'),
-                        opacity: isMobile ? (isPdfVisible ? 1 : 0) : (isPdfVisible ? 1 : 0),
-                        display: isMobile ? (isPdfVisible ? 'block' : 'none') : (isPdfVisible ? 'block' : 'none')
+                        width: isMobile ? (mobileTab === 'document' ? '100%' : '0%') : (isPdfVisible ? '40%' : '0%'),
+                        opacity: isMobile ? (mobileTab === 'document' ? 1 : 0) : (isPdfVisible ? 1 : 0),
+                        display: isMobile ? (mobileTab === 'document' ? 'block' : 'none') : (isPdfVisible ? 'block' : 'none')
                     }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     className="shrink-0 border-r border-white/5 overflow-hidden bg-black/20 relative z-30"
@@ -350,7 +375,7 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                         ) : activeSourceType === 'youtube' || activeSourceType === 'text' ? (
                             <TextViewer url={activePdfUrl} />
                         ) : (
-                            <PDFViewer url={activePdfUrl} />
+                            <PDFViewer url={activePdfUrl} isMobile={isMobile} />
                         )}
                     </div>
                 </motion.div>
@@ -359,8 +384,8 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                 <motion.div
                     layout
                     animate={{
-                        width: isMobile ? (isPdfVisible ? '0%' : '100%') : 'auto',
-                        display: isMobile ? (isPdfVisible ? 'none' : 'block') : 'block'
+                        width: isMobile ? (mobileTab === 'chat' ? '100%' : '0%') : 'auto',
+                        display: isMobile ? (mobileTab === 'chat' ? 'block' : 'none') : 'block'
                     }}
                     className="flex-1 min-w-0 bg-black/20 relative z-10 h-full"
                 >
@@ -371,6 +396,33 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     />
                 </motion.div>
             </div>
+
+            {/* Mobile Bottom Navigation */}
+            {isMobile && (
+                <div className="h-16 bg-black/80 backdrop-blur-xl border-t border-white/10 shrink-0 flex items-center justify-around px-2 z-50">
+                    <button
+                        onClick={() => setMobileTab('document')}
+                        className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${mobileTab === 'document' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                        <FileText size={20} />
+                        <span className="text-[10px] font-medium">Document</span>
+                    </button>
+                    <button
+                        onClick={() => setMobileTab('chat')}
+                        className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${mobileTab === 'chat' ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                        <MessageSquare size={20} />
+                        <span className="text-[10px] font-medium">AI Chat</span>
+                    </button>
+                    <button
+                        onClick={() => setIsSourceSidebarOpen(true)}
+                        className="flex flex-col items-center gap-1 p-2 rounded-xl text-muted-foreground hover:text-white transition-all"
+                    >
+                        <Layers size={20} />
+                        <span className="text-[10px] font-medium">Sources</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

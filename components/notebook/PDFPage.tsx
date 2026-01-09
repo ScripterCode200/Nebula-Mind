@@ -43,7 +43,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
     const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
 
     // Drawing Logic
-    const getCanvasPoint = (e: React.MouseEvent): Point | null => {
+    const getCanvasPoint = (e: React.MouseEvent | React.Touch): Point | null => {
         if (!canvasRef.current) return null;
         const rect = canvasRef.current.getBoundingClientRect();
         return {
@@ -52,12 +52,35 @@ const PDFPage: React.FC<PDFPageProps> = ({
         };
     };
 
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (activeTool === 'cursor') return;
+        // Prevent default only if drawing to avoid scroll interference
+        e.preventDefault();
+        const touch = e.touches[0];
+        const point = getCanvasPoint(touch);
+        if (!point) return;
+
+        startDrawingInternal(point);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDrawing || activeTool === 'cursor') return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const point = getCanvasPoint(touch);
+        if (!point) return;
+        drawInternal(point);
+    };
+
     const startDrawing = (e: React.MouseEvent) => {
         onPageInteract();
         if (activeTool === 'cursor') return;
         const point = getCanvasPoint(e);
         if (!point) return;
+        startDrawingInternal(point);
+    };
 
+    const startDrawingInternal = (point: Point) => {
         setIsDrawing(true);
         setCurrentPath({
             tool: activeTool,
@@ -71,7 +94,10 @@ const PDFPage: React.FC<PDFPageProps> = ({
         if (!isDrawing || !currentPath || activeTool === 'cursor') return;
         const point = getCanvasPoint(e);
         if (!point) return;
+        drawInternal(point);
+    };
 
+    const drawInternal = (point: Point) => {
         setCurrentPath(prev => prev ? {
             ...prev,
             points: [...prev.points, point]
@@ -154,7 +180,7 @@ const PDFPage: React.FC<PDFPageProps> = ({
             initial={{ opacity: 0.8 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
-            className="relative mb-8" // Add margin bottom for vertical spacing
+            className="relative mb-8 px-2 md:px-0" // Add horizontal padding for mobile
             style={activeTool !== 'cursor' ? getCursorStyle() : undefined}
             onMouseEnter={onPageInteract} // Track active page
         >
@@ -171,14 +197,18 @@ const PDFPage: React.FC<PDFPageProps> = ({
                 }}
             />
 
-            {/* Annotation Canvas Layer */}
             <canvas
                 ref={canvasRef}
                 className={`absolute inset-0 z-50 ${activeTool === 'cursor' ? 'pointer-events-none' : ''}`}
+                style={{ touchAction: activeTool === 'cursor' ? 'auto' : 'none' }}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
                 onMouseLeave={stopDrawing}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={stopDrawing}
+                onTouchCancel={stopDrawing}
             />
         </motion.div>
     );

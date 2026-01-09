@@ -38,7 +38,7 @@ const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
                         error
                             ? "border-red-500/50 bg-red-500/5"
                             : isFocused
-                                ? "border-primary/50 bg-black/80"
+                                ? "border-primary/50 bg-black/80 shadow-[0_0_15px_rgba(0,240,255,0.2)]"
                                 : "border-white/10 bg-black/40 group-hover:border-white/20 group-hover:bg-black/60"
                     )} />
 
@@ -63,7 +63,7 @@ const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
                         ref={ref}
                         type={inputType}
                         className={cn(
-                            "w-full p-3 bg-transparent rounded-xl py-3.5 text-sm text-white transition-all relative z-10 placeholder:text-muted/20 focus:outline-none",
+                            "w-full p-3 bg-transparent rounded-xl py-3.5 text-sm text-white transition-all relative z-10 placeholder:text-white/60 focus:outline-none",
                             Icon ? "pl-11" : "pl-4",
                             isPassword ? "pr-11" : "pr-4",
                             className

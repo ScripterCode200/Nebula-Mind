@@ -260,9 +260,9 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
                 </div>
             </motion.div>
 
-            {/* Sidebar Toggle Button (Floating) */}
+            {/* Sidebar Toggle Button (Floating) - Desktop Only */}
             <AnimatePresence>
-                {!showSidebar && (
+                {!showSidebar && !isMobile && (
                     <motion.button
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -284,12 +284,21 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
                             <h2 className="text-lg font-bold text-white tracking-tight">AI Notes</h2>
                             <p className="text-muted-foreground text-[10px] md:text-xs">Generate comprehensive study notes.</p>
                         </div>
-                        <button
-                            onClick={() => setShowControls(!showControls)}
-                            className="md:hidden p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-colors border border-white/5"
-                        >
-                            {showControls ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowSidebar(true)}
+                                className="md:hidden p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-primary border border-white/10 shadow-lg"
+                                title="View History"
+                            >
+                                <PanelLeftOpen size={16} />
+                            </button>
+                            <button
+                                onClick={() => setShowControls(!showControls)}
+                                className="md:hidden p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground transition-colors border border-white/5"
+                            >
+                                {showControls ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                        </div>
                     </div>
 
                     <motion.div
@@ -302,14 +311,14 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
                         transition={{ duration: 0.3, ease: "easeInOut" }}
                         className="overflow-hidden"
                     >
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                                <div className="flex gap-1 p-1 bg-white/5 rounded-lg border border-white/10 shrink-0">
+                        <div className="flex flex-col gap-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex gap-1 p-1 bg-white/5 rounded-lg border border-white/10 shrink-0 w-full md:w-auto overflow-x-auto no-scrollbar">
                                     {['brief', 'detailed', 'bullet-points'].map((t) => (
                                         <button
                                             key={t}
                                             onClick={() => setType(t as 'brief' | 'detailed' | 'bullet-points')}
-                                            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${type === t
+                                            className={`flex-1 md:flex-none px-3 py-1.5 md:py-1 rounded-md text-[10px] font-bold transition-all capitalize whitespace-nowrap ${type === t
                                                 ? 'bg-primary/20 text-primary shadow-[0_0_10px_rgba(0,240,255,0.1)]'
                                                 : 'text-muted-foreground hover:text-white hover:bg-white/5'
                                                 }`}
@@ -318,9 +327,9 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
                                         </button>
                                     ))}
                                 </div>
-                                <NeonButton onClick={generateNotes} isLoading={loading} size="sm" className="h-8 text-xs px-3 ml-auto">
+                                <NeonButton onClick={generateNotes} isLoading={loading} size="sm" className="h-9 md:h-8 text-xs px-4 w-full md:w-auto ml-0 md:ml-auto">
                                     <Sparkles size={14} className="mr-1.5" />
-                                    Generate
+                                    Generate Notes
                                 </NeonButton>
                             </div>
 

@@ -10,6 +10,7 @@ import NeonButton from '@/components/ui/NeonButton';
 import { toast } from 'sonner';
 import AuthBackground from '@/components/auth/AuthBackground';
 import AuthInput from '@/components/auth/AuthInput';
+import { useUserStore } from '@/store/useUserStore';
 
 export default function SignupPage() {
     const router = useRouter();
@@ -78,8 +79,19 @@ export default function SignupPage() {
                 throw new Error(data.error || 'Verification failed');
             }
 
-            toast.success('Email verified successfully!');
-            router.push('/login');
+            if (data.token) {
+                useUserStore.getState().saveAccount({
+                    userId: data.user.id,
+                    name: data.user.name,
+                    email: data.user.email,
+                    token: data.token,
+                    avatar: data.user.profileImage
+                });
+                toast.success('Email verified! Welcome aboard.');
+                window.location.href = '/dashboard';
+            } else {
+                router.push('/login');
+            }
         } catch (error: any) {
             toast.error(error.message);
         } finally {
@@ -118,19 +130,20 @@ export default function SignupPage() {
 
 
                     <div className="relative z-10">
-                        <div className="text-center mb-8">
+                        <div className="text-center mb-10">
                             <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
+                                initial={{ scale: 0, rotate: 180 }}
+                                animate={{ scale: 1, rotate: 0 }}
                                 transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.1 }}
-                                className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(0,240,255,0.2)]"
+                                className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-linear-to-tl from-primary/20 via-black to-secondary/20 border border-white/20 flex items-center justify-center shadow-[0_0_50px_rgba(168,85,247,0.3)] backdrop-blur-3xl relative"
                             >
-                                {step === 'register' ? <UserPlus size={32} className="text-primary" /> : <Sparkles size={32} className="text-secondary" />}
+                                <div className="absolute inset-0 rounded-3xl bg-linear-to-r from-primary/20 to-secondary/20 animate-pulse pointer-events-none" />
+                                {step === 'register' ? <UserPlus size={40} className="text-primary drop-shadow-[0_0_10px_rgba(0,240,255,0.5)]" /> : <Sparkles size={40} className="text-secondary drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />}
                             </motion.div>
-                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400 mb-2 tracking-tight">
+                            <h1 className="text-4xl font-black bg-clip-text text-transparent bg-linear-to-r from-white via-secondary/50 to-white mb-3 tracking-tighter uppercase drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
                                 {step === 'register' ? 'Join Nebula' : 'Verify Identity'}
                             </h1>
-                            <p className="text-muted text-sm">
+                            <p className="text-muted-foreground/80 font-medium text-sm max-w-[280px] mx-auto leading-relaxed">
                                 {step === 'register'
                                     ? 'Begin your journey into advanced learning.'
                                     : `Enter the code sent to ${email}`}
@@ -180,12 +193,12 @@ export default function SignupPage() {
 
                                     <NeonButton
                                         type="submit"
-                                        className="w-full mt-4"
+                                        className="w-full mt-4 h-12 text-base font-bold tracking-wide shadow-[0_0_30px_rgba(168,85,247,0.3)]"
                                         disabled={loading}
                                         variant="primary"
                                     >
                                         {loading ? <Loader2 className="animate-spin" size={20} /> : (
-                                            <>Create Account <ArrowRight size={18} className="ml-2" /></>
+                                            <>Create Account <ArrowRight size={20} className="ml-2" /></>
                                         )}
                                     </NeonButton>
                                 </motion.form>
@@ -200,8 +213,8 @@ export default function SignupPage() {
                                 >
                                     <div className="flex justify-center gap-2">
                                         {otp.map((digit, index) => (
-                                            <div key={index} className="relative group">
-                                                <div className="absolute inset-0 bg-secondary/20 rounded-xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
+                                            <div key={index} className="relative group perspective-1000">
+                                                <div className="absolute inset-0 bg-secondary/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
                                                 <input
                                                     id={`otp-${index}`}
                                                     type="text"
@@ -209,7 +222,7 @@ export default function SignupPage() {
                                                     value={digit}
                                                     onChange={(e) => handleOtpChange(index, e.target.value)}
                                                     onKeyDown={(e) => handleKeyDown(index, e)}
-                                                    className="w-12 h-14 text-center text-xl font-bold bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-secondary/50 focus:bg-black/60 transition-all relative z-10"
+                                                    className="w-12 h-16 text-center text-2xl font-black bg-black/60 border border-white/20 rounded-xl text-white focus:outline-none focus:border-secondary focus:bg-black/80 transition-all relative z-10 shadow-[inner_0_0_10px_rgba(0,0,0,0.5)] placeholder:text-white/10"
                                                 />
                                             </div>
                                         ))}

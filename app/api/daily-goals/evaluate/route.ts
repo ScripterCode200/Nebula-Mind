@@ -119,7 +119,7 @@ export async function POST(request: Request) {
             `;
 
             try {
-                const generativeModel = vertex_ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
+                const generativeModel = vertex_ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
                 const result = await generativeModel.generateContent(prompt);
                 const response = await result.response;
 

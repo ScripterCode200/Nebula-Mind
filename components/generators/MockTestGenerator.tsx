@@ -395,11 +395,11 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                 {step === 'config' && (
                     <NeonButton
                         onClick={() => setShowHistory(true)}
-                        className="flex items-center gap-2 h-8 text-xs px-3"
+                        className="flex items-center gap-2 h-9 md:h-8 text-xs px-3 md:px-3"
                         variant="secondary"
                     >
                         <History size={14} />
-                        History
+                        <span className="hidden md:inline">History</span>
                     </NeonButton>
                 )}
             </div>
@@ -606,7 +606,7 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
 
                                 <div className="relative z-10">
                                     <div className="text-center mb-4 relative">
-                                        <div className="absolute right-0 top-0">
+                                        <div className="absolute right-0 top-0 hidden md:block">
                                             <button
                                                 onClick={() => setShowHistory(true)}
                                                 className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/50 text-muted hover:text-primary transition-all"
@@ -615,11 +615,11 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                                 <History size={16} />
                                             </button>
                                         </div>
-                                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-1">
+                                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-2">
                                             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                                             SYSTEM_READY
                                         </div>
-                                        <h3 className="text-base font-bold text-white tracking-tight">CONFIGURE SIMULATION</h3>
+                                        <h3 className="text-base font-bold text-white tracking-tight">SIMULATION PARAMS</h3>
                                     </div>
 
                                     <div className="space-y-4">
@@ -669,46 +669,36 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {/* Difficulty Selector */}
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Difficulty</label>
-                                                <div className="flex flex-col gap-1">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Complexity Level</label>
+                                                <div className="grid grid-cols-3 md:flex md:flex-col gap-2">
                                                     {['Easy', 'Medium', 'Hard'].map(d => (
                                                         <button
                                                             key={d}
                                                             onClick={() => setConfig({ ...config, difficulty: d })}
                                                             className={cn(
-                                                                "relative group overflow-hidden px-2 py-1.5 rounded-md border text-left transition-all duration-300",
+                                                                "relative group overflow-hidden px-2 py-2 rounded-md border text-center md:text-left transition-all duration-300",
                                                                 config.difficulty === d
-                                                                    ? "bg-primary/10 border-primary text-primary shadow-[0_0_10px_rgba(0,240,255,0.15)]"
-                                                                    : "bg-white/5 border-white/10 hover:border-white/20 text-muted-foreground hover:text-white"
+                                                                    ? "bg-primary/20 border-primary text-primary"
+                                                                    : "bg-white/5 border-white/10 text-muted-foreground"
                                                             )}
                                                         >
-                                                            <div className={cn(
-                                                                "absolute left-0 top-0 bottom-0 w-0.5 transition-all duration-300",
-                                                                config.difficulty === d ? "bg-primary" : "bg-transparent group-hover:bg-white/20"
-                                                            )} />
-                                                            <span className="relative z-10 text-xs font-medium">{d}</span>
-                                                            {config.difficulty === d && (
-                                                                <motion.span
-                                                                    layoutId="active-diff"
-                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-primary rounded-full shadow-[0_0_8px_rgba(0,240,255,1)]"
-                                                                />
-                                                            )}
+                                                            <span className="relative z-10 text-[10px] md:text-xs font-bold">{d}</span>
                                                         </button>
                                                     ))}
                                                 </div>
                                             </div>
 
                                             {/* Question Types */}
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Modules</label>
-                                                <div className="flex flex-col gap-1">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Question Types</label>
+                                                <div className="flex flex-col gap-2">
                                                     {[
-                                                        { id: 'mcq', label: 'Multiple Choice', icon: 'A/B' },
-                                                        { id: 'true-false', label: 'True / False', icon: '+/-' },
-                                                        { id: 'short', label: 'Short Answer', icon: 'TXT' }
+                                                        { id: 'mcq', label: 'MCQ', icon: 'A/B' },
+                                                        { id: 'true-false', label: 'T / F', icon: '+/-' },
+                                                        { id: 'short', label: 'Short', icon: 'TXT' }
                                                     ].map(t => {
                                                         const isActive = config.questionTypes.includes(t.id);
                                                         return (
@@ -721,17 +711,14 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                                                     if (types.length > 0) setConfig({ ...config, questionTypes: types });
                                                                 }}
                                                                 className={cn(
-                                                                    "flex items-center justify-between px-2 py-1.5 rounded-md border transition-all duration-300",
+                                                                    "flex items-center justify-between px-3 py-2 rounded-md border transition-all duration-300",
                                                                     isActive
-                                                                        ? "bg-secondary/10 border-secondary text-secondary shadow-[0_0_10px_rgba(168,85,247,0.15)]"
-                                                                        : "bg-white/5 border-white/10 hover:border-white/20 text-muted-foreground hover:text-white"
+                                                                        ? "bg-secondary/20 border-secondary text-secondary"
+                                                                        : "bg-white/5 border-white/10 text-muted-foreground"
                                                                 )}
                                                             >
-                                                                <span className="text-xs font-medium">{t.label}</span>
-                                                                <span className={cn(
-                                                                    "text-[10px] font-mono px-1 py-0.5 rounded border",
-                                                                    isActive ? "border-secondary/50 bg-secondary/20" : "border-white/10 bg-white/5"
-                                                                )}>{t.icon}</span>
+                                                                <span className="text-[10px] md:text-xs font-bold">{t.label}</span>
+                                                                <span className="text-[9px] font-mono px-1 py-0.5 rounded border border-white/10 bg-white/5 opacity-50">{t.icon}</span>
                                                             </button>
                                                         );
                                                     })}

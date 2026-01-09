@@ -54,14 +54,18 @@ const AIToolsPanel = ({ notebookId, chatHistory, sourceIds }: AIToolsPanelProps)
 
             {/* Header with Tabs and Model Selector */}
             <div className="flex flex-col border-b border-white/5 relative z-10 bg-black/20 shrink-0">
-                <div className="flex items-center justify-between px-3 py-2">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">AI Tools</span>
+                <div className="flex items-center justify-between px-3 py-1.5 md:py-2">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest hidden md:block">AI Tools</span>
+                    <div className="md:hidden flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                        <Sparkles size={10} className="text-primary" />
+                        <span className="text-[9px] font-black text-primary uppercase tracking-wider">Neural Hub</span>
+                    </div>
 
                     <div className="relative group">
                         <select
                             value={modelProvider}
                             onChange={(e) => setModelProvider(e.target.value)}
-                            className="appearance-none bg-white/5 border border-white/10 rounded-md text-[10px] font-medium text-white pl-2 pr-6 py-1 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all cursor-pointer hover:bg-white/10 max-w-[120px] truncate"
+                            className="appearance-none bg-white/5 border border-white/10 rounded-lg text-[9px] md:text-[10px] font-medium text-white pl-2 pr-6 py-1 outline-none focus:border-primary/50 transition-all cursor-pointer hover:bg-white/10 max-w-[110px] md:max-w-[120px] truncate"
                         >
                             <option value="gemini" className="bg-[#050505]">Gemini 2.5 Flash</option>
                             <option value="gemini-3.0-pro" className="bg-[#050505]">Gemini 3.0 Pro</option>
@@ -73,14 +77,14 @@ const AIToolsPanel = ({ notebookId, chatHistory, sourceIds }: AIToolsPanelProps)
                     </div>
                 </div>
 
-                <div className="px-3 pb-2">
-                    <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/5 shadow-inner">
+                <div className="px-3 pb-2 overflow-x-auto no-scrollbar mask-gradient-r">
+                    <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/5 shadow-inner min-w-full w-max md:w-full">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={cn(
-                                    "relative flex-1 flex items-center justify-center gap-2 py-2 px-2 rounded-lg text-xs font-bold transition-all duration-300 z-10",
+                                    "relative px-3 md:px-4 md:flex-1 py-2 md:py-2 rounded-lg text-[11px] md:text-xs font-bold transition-all duration-300 z-10 shrink-0",
                                     activeTab === tab.id
                                         ? "text-white"
                                         : "text-muted-foreground hover:text-white hover:bg-white/5"
@@ -96,7 +100,7 @@ const AIToolsPanel = ({ notebookId, chatHistory, sourceIds }: AIToolsPanelProps)
                                 )}
                                 <span className="relative z-10 flex items-center gap-2">
                                     <tab.icon size={15} className={activeTab === tab.id ? "text-primary drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]" : ""} />
-                                    <span className="hidden xl:inline tracking-tight group-hover:scale-105 transition-transform">{tab.label}</span>
+                                    <span className="inline tracking-tight group-hover:scale-105 transition-transform">{tab.label}</span>
                                 </span>
                             </button>
                         ))}
@@ -110,11 +114,14 @@ const AIToolsPanel = ({ notebookId, chatHistory, sourceIds }: AIToolsPanelProps)
                     const Component = tab.component;
                     const isActive = activeTab === tab.id;
 
+                    // Only render active or keep others hidden but mounted? 
+                    // Keeping mounted allows state preservation, which is good for chat.
+
                     return (
                         <div
                             key={tab.id}
                             className={cn(
-                                "absolute inset-0 transition-all duration-300",
+                                "absolute inset-0 transition-all duration-300 w-full h-full",
                                 isActive
                                     ? "opacity-100 translate-y-0 z-10 pointer-events-auto visible"
                                     : "opacity-0 translate-y-4 -z-10 pointer-events-none invisible"

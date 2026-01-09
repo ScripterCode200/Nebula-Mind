@@ -37,27 +37,27 @@ export const sendOTP = async (email: string, otp: string) => {
                     </style>
                 </head>
                 <body style="margin: 0; padding: 0; background-color: #000000; font-family: 'Outfit', 'Segoe UI', sans-serif;">
-                    <div style="background-color: #000000; padding: 40px 0;">
-                        <div style="max-width: 600px; margin: 0 auto; background: #0a0a0a; border-radius: 24px; overflow: hidden; border: 1px solid #222; position: relative;">
+                    <div style="background-color: #000000; padding: 20px;">
+                        <div style="max-width: 600px; width: 100%; margin: 0 auto; background: #0a0a0a; border-radius: 24px; overflow: hidden; border: 1px solid #222; position: relative;">
                             
                             <!-- Header -->
                             <div style="padding: 40px 20px; text-align: center; background: radial-gradient(circle at top, #1a1a1a 0%, #0a0a0a 70%);">
-                                <h1 style="margin: 0; font-size: 32px; font-weight: 800; color: #fff; text-transform: uppercase;">
+                                <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 2px;">
                                     Nebula <span style="color: #00f0ff;">Mind</span>
                                 </h1>
                             </div>
 
                             <!-- OTP Section -->
-                            <div style="padding: 20px 40px 40px; text-align: center;">
-                                <h2 style="color: #fff; margin-top: 0; font-weight: 600;">Verification Required</h2>
-                                <p style="color: #888; font-size: 16px; line-height: 1.6;">Secure access requested for your account.</p>
+                            <div style="padding: 20px 20px 40px; text-align: center;">
+                                <h2 style="color: #fff; margin-top: 0; font-weight: 600; font-size: 20px;">Verification Required</h2>
+                                <p style="color: #888; font-size: 14px; line-height: 1.6; max-width: 80%; margin: 10px auto;">Secure access requested for your account.</p>
                                 
-                                <div class="otp-box" style="background: rgba(0, 240, 255, 0.05); border: 2px solid rgba(0, 240, 255, 0.3); border-radius: 16px; padding: 30px; margin: 30px 0; display: inline-block; min-width: 200px;">
+                                <div class="otp-box" style="background: rgba(0, 240, 255, 0.05); border: 2px solid rgba(0, 240, 255, 0.3); border-radius: 16px; padding: 20px; margin: 30px auto; display: inline-block; max-width: 100%; box-sizing: border-box;">
                                     <div style="color: #00f0ff; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; font-weight: 700;">One-Time Password</div>
-                                    <div style="font-family: 'Courier New', monospace; font-size: 48px; font-weight: 700; color: #fff; letter-spacing: 8px; text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);">${otp}</div>
+                                    <div style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; color: #fff; letter-spacing: 4px; text-shadow: 0 0 20px rgba(0, 240, 255, 0.5); word-break: break-all;">${otp}</div>
                                 </div>
                                 
-                                <p style="color: #555; font-size: 13px; margin: 0;">Expires in 10 minutes • Single use only</p>
+                                <p style="color: #555; font-size: 12px; margin: 0;">Expires in 10 minutes • Single use only</p>
                             </div>
                         </div>
                     </div>

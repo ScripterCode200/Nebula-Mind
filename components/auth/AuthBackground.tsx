@@ -43,7 +43,13 @@ const AuthBackground = ({ children }: { children: React.ReactNode }) => {
                 this.speedX = (Math.random() - 0.5) * 0.5;
                 this.speedY = (Math.random() - 0.5) * 0.5;
 
-                const colors = ['rgba(0, 240, 255, ', 'rgba(168, 85, 247, '];
+                // Vibrant Colors
+                const colors = [
+                    'rgba(0, 240, 255, ', // Cyan
+                    'rgba(168, 85, 247, ', // Purple
+                    'rgba(236, 72, 153, ', // Pink
+                    'rgba(250, 204, 21, '  // Yellow
+                ];
                 this.color = colors[Math.floor(Math.random() * colors.length)];
             }
 
@@ -96,7 +102,7 @@ const AuthBackground = ({ children }: { children: React.ReactNode }) => {
 
         const initParticles = () => {
             particles = [];
-            const numberOfParticles = Math.min(100, (canvas.width * canvas.height) / 15000);
+            const numberOfParticles = Math.min(150, (canvas.width * canvas.height) / 10000);
             for (let i = 0; i < numberOfParticles; i++) {
                 particles.push(new Particle());
             }
@@ -128,7 +134,7 @@ const AuthBackground = ({ children }: { children: React.ReactNode }) => {
 
                     if (distance < maxDistance) {
                         const opacity = 1 - (distance / maxDistance);
-                        ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.1})`;
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.15})`;
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.moveTo(particles[a].x, particles[a].y);
@@ -165,12 +171,13 @@ const AuthBackground = ({ children }: { children: React.ReactNode }) => {
                 className="absolute inset-0 z-0 pointer-events-none"
             />
 
-            {/* Ambient Glows */}
-            <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[150px] animate-pulse pointer-events-none" />
-            <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-secondary/10 rounded-full blur-[150px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }} />
+            {/* Ambient Glows - Vibrant */}
+            <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-primary/20 rounded-full blur-[120px] animate-pulse pointer-events-none mix-blend-screen" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-secondary/20 rounded-full blur-[120px] animate-pulse pointer-events-none mix-blend-screen" style={{ animationDelay: '2s' }} />
+            <div className="absolute top-[40%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[50%] h-[50%] bg-pink-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none mix-blend-screen" style={{ animationDelay: '4s' }} />
 
             {/* Grid Overlay */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px] pointer-events-none" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-size-[40px_40px] pointer-events-none" />
 
             {/* Content */}
             <div className="relative z-10 w-full max-w-md p-4">

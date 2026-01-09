@@ -44,6 +44,11 @@ export default function LoginPage() {
                     window.location.href = '/dashboard';
                 }
             } else {
+                if (res.status === 404 && data.shouldRegister) {
+                    toast.error('Account not found. Please create an account.');
+                    setTimeout(() => router.push('/signup'), 1500);
+                    return;
+                }
                 toast.error(data.error || 'Login failed');
             }
         } catch (error) {
@@ -108,20 +113,21 @@ export default function LoginPage() {
 
 
                     <div className="relative z-10">
-                        <div className="text-center mb-8">
+                        <div className="text-center mb-10">
                             <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
+                                initial={{ scale: 0, rotate: -180 }}
+                                animate={{ scale: 1, rotate: 0 }}
                                 transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.1 }}
-                                className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-linear-to-br from-primary/20 to-secondary/20 border border-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(0,240,255,0.2)]"
+                                className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-linear-to-br from-primary/20 via-black to-secondary/20 border border-white/20 flex items-center justify-center shadow-[0_0_50px_rgba(0,240,255,0.3)] backdrop-blur-3xl relative"
                             >
-                                {step === 'credentials' ? <KeyRound size={32} className="text-primary" /> : <ShieldCheck size={32} className="text-secondary" />}
+                                <div className="absolute inset-0 rounded-3xl bg-linear-to-r from-primary/20 to-secondary/20 animate-pulse pointer-events-none" />
+                                {step === 'credentials' ? <KeyRound size={40} className="text-primary drop-shadow-[0_0_10px_rgba(0,240,255,0.5)]" /> : <ShieldCheck size={40} className="text-secondary drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />}
                             </motion.div>
-                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white via-gray-200 to-gray-400 mb-2 tracking-tight">
+                            <h1 className="text-4xl font-black bg-clip-text text-transparent bg-linear-to-r from-white via-primary/50 to-white mb-3 tracking-tighter uppercase drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">
                                 {step === 'credentials' ? 'Welcome Back' : 'Security Check'}
                             </h1>
-                            <p className="text-muted text-sm">
-                                {step === 'credentials' ? 'Enter your credentials to access the nebula.' : `We've sent a code to ${email}`}
+                            <p className="text-muted-foreground/80 font-medium text-sm max-w-[280px] mx-auto leading-relaxed">
+                                {step === 'credentials' ? 'Authenticate to access the Nebula Neural Network.' : `We've sent a 6-digit code to ${email}`}
                             </p>
                         </div>
 
@@ -161,8 +167,8 @@ export default function LoginPage() {
                                         </Link>
                                     </div>
 
-                                    <NeonButton type="submit" className="w-full mt-2" isLoading={loading} variant="primary">
-                                        Initiate Login <ArrowRight size={18} className="ml-2" />
+                                    <NeonButton type="submit" className="w-full mt-4 h-12 text-base font-bold tracking-wide shadow-[0_0_30px_rgba(0,240,255,0.3)]" isLoading={loading} variant="primary">
+                                        Initiate Login <ArrowRight size={20} className="ml-2" />
                                     </NeonButton>
                                 </motion.form>
                             ) : (
@@ -175,15 +181,15 @@ export default function LoginPage() {
                                     className="space-y-6"
                                 >
                                     <div className="space-y-2">
-                                        <label className="text-xs font-semibold text-muted ml-1 uppercase tracking-wider text-center block">Authentication Code</label>
-                                        <div className="relative group">
-                                            <div className="absolute inset-0 bg-secondary/20 rounded-xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
+                                        <label className="text-xs font-bold text-secondary ml-1 uppercase tracking-[0.2em] text-center block mb-3">Authentication Code</label>
+                                        <div className="relative group perspective-1000">
+                                            <div className="absolute inset-0 bg-secondary/20 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
                                             <input
                                                 type="text"
                                                 required
                                                 value={otp}
                                                 onChange={(e) => setOtp(e.target.value)}
-                                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-center text-3xl tracking-[0.5em] font-mono text-secondary focus:outline-none focus:border-secondary/50 focus:bg-black/60 transition-all relative z-10 placeholder:text-muted/10"
+                                                className="w-full bg-black/60 border border-white/20 rounded-2xl px-4 py-6 text-center text-4xl tracking-[0.5em] font-black font-mono text-secondary focus:outline-none focus:border-secondary focus:bg-black/80 transition-all relative z-10 placeholder:text-white/10 shadow-[inner_0_0_20px_rgba(0,0,0,0.5)]"
                                                 placeholder="000000"
                                                 maxLength={6}
                                                 autoFocus

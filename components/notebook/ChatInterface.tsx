@@ -142,49 +142,43 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory, sourceIds }:
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 transition={{ duration: 0.3, ease: "easeOut" }}
                                 className={cn(
-                                    "flex flex-col gap-2 max-w-full",
-                                    msg.role === 'user' ? "items-end" : "items-start"
+                                    "flex flex-col gap-1.5 max-w-full",
+                                    msg.role === 'user' ? "items-end pl-10 md:pl-8" : "items-start pr-10 md:pr-8"
                                 )}
                             >
-                                {/* Profile Icon - Top Positioned */}
-                                <div className="flex items-center gap-3 px-1">
-                                    {msg.role === 'ai' && (
-                                        <div className="relative group">
-                                            <div className="absolute inset-0 bg-secondary/40 blur-md rounded-full group-hover:bg-secondary/60 transition-colors" />
-                                            <div className="relative w-8 h-8 rounded-full bg-black border border-secondary/50 flex items-center justify-center overflow-hidden">
-                                                <div className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(168,85,247,0.5)_360deg)] animate-[spin_4s_linear_infinite]" />
-                                                <div className="absolute inset-px bg-black rounded-full flex items-center justify-center">
-                                                    <BrainCircuit size={14} className="text-secondary relative z-10" />
-                                                </div>
+                                {/* Compact Header: Icon + Name */}
+                                <div className={cn(
+                                    "flex items-center gap-2 px-1",
+                                    msg.role === 'user' && "flex-row-reverse"
+                                )}>
+                                    <div className="relative">
+                                        {msg.role === 'ai' ? (
+                                            <div className="relative w-6 h-6 md:w-8 md:h-8 rounded-full bg-black border border-secondary/50 flex items-center justify-center overflow-hidden">
+                                                <div className="absolute inset-0 bg-secondary/10 animate-pulse" />
+                                                <BrainCircuit size={12} className="text-secondary relative z-10" />
                                             </div>
-                                        </div>
-                                    )}
+                                        ) : (
+                                            <div className="relative w-6 h-6 md:w-8 md:h-8 bg-black border border-primary/50 flex items-center justify-center overflow-hidden" style={{ clipPath: 'polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)' }}>
+                                                <User size={12} className="text-primary relative z-10" />
+                                            </div>
+                                        )}
+                                    </div>
 
                                     <span className={cn(
-                                        "text-[11px] uppercase tracking-wider font-semibold",
-                                        msg.role === 'user' ? "text-primary" : "text-secondary"
+                                        "text-[10px] uppercase tracking-wider font-bold",
+                                        msg.role === 'user' ? "text-primary/70" : "text-secondary/70"
                                     )}>
-                                        {msg.role === 'user' ? 'You' : 'AI Assistant'}
+                                        {msg.role === 'user' ? 'Me' : 'Nebula'}
                                     </span>
-
-                                    {msg.role === 'user' && (
-                                        <div className="relative group">
-                                            <div className="absolute inset-0 bg-primary/40 blur-md rounded-lg group-hover:bg-primary/60 transition-colors" />
-                                            <div className="relative w-8 h-8 bg-black border border-primary/50 flex items-center justify-center overflow-hidden" style={{ clipPath: 'polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)' }}>
-                                                <div className="absolute inset-0 bg-linear-to-br from-primary/20 to-transparent" />
-                                                <User size={14} className="text-primary relative z-10" />
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
 
                                 {/* Message Bubble */}
                                 <div className={cn(
-                                    "relative p-5 rounded-2xl text-sm leading-relaxed overflow-hidden shadow-lg backdrop-blur-md transition-all duration-300 w-fit max-w-[90%]",
+                                    "relative p-3 md:p-5 rounded-2xl text-[13px] md:text-sm leading-relaxed overflow-hidden shadow-lg backdrop-blur-md transition-all duration-300 w-fit max-w-full md:max-w-[95%]",
                                     msg.role === 'user'
-                                        ? "bg-primary/5 text-foreground rounded-tr-sm border border-primary/20 hover:border-primary/40"
-                                        : "bg-white/5 text-muted-foreground rounded-tl-sm border border-white/10 hover:bg-white/10 hover:border-white/20",
-                                    isGenerating && "border-secondary/50 shadow-[0_0_15px_rgba(168,85,247,0.1)]"
+                                        ? "bg-primary/10 text-foreground rounded-tr-sm border border-primary/20"
+                                        : "bg-white/5 text-muted-foreground rounded-tl-sm border border-white/10",
+                                    isGenerating && "border-secondary/40 shadow-[0_0_20px_rgba(168,85,247,0.1)]"
                                 )}>
                                     {/* Generating Animation Border */}
                                     {isGenerating && (

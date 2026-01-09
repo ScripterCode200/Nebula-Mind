@@ -38,8 +38,11 @@ export async function GET(request: Request) {
         // console.log(`[Status API] Checking status for goal: ${goalId}`);
 
         await connectToDatabase();
+        // Standardize User ID
+        const activeUserId = String(userPayload.userId || userPayload.id || userPayload.sub);
+
         // Set a timeout for the DB query to prevent hanging
-        const result = await TestResult.findOne({ userId: userPayload.id, goalId }).maxTimeMS(3000);
+        const result = await TestResult.findOne({ userId: activeUserId, goalId }).maxTimeMS(3000);
 
         return NextResponse.json({
             status: result ? result.status : 'pending',

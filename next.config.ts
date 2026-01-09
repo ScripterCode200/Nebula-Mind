@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-
+// Next.js Config
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: false,

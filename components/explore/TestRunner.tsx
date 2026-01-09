@@ -160,25 +160,63 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             reportDisqualification(reason);
         };
 
+        let antiCheatTimeout: NodeJS.Timeout | null = null;
+
+        const handleViolation = (reason: string) => {
+            // Add a small 1s grace period to prevent accidental triggers from 
+            // transient focus flickers or system notifications
+            if (antiCheatTimeout) return;
+
+            console.warn(`[Anti-Cheat] Potential Violation: ${reason}. Grace period active...`);
+            antiCheatTimeout = setTimeout(() => {
+                failTest(reason);
+            }, 1000); // 1s grace period
+        };
+
+        const clearViolation = () => {
+            if (antiCheatTimeout) {
+                console.log("[Anti-Cheat] Violation cleared. Focus returned within grace period.");
+                clearTimeout(antiCheatTimeout);
+                antiCheatTimeout = null;
+            }
+        };
+
         const handleVisibilityChange = () => {
-            if (document.hidden) failTest("Anti-Cheat: Focus detected. Test disqualified.");
+            if (document.hidden) {
+                handleViolation("Anti-Cheat: Focus detected. Test disqualified.");
+            } else {
+                clearViolation();
+            }
         };
 
         const handleBlur = () => {
-            // Only fail if it's been a few seconds (allow for transition focus flickers)
-            failTest("Anti-Cheat: Window focus lost. Test disqualified.");
+            handleViolation("Anti-Cheat: Window focus lost. Test disqualified.");
+        };
+
+        const handleFocus = () => {
+            clearViolation();
         };
 
         const handleResize = () => {
-            // Lenient resize check: allow small changes (e.g. browser chrome adjustments)
-            if (window.outerHeight < screen.availHeight * 0.8 || window.outerWidth < screen.availWidth * 0.8) {
-                failTest("Anti-Cheat: Browser window resized significantly. Test disqualified.");
+            // Lenient resize check: allow changes within 15% range
+            // This prevents triggers from browser scrollbars appearing or chrome shifts
+            const threshold = 0.15;
+            const isSignificantResize =
+                Math.abs(window.outerHeight - screen.availHeight) > screen.availHeight * threshold ||
+                Math.abs(window.outerWidth - screen.availWidth) > screen.availWidth * threshold;
+
+            if (isSignificantResize) {
+                handleViolation("Anti-Cheat: Browser window resized significantly. Test disqualified.");
+            } else {
+                clearViolation();
             }
         };
 
         const handleFullscreenChange = () => {
             if (!document.fullscreenElement) {
-                failTest("Anti-Cheat: You exited Full Screen mode. Test disqualified.");
+                handleViolation("Anti-Cheat: You exited Full Screen mode. Test disqualified.");
+            } else {
+                clearViolation();
             }
         };
 
@@ -191,6 +229,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
         const timer = setTimeout(() => {
             document.addEventListener('visibilitychange', handleVisibilityChange);
             window.addEventListener('blur', handleBlur);
+            window.addEventListener('focus', handleFocus);
             window.addEventListener('resize', handleResize);
             document.addEventListener('fullscreenchange', handleFullscreenChange);
             document.addEventListener('copy', preventCopyPaste);
@@ -204,6 +243,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             clearTimeout(timer);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('focus', handleFocus);
             window.removeEventListener('resize', handleResize);
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
             document.removeEventListener('copy', preventCopyPaste);

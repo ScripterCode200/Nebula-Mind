@@ -14,6 +14,8 @@ const notebookSchema = new mongoose.Schema({
     sharedWith: Array
 });
 
+
+
 const Notebook = mongoose.models.Notebook || mongoose.model('Notebook', notebookSchema);
 
 async function inspect() {
@@ -26,6 +28,7 @@ async function inspect() {
             userId: n.userId,
             userIdType: typeof n.userId,
             sharedWith: n.sharedWith
+
         })));
     } catch (e) {
         console.error(e);

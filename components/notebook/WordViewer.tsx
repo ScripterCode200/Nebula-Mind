@@ -167,24 +167,42 @@ const WordViewer = ({ contentHtml, notebookId }: WordViewerProps) => {
     }, [redrawCanvas]);
 
 
-    const getPoint = (e: React.MouseEvent<HTMLCanvasElement>): Point | null => {
+    const getPoint = (e: React.MouseEvent<HTMLCanvasElement> | React.Touch): Point | null => {
         if (!canvasRef.current) return null;
         const rect = canvasRef.current.getBoundingClientRect();
-        // Calculate coordinate relative to the unscaled canvas
-        // The canvas is scaled by CSS transform, but its internal resolution match the unscaled element size
-        // We need to divide by scale to get back to local coordinates
         return {
             x: (e.clientX - rect.left) / scale,
             y: (e.clientY - rect.top) / scale
         };
     };
 
-    const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
         if (tool === 'cursor') return;
-
-        const point = getPoint(e);
+        e.preventDefault();
+        const touch = e.touches[0];
+        const point = getPoint(touch);
         if (!point) return;
 
+        startDrawingInternal(point);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isDrawing || !currentPath || !canvasRef.current) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const point = getPoint(touch);
+        if (!point) return;
+        drawInternal(point);
+    };
+
+    const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (tool === 'cursor') return;
+        const point = getPoint(e);
+        if (!point) return;
+        startDrawingInternal(point);
+    };
+
+    const startDrawingInternal = (point: Point) => {
         setIsDrawing(true);
         setCurrentPath({
             points: [point],
@@ -196,10 +214,12 @@ const WordViewer = ({ contentHtml, notebookId }: WordViewerProps) => {
 
     const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
         if (!isDrawing || !currentPath || !canvasRef.current) return;
-
         const point = getPoint(e);
         if (!point) return;
+        drawInternal(point);
+    };
 
+    const drawInternal = (point: Point) => {
         setCurrentPath(prev => prev ? ({
             ...prev,
             points: [...prev.points, point]
@@ -257,7 +277,7 @@ const WordViewer = ({ contentHtml, notebookId }: WordViewerProps) => {
             >
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-10 pointer-events-none">
-                    <div className="absolute inset-0 bg-[radial-gradient(#ffffff33_1px,transparent_1px)] [background-size:16px_16px]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(#ffffff33_1px,transparent_1px)] bg-size-[16px_16px]" />
                 </div>
 
                 <motion.div
@@ -270,18 +290,22 @@ const WordViewer = ({ contentHtml, notebookId }: WordViewerProps) => {
                 >
                     {/* Content Layer */}
                     <div
-                        className="p-[2.54cm] prose prose-lg max-w-none text-black prose-headings:font-serif prose-headings:font-bold prose-headings:text-black prose-p:font-serif prose-p:text-left prose-li:text-black prose-strong:text-black [&_*]:text-black pointer-events-auto whitespace-pre-wrap"
+                        className="p-[2.54cm] prose prose-lg max-w-none text-black prose-headings:font-serif prose-headings:font-bold prose-headings:text-black prose-p:font-serif prose-p:text-left prose-li:text-black prose-strong:text-black **:text-black pointer-events-auto whitespace-pre-wrap"
                         dangerouslySetInnerHTML={{ __html: contentHtml || '<p class="text-center text-gray-500 mt-20 font-serif">No preview available</p>' }}
                     />
 
-                    {/* Canvas Layer */}
                     <canvas
                         ref={canvasRef}
                         className={`absolute inset-0 z-20 ${tool === 'cursor' ? 'pointer-events-none' : 'cursor-crosshair'}`}
+                        style={{ touchAction: tool === 'cursor' ? 'auto' : 'none' }}
                         onMouseDown={handleMouseDown}
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseUp}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleMouseUp}
+                        onTouchCancel={handleMouseUp}
                     />
 
                 </motion.div>
@@ -299,11 +323,11 @@ const WordViewer = ({ contentHtml, notebookId }: WordViewerProps) => {
                         <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#1e1e1e]/80 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden min-w-[200px] justify-center">
 
                             {/* Zoom Controls */}
-                            <div className="flex items-center gap-1 px-2 flex-shrink-0 border-r border-white/10 pr-3">
+                            <div className="flex items-center gap-1 px-2 shrink-0 border-r border-white/10 pr-3">
                                 <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 rounded-xl hover:bg-white/10 text-white transition-colors">
                                     <ZoomOut size={18} />
                                 </button>
-                                <span className="text-xs font-bold text-white min-w-[3rem] text-center font-mono">{Math.round(scale * 100)}%</span>
+                                <span className="text-xs font-bold text-white min-w-12 text-center font-mono">{Math.round(scale * 100)}%</span>
                                 <button onClick={() => setScale(s => Math.min(3.0, s + 0.1))} className="p-2 rounded-xl hover:bg-white/10 text-white transition-colors">
                                     <ZoomIn size={18} />
                                 </button>

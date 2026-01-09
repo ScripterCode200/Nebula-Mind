@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, FileText, Check, Loader2, X, ChevronLeft, ChevronRight, Youtube, Upload } from 'lucide-react';
 import NeonButton from '@/components/ui/NeonButton';
+import { cn } from '@/lib/utils';
 
 interface Source {
     _id: string;
@@ -25,6 +26,9 @@ interface SourceSidebarProps {
     loadingStep?: string;
     transcribeProgress?: number;
     videoInfo?: { title: string; duration: number } | null;
+    isMobile?: boolean;
+    isOpen?: boolean;
+    onClose?: () => void;
 }
 
 const SourceSidebar = ({
@@ -38,7 +42,10 @@ const SourceSidebar = ({
     isAddingSource = false,
     loadingStep = '',
     transcribeProgress = 0,
-    videoInfo = null
+    videoInfo = null,
+    isMobile = false,
+    isOpen = true,
+    onClose
 }: SourceSidebarProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [collapsed, setCollapsed] = useState(false);
@@ -60,21 +67,47 @@ const SourceSidebar = ({
     };
 
     return (
-        <div className={`relative h-full flex flex-col border-r border-white/5 bg-[#050505]/95 backdrop-blur-xl transition-all duration-300 z-40 shadow-2xl ${collapsed ? 'w-16' : 'w-72'}`}>
+        <motion.div
+            initial={isMobile ? { y: '100%' } : false}
+            animate={isMobile ? { y: isOpen ? 0 : '100%' } : { x: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className={cn(
+                "flex flex-col border-r border-white/5 bg-[#050505] backdrop-blur-xl transition-all duration-300 z-40 shadow-2xl",
+                isMobile
+                    ? "fixed bottom-16 left-0 right-0 h-[80vh] w-full border-r-0 border-t rounded-t-2xl"
+                    : (collapsed ? 'w-16 h-full relative' : 'w-72 h-full relative'),
+                isMobile && !isOpen && "pointer-events-none"
+            )}
+        >
             {/* Header */}
-            <div className={`flex items-center h-14 md:h-16 px-4 border-b border-white/5 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+            <div className={cn(
+                "flex items-center h-14 md:h-16 px-4 border-b border-white/5",
+                collapsed ? 'justify-center' : 'justify-between'
+            )}>
                 {!collapsed && (
                     <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                         <FileText size={14} className="text-primary" />
                         Sources
                     </span>
                 )}
-                <button
-                    onClick={() => setCollapsed(!collapsed)}
-                    className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
-                >
-                    {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                </button>
+                <div className="flex items-center gap-1">
+                    {isMobile && (
+                        <button
+                            onClick={onClose}
+                            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
+                    {!isMobile && (
+                        <button
+                            onClick={() => setCollapsed(!collapsed)}
+                            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
+                        >
+                            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* List */}
@@ -239,7 +272,7 @@ const SourceSidebar = ({
                     className="hidden"
                 />
             </div>
-        </div>
+        </motion.div>
     );
 };
 
