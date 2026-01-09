@@ -95,8 +95,11 @@ export const useUserStore = create<UserState>()(
                 user: state.user ? { ...state.user, stats } : null
             })),
             fetchUser: async () => {
-                // Prevent concurrent fetches if already fetching? (Not implemented yet, but good practice)
+                console.log('[useUserStore] fetchUser triggered');
                 try {
+                    const pathname = window.location.pathname;
+                    const isAuthPage = pathname === '/login' || pathname === '/signup';
+
                     const res = await fetch('/api/auth/me');
                     if (res.ok) {
                         const contentType = res.headers.get('content-type');
@@ -112,16 +115,16 @@ export const useUserStore = create<UserState>()(
                                     university: data.user.university || '',
                                     deletionScheduledAt: data.user.deletionScheduledAt ? new Date(data.user.deletionScheduledAt) : null,
                                     isAuthenticated: true,
-                                    // Ensure isSubscribed is passed if it exists on data.user
                                 });
 
                                 // Handle Maintenance Mode
                                 if (data.maintenanceMode && data.user.role !== 'admin') {
-                                    if (window.location.pathname !== '/maintenance') {
-                                        // Allow admin login flow
-                                        if (window.location.pathname === '/login' && window.location.search.includes('admin=true')) {
-                                            // Allow
+                                    console.log('[useUserStore] Maintenance mode detected');
+                                    if (pathname !== '/maintenance' && !isAuthPage) {
+                                        if (pathname === '/login' && window.location.search.includes('admin=true')) {
+                                            console.log('[useUserStore] Admin login flow allowed');
                                         } else {
+                                            console.log('[useUserStore] Redirecting to /maintenance');
                                             window.location.href = '/maintenance';
                                         }
                                     }
@@ -130,8 +133,7 @@ export const useUserStore = create<UserState>()(
                                 set({ user: null, isAuthenticated: false });
                             }
                         } else {
-                            // Non-JSON response (likely HTML error page)
-                            console.warn('Received non-JSON response from /api/auth/me');
+                            console.warn('[useUserStore] Received non-JSON response from /api/auth/me');
                             set({ user: null, isAuthenticated: false });
                         }
                     } else if (res.status === 403) {
@@ -139,9 +141,11 @@ export const useUserStore = create<UserState>()(
                         if (contentType && contentType.includes('application/json')) {
                             const data = await res.json();
                             if (data.isBlocked) {
+                                console.log('[useUserStore] User blocked');
                                 set({ user: null, isAuthenticated: false });
                                 const allowedPaths = ['/login', '/signup', '/blocked'];
-                                if (!allowedPaths.includes(window.location.pathname)) {
+                                if (!allowedPaths.includes(pathname)) {
+                                    console.log('[useUserStore] Redirecting to /blocked');
                                     window.location.href = '/blocked';
                                 }
                             } else {
@@ -154,7 +158,7 @@ export const useUserStore = create<UserState>()(
                         set({ user: null, isAuthenticated: false });
                     }
                 } catch (error) {
-                    console.error('Failed to fetch user', error);
+                    console.error('[useUserStore] Failed to fetch user', error);
                     set({ user: null, isAuthenticated: false });
                 }
             },

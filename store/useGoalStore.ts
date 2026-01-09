@@ -15,8 +15,20 @@ export const useGoalStore = create<GoalState>((set) => ({
     dailyGoals: [],
     isLoading: true,
     isTestActive: false,
-    setDailyGoals: (dailyGoals) => set({ dailyGoals }),
-    addDailyGoal: (goal) => set((state) => ({ dailyGoals: [...state.dailyGoals, goal] })),
+    setDailyGoals: (dailyGoals) => set((state) => {
+        // Deduplicate incoming goals by ID
+        const uniqueMap = new Map();
+        dailyGoals.forEach(g => {
+            if (g.id) uniqueMap.set(g.id, g);
+        });
+        const uniqueGoals = Array.from(uniqueMap.values());
+        return { dailyGoals: uniqueGoals };
+    }),
+    addDailyGoal: (goal) => set((state) => {
+        // Prevent duplicates
+        if (state.dailyGoals.some(g => g.id === goal.id)) return state;
+        return { dailyGoals: [...state.dailyGoals, goal] };
+    }),
     setIsLoading: (isLoading) => set({ isLoading }),
     setIsTestActive: (isTestActive) => set({ isTestActive }),
 }));

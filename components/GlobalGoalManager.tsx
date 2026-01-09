@@ -24,11 +24,20 @@ export default function GlobalGoalManager() {
                 if (currentGoals.length === 0 && cachedData) {
                     try {
                         const parsed = JSON.parse(cachedData);
-                        if (parsed.date === today) {
-                            currentGoals = parsed.goals;
-                            setDailyGoals(currentGoals);
-                            if (currentGoals.length >= 7) {
-                                setIsLoading(false);
+                        if (parsed.date === today && Array.isArray(parsed.goals)) {
+                            // Ensure all cached goals have IDs and are unique
+                            const uniqueMap = new Map();
+                            parsed.goals.forEach((g: any) => {
+                                const id = g.id || g._id;
+                                if (id) uniqueMap.set(String(id), { ...g, id: String(id) });
+                            });
+                            currentGoals = Array.from(uniqueMap.values());
+
+                            if (currentGoals.length > 0) {
+                                setDailyGoals(currentGoals);
+                                if (currentGoals.length >= 7) {
+                                    setIsLoading(false);
+                                }
                             }
                         }
                     } catch (e) {
@@ -42,10 +51,17 @@ export default function GlobalGoalManager() {
                         if (res.ok) {
                             const data = await res.json();
                             if (data.goals) {
-                                const mapped = data.goals.map((g: any) => ({ ...g, id: g._id, duration: g.estimatedTime }));
-                                // Dedupe
+                                const mapped = data.goals.map((g: any) => ({
+                                    ...g,
+                                    id: String(g._id),
+                                    duration: g.estimatedTime || g.duration
+                                }));
+
+                                // Dedupe with existing currentGoals (which should be empty anyway)
                                 const uniqueMap = new Map();
-                                [...currentGoals, ...mapped].forEach(g => uniqueMap.set(g.id, g));
+                                [...currentGoals, ...mapped].forEach(g => {
+                                    if (g.id) uniqueMap.set(g.id, g);
+                                });
                                 currentGoals = Array.from(uniqueMap.values());
 
                                 setDailyGoals(currentGoals);
@@ -71,7 +87,12 @@ export default function GlobalGoalManager() {
                         if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
                         if (generationController.signal.aborted) break;
 
-                        const offset = currentGoals.length + i;
+                        // Use actual current length to avoid overlapping indices
+                        const latestState = useGoalStore.getState();
+                        const offset = latestState.dailyGoals.length;
+
+                        // If we already have enough, stop
+                        if (offset >= 7) break;
 
                         try {
                             const genRes = await fetch('/api/daily-goals', {
@@ -85,24 +106,35 @@ export default function GlobalGoalManager() {
 
                             const genData = await genRes.json();
                             if (genData.goal) {
-                                const newGoal = { ...genData.goal, id: genData.goal._id, duration: genData.goal.estimatedTime };
+                                const goalId = String(genData.goal._id);
+                                const newGoal = {
+                                    ...genData.goal,
+                                    id: goalId,
+                                    duration: genData.goal.estimatedTime || genData.goal.duration
+                                };
+
+                                // addDailyGoal has internal dedupe, but let's be double sure
                                 addDailyGoal(newGoal);
 
-                                // Update Cache
-                                // Note: we need the *latest* state here. 
-                                // Since we are in a loop, 'currentGoals' is stale.
-                                // But we can just read from store or update cache with the new goal appended.
-                                // For simplicity, let's just update cache with what we know + new goal.
-                                // Better: use a functional update for cache next time, but here we can just append to local 'currentGoals' to keep track in this loop
-                                // currentGoals.push(newGoal); // This mutates local variable, fine for cache
-                                // localStorage.setItem('dailyGoalsCache', JSON.stringify({ date: today, goals: currentGoals }));
-
-                                // Actually, let's just pull from store in a safer way or just trust the additive process
-                                // Re-reading from LS is safer to avoid race conditions with other tabs? No, single thread JS.
-                                const latestCache = JSON.parse(localStorage.getItem('dailyGoalsCache') || '{"goals":[]}');
-                                if (latestCache.date === today) {
-                                    latestCache.goals.push(newGoal);
-                                    localStorage.setItem('dailyGoalsCache', JSON.stringify(latestCache));
+                                // Update Cache safely
+                                const latestCacheStr = localStorage.getItem('dailyGoalsCache');
+                                if (latestCacheStr) {
+                                    try {
+                                        const latestCache = JSON.parse(latestCacheStr);
+                                        if (latestCache.date === today) {
+                                            if (!latestCache.goals.some((g: any) => String(g.id) === goalId)) {
+                                                latestCache.goals.push(newGoal);
+                                                localStorage.setItem('dailyGoalsCache', JSON.stringify(latestCache));
+                                            }
+                                        }
+                                    } catch (e) {
+                                        // Silent fail for cache update
+                                    }
+                                } else {
+                                    localStorage.setItem('dailyGoalsCache', JSON.stringify({
+                                        date: today,
+                                        goals: [newGoal]
+                                    }));
                                 }
                             }
                             if (i === 0) setIsLoading(false);

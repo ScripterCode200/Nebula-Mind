@@ -124,6 +124,7 @@ export default function Navbar() {
 
     // Fetch user on mount
     useEffect(() => {
+        console.log('[Navbar] Mount effect triggered');
         useUserStore.getState().fetchUser();
     }, []);
 
