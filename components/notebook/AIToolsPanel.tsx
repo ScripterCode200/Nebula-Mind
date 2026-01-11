@@ -7,7 +7,8 @@ import ChatInterface from './ChatInterface';
 import NotesGenerator from '../generators/NotesGenerator';
 import FlashcardGenerator from '../generators/FlashcardGenerator';
 import MockTestGenerator from '../generators/MockTestGenerator';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import FuturisticSelect from '../ui/FuturisticSelect';
 
 const InteractiveAIPlaceholder = () => (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-[#050505]/50">
@@ -48,95 +49,136 @@ const AIToolsPanel = ({ notebookId, chatHistory, sourceIds }: AIToolsPanelProps)
     const [modelProvider, setModelProvider] = useState<string>('gemini');
 
     return (
-        <div className="flex flex-col h-full bg-black/40 backdrop-blur-xl border-l border-white/5 relative overflow-hidden">
-            {/* Ambient Background Glow */}
-            <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="flex flex-col md:flex-row h-full md:pt-[75px] bg-[#050505]/40 backdrop-blur-3xl relative overflow-hidden">
+            {/* Ambient Neural Backgrounds - Subtle */}
+            <div className="absolute -top-[100px] -right-[100px] w-[400px] h-[400px] bg-primary/5 rounded-full blur-[120px] pointer-events-none opacity-40" />
+            <div className="absolute -bottom-[50px] -left-[50px] w-[300px] h-[300px] bg-secondary/5 rounded-full blur-[100px] pointer-events-none opacity-20" />
 
-            {/* Header with Tabs and Model Selector */}
-            <div className="flex flex-col border-b border-white/5 relative z-10 bg-black/20 shrink-0">
-                <div className="flex items-center justify-between px-3 py-1.5 md:py-2">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest hidden md:block">AI Tools</span>
-                    <div className="md:hidden flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-                        <Sparkles size={10} className="text-primary" />
-                        <span className="text-[9px] font-black text-primary uppercase tracking-wider">Neural Hub</span>
+            {/* Desktop Side Dock (Hidden on Mobile) */}
+            <div className="hidden md:flex flex-col w-[64px] bg-black/60 border-r border-white/5 relative z-20 shrink-0 items-center py-6">
+                <div className="flex flex-col gap-3 w-full px-2">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={cn(
+                                "group relative flex flex-col items-center justify-center aspect-square w-full rounded-xl transition-all duration-300",
+                                activeTab === tab.id
+                                    ? "bg-primary/10 text-primary border border-primary/20"
+                                    : "text-muted-foreground hover:text-white hover:bg-white/5 border border-transparent"
+                            )}
+                        >
+                            {/* Internal Active Indicator - No Overlap */}
+                            {activeTab === tab.id && (
+                                <motion.div
+                                    layoutId="dockInternalIndicator"
+                                    className="absolute left-1 w-1 h-1/2 bg-primary rounded-full shadow-[0_0_10px_#00f0ff]"
+                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                />
+                            )}
+
+                            <tab.icon size={20} className={cn("transition-transform duration-300", activeTab === tab.id && "drop-shadow-[0_0_8px_#00f0ff]")} />
+
+                            {/* Hover Tooltip */}
+                            <div className="absolute left-[72px] px-3 py-1.5 bg-[#0A0A0A] border border-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 translate-x-[-10px] group-hover:translate-x-0 transition-all pointer-events-none whitespace-nowrap z-50 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+                                {tab.label}
+                                <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-[#0A0A0A] border-l border-t border-white/10 -rotate-45" />
+                            </div>
+                        </button>
+                    ))}
+                </div>
+
+                <div className="mt-auto px-2">
+                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center opacity-40">
+                        <Cpu size={18} className="text-white" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-hidden relative z-10 min-h-0 flex flex-col bg-black/20">
+                {/* Unified Header (Desktop + Mobile Header integration) */}
+                <div className="flex items-center justify-between px-4 py-2 bg-black/20 border-b border-white/5 shrink-0 relative z-20">
+                    <div className="flex items-center gap-3">
+                        {/* Tab Title Display - Desktop context */}
+                        <div className="hidden md:flex items-center gap-2">
+                            {tabs.find(t => t.id === activeTab)?.icon && React.createElement(tabs.find(t => t.id === activeTab)!.icon, { size: 14, className: "text-primary" })}
+                            <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{tabs.find(t => t.id === activeTab)?.label}</span>
+                        </div>
+                        {/* Mobile Brand Name */}
+                        <div className="md:hidden flex items-center gap-2">
+                            <Sparkles size={12} className="text-primary animate-pulse" />
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Neural Hub</span>
+                        </div>
                     </div>
 
-                    <div className="relative group">
-                        <select
+                    <div className="flex items-center gap-3">
+                        <FuturisticSelect
                             value={modelProvider}
-                            onChange={(e) => setModelProvider(e.target.value)}
-                            className="appearance-none bg-white/5 border border-white/10 rounded-lg text-[9px] md:text-[10px] font-medium text-white pl-2 pr-6 py-1 outline-none focus:border-primary/50 transition-all cursor-pointer hover:bg-white/10 max-w-[110px] md:max-w-[120px] truncate"
-                        >
-                            <option value="gemini" className="bg-[#050505]">Gemini 2.5 Flash</option>
-                            <option value="gemini-3.0-pro" className="bg-[#050505]">Gemini 3.0 Pro</option>
-                            <option value="gemini-3.0-flash" className="bg-[#050505]">Gemini 3.0 Flash</option>
-                            <option value="ollama" className="bg-[#050505]">Nebula Ai 2.0</option>
-                            <option value="phi3.5:3.8b" className="bg-[#050505]">Nebula AI 3.0</option>
-                        </select>
-                        <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none group-hover:text-white transition-colors" />
+                            onChange={setModelProvider}
+                            options={[
+                                { value: 'gemini', label: 'Gemini 2.5 Flash', icon: <Sparkles size={14} className="text-yellow-400" /> },
+                                { value: 'gemini-3.0-flash', label: 'Gemini 3.0 Flash', icon: <Sparkles size={14} className="text-purple-400" /> },
+                                { value: 'ollama', label: 'Nebula AI 2.0', icon: <Cpu size={14} className="text-primary" /> }
+                            ]}
+                        />
                     </div>
                 </div>
 
-                <div className="px-3 pb-2 overflow-x-auto no-scrollbar mask-gradient-r">
-                    <div className="flex items-center gap-1 p-1 rounded-xl bg-white/5 border border-white/5 shadow-inner min-w-full w-max md:w-full">
+                {/* Tab Content */}
+                <div className="flex-1 relative overflow-hidden">
+                    {tabs.map((tab) => {
+                        const Component = tab.component;
+                        const isActive = activeTab === tab.id;
+
+                        return (
+                            <div
+                                key={tab.id}
+                                className={cn(
+                                    "absolute inset-0 transition-opacity duration-300 ease-in-out",
+                                    isActive
+                                        ? "opacity-100 z-10 pointer-events-auto visible"
+                                        : "opacity-0 z-0 pointer-events-none invisible"
+                                )}
+                            >
+                                <Component
+                                    key={notebookId}
+                                    notebookId={notebookId}
+                                    modelProvider={modelProvider}
+                                    sourceIds={sourceIds}
+                                    {...(tab.id === 'chat' ? { initialHistory: chatHistory } : {})}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Mobile Bottom Dock Island - Compacted */}
+                <div className="md:hidden px-4 pb-4 pt-1 h-auto shrink-0 relative z-30 pointer-events-none">
+                    <div className="flex items-center justify-around bg-[#0A0A0A]/80 backdrop-blur-2xl border border-white/5 rounded-2xl p-1 shadow-[0_10px_30px_rgba(0,0,0,0.5)] pointer-events-auto">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={cn(
-                                    "relative px-3 md:px-4 md:flex-1 py-2 md:py-2 rounded-lg text-[11px] md:text-xs font-bold transition-all duration-300 z-10 shrink-0",
-                                    activeTab === tab.id
-                                        ? "text-white"
-                                        : "text-muted-foreground hover:text-white hover:bg-white/5"
+                                    "relative flex items-center gap-2 py-2 px-3 rounded-xl transition-all duration-300",
+                                    activeTab === tab.id ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-white/5"
                                 )}
-                                title={tab.label}
                             >
+                                <tab.icon size={16} className={activeTab === tab.id ? "drop-shadow-[0_0_5px_#00f0ff]" : ""} />
                                 {activeTab === tab.id && (
-                                    <motion.div
-                                        layoutId="activeTab"
-                                        className="absolute inset-0 bg-primary/15 border border-primary/30 rounded-lg shadow-[0_0_20px_rgba(0,240,255,0.15)]"
-                                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                                    />
+                                    <motion.span
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap"
+                                    >
+                                        {tab.id === 'interactive' ? 'AI' : tab.label}
+                                    </motion.span>
                                 )}
-                                <span className="relative z-10 flex items-center gap-2">
-                                    <tab.icon size={15} className={activeTab === tab.id ? "text-primary drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]" : ""} />
-                                    <span className="inline tracking-tight group-hover:scale-105 transition-transform">{tab.label}</span>
-                                </span>
                             </button>
                         ))}
                     </div>
                 </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-hidden relative z-0 min-h-0">
-                {tabs.map((tab) => {
-                    const Component = tab.component;
-                    const isActive = activeTab === tab.id;
-
-                    // Only render active or keep others hidden but mounted? 
-                    // Keeping mounted allows state preservation, which is good for chat.
-
-                    return (
-                        <div
-                            key={tab.id}
-                            className={cn(
-                                "absolute inset-0 transition-all duration-300 w-full h-full",
-                                isActive
-                                    ? "opacity-100 translate-y-0 z-10 pointer-events-auto visible"
-                                    : "opacity-0 translate-y-4 -z-10 pointer-events-none invisible"
-                            )}
-                        >
-                            <Component
-                                key={notebookId} // Force remount when notebook changes
-                                notebookId={notebookId}
-                                modelProvider={modelProvider}
-                                sourceIds={sourceIds}
-                                {...(tab.id === 'chat' ? { initialHistory: chatHistory } : {})}
-                            />
-                        </div>
-                    );
-                })}
             </div>
         </div>
     );

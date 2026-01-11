@@ -280,14 +280,7 @@ export async function POST(req: NextRequest) {
                             } catch (previewError: unknown) {
                                 const pErr = previewError as Error;
                                 console.warn(`[Chat API] Failed with gemini-2.0-flash-001: ${pErr.message}`);
-                                // Fallback to 1.5 Flash 002
-                                if (err.message?.includes('404') || err.message?.includes('NOT_FOUND') || pErr.message?.includes('404')) {
-                                    console.log('[Chat API] Falling back to gemini-1.5-flash-002...');
-                                    activeModel = 'gemini-1.5-flash-002';
-                                    result = await runChatStream("gemini-1.5-flash-002");
-                                } else {
-                                    throw error;
-                                }
+                                throw error;
                             }
                         }
 

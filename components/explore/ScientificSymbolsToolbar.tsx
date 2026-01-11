@@ -49,6 +49,158 @@ const SYMBOL_CATEGORIES = [
     }
 ];
 
+const SYMBOL_METADATA: Record<string, string[]> = {
+    // Greek Lower
+    'α': ['alpha', 'greek', 'a'],
+    'β': ['beta', 'greek', 'b'],
+    'γ': ['gamma', 'greek', 'g'],
+    'δ': ['delta', 'greek', 'd'],
+    'ε': ['epsilon', 'greek', 'e'],
+    'ζ': ['zeta', 'greek', 'z'],
+    'η': ['eta', 'greek', 'h'],
+    'θ': ['theta', 'greek', 'th', 'angle'],
+    'ι': ['iota', 'greek', 'i'],
+    'κ': ['kappa', 'greek', 'k'],
+    'λ': ['lambda', 'greek', 'l'],
+    'μ': ['mu', 'micro', 'greek', 'm'],
+    'ν': ['nu', 'greek', 'n'],
+    'ξ': ['xi', 'greek', 'x'],
+    'ο': ['omicron', 'greek', 'o'],
+    'π': ['pi', 'peak', 'greek', 'p'],
+    'ρ': ['rho', 'greek', 'r'],
+    'σ': ['sigma', 'greek', 's'],
+    'ς': ['sigma', 'greek', 's', 'tail'],
+    'τ': ['tau', 'greek', 't'],
+    'υ': ['upsilon', 'greek', 'u'],
+    'φ': ['phi', 'greek', 'f'],
+    'χ': ['chi', 'greek', 'x', 'cross'],
+    'ψ': ['psi', 'greek', 'ps'],
+    'ω': ['omega', 'greek', 'w'],
+    // Greek Capital
+    'Α': ['alpha', 'greek', 'a', 'capital'],
+    'Β': ['beta', 'greek', 'b', 'capital'],
+    'Γ': ['gamma', 'greek', 'g', 'capital'],
+    'Δ': ['delta', 'triangle', 'greek', 'd', 'capital'],
+    'Ε': ['epsilon', 'greek', 'e', 'capital'],
+    'Ζ': ['zeta', 'greek', 'z', 'capital'],
+    'Η': ['eta', 'greek', 'h', 'capital'],
+    'Θ': ['theta', 'greek', 'th', 'capital'],
+    'Ι': ['iota', 'greek', 'i', 'capital'],
+    'Κ': ['kappa', 'greek', 'k', 'capital'],
+    'Λ': ['lambda', 'greek', 'l', 'capital'],
+    'Μ': ['mu', 'greek', 'm', 'capital'],
+    'Ν': ['nu', 'greek', 'n', 'capital'],
+    'Ξ': ['xi', 'greek', 'x', 'capital'],
+    'Ο': ['omicron', 'greek', 'o', 'capital'],
+    'Π': ['pi', 'product', 'greek', 'p', 'capital'],
+    'Ρ': ['rho', 'greek', 'r', 'capital'],
+    'Σ': ['sigma', 'sum', 'summation', 'greek', 's', 'capital'],
+    'Τ': ['tau', 'greek', 't', 'capital'],
+    'Υ': ['upsilon', 'greek', 'u', 'capital'],
+    'Φ': ['phi', 'greek', 'f', 'capital'],
+    'Χ': ['chi', 'greek', 'x', 'capital'],
+    'Ψ': ['psi', 'greek', 'ps', 'capital'],
+    'Ω': ['omega', 'ohm', 'greek', 'w', 'capital'],
+    // Math Operators
+    '+': ['plus', 'add', 'positive', 'sum'],
+    '−': ['minus', 'subtract', 'negative', 'dash'],
+    '±': ['plus minus', 'positive negative', 'tolerance'],
+    '×': ['times', 'multiplication', 'multiply', 'cross'],
+    '÷': ['divide', 'division'],
+    '=': ['equal', 'same', 'equation'],
+    '≠': ['not equal', 'different'],
+    '≈': ['approx', 'approximately', 'similar', 'estimation'],
+    '<': ['less than', 'smaller'],
+    '>': ['greater than', 'bigger'],
+    '≤': ['less than equal', 'smaller equal'],
+    '≥': ['greater than equal', 'bigger equal', 'at least'],
+    '√': ['square root', 'root', 'sqrt'],
+    '∛': ['cube root', '3rd root'],
+    '∜': ['fourth root', '4th root'],
+    '∞': ['infinity', 'forever', 'endless'],
+    '∝': ['proportional', 'varies as'],
+    '∀': ['for all', 'universal quantifier'],
+    '∃': ['exists', 'there exists', 'existential quantifier'],
+    '∄': ['not exist', 'not exists'],
+    '∈': ['element of', 'belongs to', 'in'],
+    '∉': ['not element of', 'not in'],
+    '∩': ['intersection', 'cap', 'and'],
+    '∪': ['union', 'cup', 'or'],
+    '⊂': ['subset', 'contained in'],
+    '⊃': ['superset', 'contains'],
+    '⊆': ['subset equal'],
+    '⊇': ['superset equal'],
+    '∬': ['double integral'],
+    '∭': ['triple integral'],
+    '∮': ['contour integral', 'line integral'],
+    '∯': ['surface integral'],
+    '∰': ['volume integral'],
+    '∂': ['partial', 'derivative', 'd'],
+    '∇': ['nabla', 'gradient', 'del', 'vector derivative'],
+    'ℏ': ['h bar', 'planck constant', 'reduced planck', 'quantum', 'hbar'],
+    'Å': ['angstrom', 'units', 'length', 'swedish a'],
+    '⌀': ['diameter', 'circle cross', 'null'],
+    '⌬': ['benzene', 'ring', 'hexagon', 'chemistry', 'aromatic'],
+    '°': ['degree', 'temperature', 'angle', 'units'],
+    '→': ['arrow', 'right arrow', 'implies', 'to', 'then', 'forward'],
+    '←': ['arrow', 'left arrow', 'from', 'back', 'previous'],
+    '↑': ['arrow', 'up arrow', 'increase', 'top'],
+    '↓': ['arrow', 'down arrow', 'decrease', 'bottom'],
+    '↔': ['arrow', 'left right arrow', 'horizontal', 'range'],
+    '↕': ['arrow', 'up down arrow', 'vertical', 'height'],
+    '↗': ['arrow', 'up right', 'northeast', 'increase'],
+    '↘': ['arrow', 'down right', 'southeast', 'decrease'],
+    '↖': ['arrow', 'up left', 'northwest'],
+    '↙': ['arrow', 'down left', 'southwest'],
+    '⇌': ['equilibrium', 'reversible', 'reaction', 'chemistry'],
+    '℅': ['care of', 'address'],
+    'ℓ': ['liter', 'script l', 'units'],
+    '№': ['number sign', 'numero'],
+    '™': ['trademark', 'tm', 'brand'],
+    '©': ['copyright', 'legal'],
+    '®': ['registered', 'brand'],
+    '§': ['section', 'legal', 'clause'],
+    '¶': ['paragraph', 'legal'],
+    '†': ['dagger', 'obelisk', 'footnote'],
+    '‡': ['double dagger', 'footnote'],
+    '′': ['prime', 'minutes', 'feet', 'derivative'],
+    '″': ['double prime', 'seconds', 'inches'],
+    '‴': ['triple prime'],
+    '⁗': ['quadruple prime'],
+    '∆': ['delta', 'triangle', 'difference', 'change', 'increment', 'laplacian'],
+    '∑': ['sum', 'summation', 'sigma', 'total', 'add'],
+    '∏': ['product', 'pi', 'multiply'],
+    '∫': ['integral', 'integrate', 'calculus', 'area', 'antiderivative'],
+};
+
+// Lightweight fuzzy match helper
+function fuzzyMatch(query: string, target: string): boolean {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const t = target.toLowerCase();
+
+    // Direct inclusion
+    if (t.includes(q)) return true;
+
+    // Typos: check if at least 80% of query characters are in target in order, 
+    // or if distance is very small (for short words)
+    if (q.length < 3) return t.includes(q);
+
+    let matchCount = 0;
+    let targetIdx = 0;
+    for (let i = 0; i < q.length; i++) {
+        const foundIdx = t.indexOf(q[i], targetIdx);
+        if (foundIdx !== -1) {
+            matchCount++;
+            targetIdx = foundIdx + 1;
+        }
+    }
+
+    // Allow 1 typo for words length 4-6, 2 for 7+
+    const maxErrors = q.length > 6 ? 2 : (q.length > 3 ? 1 : 0);
+    return matchCount >= q.length - maxErrors;
+}
+
 interface ScientificSymbolsToolbarProps {
     onInsert: (symbol: string) => void;
     className?: string;
@@ -72,10 +224,24 @@ export default function ScientificSymbolsToolbar({ onInsert, className }: Scient
             const symbols = SYMBOL_CATEGORIES.find(c => c.name === activeCategory)?.symbols || [];
             return Array.from(new Set(symbols));
         }
+
         const query = searchQuery.toLowerCase();
         let all: string[] = [];
         SYMBOL_CATEGORIES.forEach(c => all = [...all, ...c.symbols]);
-        return Array.from(new Set(all)).filter(s => s.toLowerCase().includes(query));
+
+        const uniqueSymbols = Array.from(new Set(all));
+
+        return uniqueSymbols.filter(s => {
+            // 1. Exact match
+            if (s === searchQuery) return true;
+
+            // 2. Character match (simple)
+            if (s.toLowerCase().includes(query)) return true;
+
+            // 3. Metadata Keywords match (fuzzy)
+            const tags = SYMBOL_METADATA[s] || [];
+            return tags.some(tag => fuzzyMatch(query, tag));
+        });
     }, [searchQuery, activeCategory]);
 
     return (

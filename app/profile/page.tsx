@@ -10,6 +10,10 @@ import { useRef } from 'react';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/imageUtils';
 import { getRank } from '@/lib/levelUtils';
+import { upload } from "@imagekit/next";
+
+const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY;
+const authenticationEndpoint = "/api/imagekit-auth";
 
 export default function ProfilePage() {
     const [loading, setLoading] = useState(true);
@@ -47,35 +51,39 @@ export default function ProfilePage() {
 
         try {
             const compressedFile = await compressImage(file, 800, 0.7);
-            toast.loading('Uploading...', { id: toastId });
-            const presignRes = await fetch('/api/upload/presign', {
-                method: 'POST',
-                body: JSON.stringify({
-                    filename: compressedFile.name,
-                    contentType: compressedFile.type
-                }),
+            toast.loading('Authenticating...', { id: toastId });
+
+            // 1. Get Authentication Parameters
+            const authRes = await fetch(authenticationEndpoint);
+            const authData = await authRes.json();
+            if (authData.error) throw new Error(authData.error);
+
+            toast.loading('Uploading to Cloud...', { id: toastId });
+
+            // 2. Perform Upload via ImageKit
+            const uploadResponse = await upload({
+                file: compressedFile,
+                fileName: `profile-${Date.now()}`,
+                publicKey: publicKey!,
+                signature: authData.signature,
+                token: authData.token,
+                expire: authData.expire,
+                useUniqueFileName: true,
+                folder: "/profile-pictures"
             });
 
-            if (!presignRes.ok) throw new Error('Upload init failed');
-            const { url, key, publicDomain } = await presignRes.json();
+            const newUrl = uploadResponse.url as string;
+            const fileId = uploadResponse.fileId as string;
 
-            const uploadRes = await fetch(url, {
-                method: 'PUT',
-                body: compressedFile,
-                headers: { 'Content-Type': compressedFile.type }
-            });
+            toast.loading('Saving to Profile...', { id: toastId });
 
-            if (!uploadRes.ok) throw new Error('Upload failed');
-            const domain = publicDomain || 'https://pub-your-r2-domain.r2.dev';
-            const finalUrl = `${domain}/${key}`;
-
-            toast.loading('Saving profile...', { id: toastId });
+            // 3. Sync with Backend
             const saveRes = await fetch('/api/user/profile-image', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    profileImage: finalUrl,
-                    imageKitFileId: ''
+                    profileImage: newUrl,
+                    imageKitFileId: fileId
                 })
             });
 

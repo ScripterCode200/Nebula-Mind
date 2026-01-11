@@ -260,38 +260,26 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
                 </div>
             </motion.div>
 
-            {/* Sidebar Toggle Button (Floating) - Desktop Only */}
-            <AnimatePresence>
-                {!showSidebar && !isMobile && (
-                    <motion.button
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                        onClick={() => setShowSidebar(true)}
-                        className="absolute left-4 top-16 md:top-6 z-30 flex items-center gap-2 px-3 py-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 text-muted-foreground hover:text-white hover:bg-white/10 hover:border-primary/50 transition-all group shadow-lg"
-                    >
-                        <PanelLeftOpen size={18} className="text-primary" />
-                        <span className="text-xs font-medium hidden group-hover:block transition-all">History</span>
-                    </motion.button>
-                )}
-            </AnimatePresence>
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <div className="shrink-0 p-3 md:px-4 md:py-3 pb-0">
+                <div className="shrink-0 p-3 md:px-4 md:py-3 pb-0 relative z-20">
                     <div className="flex items-start justify-between gap-3 mb-3">
                         <div>
                             <h2 className="text-lg font-bold text-white tracking-tight">AI Notes</h2>
                             <p className="text-muted-foreground text-[10px] md:text-xs">Generate comprehensive study notes.</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setShowSidebar(true)}
-                                className="md:hidden p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-primary border border-white/10 shadow-lg"
-                                title="View History"
-                            >
-                                <PanelLeftOpen size={16} />
-                            </button>
+                            {!showSidebar && (
+                                <button
+                                    onClick={() => setShowSidebar(true)}
+                                    className="flex items-center gap-2 p-1.5 md:px-3 md:py-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-primary border border-white/20 shadow-xl transition-all group backdrop-blur-md"
+                                    title="View History"
+                                >
+                                    <PanelLeftOpen size={16} />
+                                    <span className="text-xs font-bold hidden md:inline-block">History</span>
+                                </button>
+                            )}
                             <button
                                 onClick={() => setShowControls(!showControls)}
                                 className="md:hidden p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground transition-colors border border-white/5"

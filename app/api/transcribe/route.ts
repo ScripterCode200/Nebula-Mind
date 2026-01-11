@@ -1,10 +1,12 @@
-
 import { NextRequest, NextResponse } from 'next/server';
-import { YoutubeTranscript } from 'youtube-transcript';
+// import { YoutubeTranscript } from 'youtube-transcript'; // REMOVED
 import { r2Client, R2_BUCKET_NAME } from '@/lib/r2';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import { transcribeAudioWithGemini } from './gemini-audio';
+import { fetchCaptionsWithYtDlp, extractVideoId } from './yt-dlp-captions';
+import connectToDatabase from '@/lib/db';
+import CachedTranscript from '@/models/CachedTranscript';
 
 export async function POST(req: NextRequest) {
     try {
@@ -19,17 +21,51 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
         }
 
+        const videoId = extractVideoId(url);
+        if (!videoId) {
+            return NextResponse.json({ error: 'Could not extract Video ID' }, { status: 400 });
+        }
+
         console.log(`\n--- [YOUTUBE TRANSCRIBER] START ---`);
         console.log(`[Target URL]: ${url}`);
+        console.log(`[Video ID]: ${videoId}`);
 
-        // Strategy 1: Direct Caption Strategy (Lightweight)
-        console.log(`[Strategy 1]: ATTEMPTING DIRECT CAPTION EXTRACTION (Fastest)`);
+        // 0. CACHE CHECK
         try {
-            const transcriptItems = await YoutubeTranscript.fetchTranscript(url);
+            await connectToDatabase();
+            const cached = await CachedTranscript.findOne({ videoId });
+            if (cached) {
+                console.log(`[CACHE HIT]: Found existing transcript -> ${cached.r2Key}`);
+                return NextResponse.json({
+                    success: true,
+                    strategy: cached.strategy + ' (cached)',
+                    r2Key: cached.r2Key,
+                    fromCache: true,
+                    videoId: url
+                });
+            } else {
+                console.log(`[CACHE MISS]: Processing new transcription...`);
+            }
+        } catch (dbError) {
+            console.warn(`[CACHE ERROR]: Database check failed, proceeding without cache.`, dbError);
+        }
 
-            if (transcriptItems && transcriptItems.length > 0) {
-                const transcriptText = transcriptItems.map(item => item.text).join(' ');
-                console.log(`[Strategy 1 SUCCESS]: Found generic captions | Length: ${transcriptText.length} characters`);
+        // Check Global Settings (Compliance)
+        const SystemSetting = (await import('@/models/SystemSetting')).default;
+        const globalSettings = await SystemSetting.findOne({ key: 'global' });
+        const enableDirectCaptions = globalSettings?.enableDirectCaptions ?? false; // Default OFF
+
+        // Strategy 1: Direct Caption Strategy (Lightweight but Robust with yt-dlp)
+        console.log(`[Strategy 1]: ATTEMPTING DIRECT CAPTION EXTRACTION (yt-dlp)`);
+        try {
+            if (!enableDirectCaptions) {
+                console.log('[Strategy 1]: SKIPPING - Disabled by Global Settings (Compliance Mode)');
+                throw new Error('Compliance: Direct scraping disabled');
+            }
+            const transcriptText = await fetchCaptionsWithYtDlp(url);
+
+            if (transcriptText && transcriptText.length > 50) {
+                console.log(`[Strategy 1 SUCCESS]: Found captions | Length: ${transcriptText.length} characters`);
 
                 // Upload to R2
                 const fileId = uuidv4();
@@ -43,7 +79,23 @@ export async function POST(req: NextRequest) {
                     ContentType: 'text/plain',
                 }));
 
-                console.log(`[YOUTUBE TRANSCRIBER] FINISHED | COMPLETED VIA DIRECT CAPTIONS\n`);
+                // SAVE TO CACHE
+                try {
+                    await CachedTranscript.create({
+                        videoId,
+                        r2Key: fileKey,
+                        strategy: 'direct-captions',
+                        transcriptPreview: transcriptText.substring(0, 100)
+                    });
+                    console.log(`[CACHE SAVE]: Saved to cache.`);
+                } catch (saveError: any) {
+                    // Ignore duplicate key errors (race conditions)
+                    if (saveError.code !== 11000) {
+                        console.warn(`[CACHE SAVE FAIL]:`, saveError);
+                    }
+                }
+
+                console.log(`[YOUTUBE TRANSCRIBER] FINISHED | COMPLETED VIA YT-DLP CAPTIONS\n`);
 
                 return NextResponse.json({
                     success: true,
@@ -53,7 +105,7 @@ export async function POST(req: NextRequest) {
                     videoId: url
                 });
             } else {
-                throw new Error('No transcript items returned');
+                throw new Error('No valid captions found via yt-dlp');
             }
 
         } catch (captionError) {
@@ -61,7 +113,7 @@ export async function POST(req: NextRequest) {
             console.log(`[Error Details]: ${captionError instanceof Error ? captionError.message : String(captionError)}`);
 
             // Strategy 2: Audio Download + Gemini Strategy (Heavyweight)
-            console.log(`[Strategy 2]: FALLING BACK TO AUDIO DOWNLOAD + GEMINI 1.5 FLASH (Standard)`);
+            console.log(`[Strategy 2]: FALLING BACK TO AUDIO DOWNLOAD + GEMINI 2.0 FLASH (Standard)`);
             try {
                 const geminiText = await transcribeAudioWithGemini(url);
                 console.log(`[Strategy 2 SUCCESS]: Gemini Generated Transcript | Length: ${geminiText.length} characters`);
@@ -77,6 +129,21 @@ export async function POST(req: NextRequest) {
                     Body: geminiText,
                     ContentType: 'text/plain',
                 }));
+
+                // SAVE TO CACHE
+                try {
+                    await CachedTranscript.create({
+                        videoId,
+                        r2Key: fileKey,
+                        strategy: 'gemini-audio',
+                        transcriptPreview: geminiText.substring(0, 100)
+                    });
+                    console.log(`[CACHE SAVE]: Saved to cache.`);
+                } catch (saveError: any) {
+                    if (saveError.code !== 11000) {
+                        console.warn(`[CACHE SAVE FAIL]:`, saveError);
+                    }
+                }
 
                 console.log(`[YOUTUBE TRANSCRIBER] FINISHED | COMPLETED VIA GEMINI AUDIO\n`);
 

@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ISource {
     _id?: string;
-    type: 'pdf' | 'youtube';
+    type: 'pdf' | 'youtube' | 'docx';
     name: string;
     fileKey?: string;
     contentKey: string;
@@ -44,7 +44,7 @@ const NotebookSchema: Schema = new Schema({
     pdfKey: { type: String },
     contentKey: { type: String },
     sources: [{
-        type: { type: String, enum: ['pdf', 'youtube'], default: 'pdf' },
+        type: { type: String, enum: ['pdf', 'youtube', 'docx'], default: 'pdf' },
         name: { type: String, required: true },
         fileKey: { type: String }, // R2 Key for the PDF (Optional for YouTube)
         contentKey: { type: String, required: true }, // R2 Key for the extracted text
@@ -59,7 +59,7 @@ const NotebookSchema: Schema = new Schema({
     //     timestamp: { type: Date, default: Date.now }
     // }],
     annotations: { type: Map, of: [Object], default: {} },
-    fileType: { type: String, enum: ['pdf', 'docx', 'text'], default: 'pdf' },
+    fileType: { type: String, enum: ['pdf', 'docx', 'text', 'youtube'], default: 'pdf' },
     contentHtml: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },
     sharedWith: [{

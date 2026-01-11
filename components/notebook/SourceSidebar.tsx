@@ -2,13 +2,13 @@
 
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, FileText, Check, Loader2, X, ChevronLeft, ChevronRight, Youtube, Upload } from 'lucide-react';
+import { Plus, FileText, Check, Loader2, X, ChevronLeft, ChevronRight, Youtube, Upload, Trash2 } from 'lucide-react';
 import NeonButton from '@/components/ui/NeonButton';
 import { cn } from '@/lib/utils';
-
+import { toast } from 'sonner';
 interface Source {
     _id: string;
-    type: 'pdf' | 'youtube';
+    type: 'pdf' | 'youtube' | 'docx';
     name: string;
     addedAt: string;
     url?: string;
@@ -22,6 +22,7 @@ interface SourceSidebarProps {
     onToggledSource: (id: string) => void;
     onAddSource: (file: File) => void;
     onAddYoutube: (url: string) => Promise<void>;
+    onDeleteSource: (id: string) => Promise<void>;
     isAddingSource?: boolean;
     loadingStep?: string;
     transcribeProgress?: number;
@@ -39,6 +40,7 @@ const SourceSidebar = ({
     onToggledSource,
     onAddSource,
     onAddYoutube,
+    onDeleteSource,
     isAddingSource = false,
     loadingStep = '',
     transcribeProgress = 0,
@@ -49,6 +51,7 @@ const SourceSidebar = ({
 }: SourceSidebarProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [collapsed, setCollapsed] = useState(false);
+    const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null);
     const [addMode, setAddMode] = useState<'none' | 'upload' | 'youtube'>('none');
     const [youtubeUrl, setYoutubeUrl] = useState('');
 
@@ -62,6 +65,31 @@ const SourceSidebar = ({
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // 1. Validation
+        const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+        if (file.size > MAX_SIZE) {
+            toast.error('File too large', {
+                description: 'Please upload a file smaller than 10MB to ensure smooth processing.'
+            });
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        const allowedTypes = [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword'
+        ];
+
+        if (!allowedTypes.includes(file.type) && !file.name.endsWith('.docx') && !file.name.endsWith('.doc') && !file.name.endsWith('.pdf')) {
+            toast.error('Invalid format', {
+                description: 'Please upload a PDF or Word document (.docx, .doc).'
+            });
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
         onAddSource(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
@@ -166,6 +194,26 @@ const SourceSidebar = ({
                                 {isActive && !collapsed && (
                                     <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-primary shadow-[0_0_10px_var(--primary-color)]" />
                                 )}
+
+                                {!collapsed && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm('Are you sure you want to delete this source?')) {
+                                                setDeletingSourceId(source._id);
+                                                onDeleteSource(source._id).finally(() => setDeletingSourceId(null));
+                                            }
+                                        }}
+                                        disabled={deletingSourceId === source._id}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all z-20 disabled:opacity-50"
+                                    >
+                                        {deletingSourceId === source._id ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                        ) : (
+                                            <Trash2 size={14} />
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </motion.div>
                     );
@@ -268,7 +316,7 @@ const SourceSidebar = ({
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
-                    accept=".pdf"
+                    accept=".pdf,.docx,.doc"
                     className="hidden"
                 />
             </div>

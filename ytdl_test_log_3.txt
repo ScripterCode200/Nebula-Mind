@@ -1,3 +1,0 @@
-STARTING YTDL TEST 3
-Fetching info for https://www.youtube.com/watch?v=qJZ1Ez28C-A...
-Stream Error: Status code: 403

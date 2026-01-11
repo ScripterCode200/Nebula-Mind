@@ -1,4 +1,4 @@
-import { VertexAI } from '@google-cloud/vertexai';
+import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
 import { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
@@ -26,118 +26,172 @@ function extractVideoId(url: string): string | null {
     return null;
 }
 
+async function getVideoDuration(url: string, ytDlpPath: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const process = spawn(ytDlpPath, ['--print', 'duration', '--no-playlist', url]);
+        let output = '';
+        process.stdout.on('data', (d) => output += d.toString());
+        process.on('close', (code) => {
+            if (code === 0 && output.trim()) resolve(parseFloat(output.trim()));
+            else reject(new Error('Failed to get video duration'));
+        });
+    });
+}
+
+function formatTime(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+async function generateWithPrompt(model: any, base64Audio: string, start: number, end?: number): Promise<string> {
+    let prompt = "Transcribe the audio from this file accurately. Output ONLY the transcript text, no other commentary.";
+
+    if (end !== undefined) {
+        // If start is 0, we can say "first X minutes" or just range. Range is safer.
+        const startStr = formatTime(start);
+        const endStr = formatTime(end);
+        // Explicitly instruct the model to focus on the time range.
+        // Note: Gemini 1.5/2.0 understands audio context well, but exact timestamps can sometimes be tricky.
+        // However, this is the best strategy without ffmpeg.
+        prompt = `Please transcribe the audio specifically between timestamp ${startStr} and ${endStr}. Ignore any audio before ${startStr} or after ${endStr}. Output ONLY the transcript for this segment.`;
+    }
+
+    const result = await model.generateContent({
+        contents: [{
+            role: 'user',
+            parts: [
+                { text: prompt },
+                { inlineData: { mimeType: 'audio/mp4', data: base64Audio } } // Mime type audio/mp4 covers m4a
+            ]
+        }]
+    });
+
+    const response = await result.response;
+    return response.candidates?.[0].content.parts[0].text || '';
+}
+
 export async function transcribeAudioWithGemini(url: string): Promise<string> {
     const projectId = process.env.GOOGLE_PROJECT_ID || 'nebula-mind-480116';
     const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
     const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!clientEmail || !privateKey) {
-        throw new Error('Vertex AI credentials (GOOGLE_CLIENT_EMAIL/PRIVATE_KEY) are not defined');
+        throw new Error('Vertex AI credentials not defined');
     }
 
     const videoId = extractVideoId(url);
-    if (!videoId) {
-        throw new Error('Could not extract video ID from URL: ' + url);
-    }
+    if (!videoId) throw new Error('Could not extract video ID');
 
-    // Initialize Vertex AI
     const vertexAI = new VertexAI({
         project: projectId,
         location: 'us-central1',
         googleAuthOptions: {
-            credentials: {
-                client_email: clientEmail,
-                private_key: privateKey,
-                project_id: projectId
-            }
+            credentials: { client_email: clientEmail, private_key: privateKey, project_id: projectId }
         }
     });
 
+    const model = vertexAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+            maxOutputTokens: 8192,
+            temperature: 0.1,
+            topP: 0.8,
+        },
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+        ]
+    });
+
     const tempDir = os.tmpdir();
-    const tempFilePath = path.join(tempDir, `${uuidv4()}.mp3`);
+    // Unique ID for this job
+    const uniqueId = uuidv4();
+    const tempFilePath = path.join(tempDir, `${uniqueId}.m4a`); // using m4a/mp4 container
     const ytDlpPath = path.join(process.cwd(), 'scripts', 'yt-dlp.exe');
 
     try {
-        let currentFilePath = tempFilePath;
-        let success = false;
-        let attempt = 1;
+        const duration = await getVideoDuration(url, ytDlpPath);
+        console.log(`[Vertex Audio] Video Duration: ${duration}s`);
 
-        // Attempt 1: Prefer moderate bitrate (96k)
-        // Attempt 2: Forced low bitrate (48k or lower)
-        while (attempt <= 2 && !success) {
-            console.log(`[Vertex Audio] Download attempt ${attempt} for: ${videoId} using yt-dlp`);
+        // 1. Download FULL Audio (Compressed)
+        console.log(`[Vertex Audio] Downloading FULL Audio (Compressed)...`);
+        await new Promise<void>((resolve, reject) => {
+            // Force low bitrate (<=50k) to keep file small.
+            // Using 'bestaudio' may default to opus/webm which Gemini might accept, but m4a is safer for inlineData mime 'audio/mp4'.
+            // [abr<=50] tries to find low bitrate.
+            const dlArgs = [
+                '-f', 'bestaudio[abr<=50][ext=m4a]/bestaudio[abr<=50]/bestaudio',
+                '-o', '-',
+                '--no-playlist',
+                url
+            ];
 
-            const formatStr = attempt === 1
-                ? 'bestaudio[abr<=96][ext=m4a]/bestaudio[abr<=96]/bestaudio[ext=m4a]/bestaudio'
-                : 'bestaudio[abr<=48][ext=m4a]/bestaudio[abr<=48]/bestaudio';
+            const dlProcess = spawn(ytDlpPath, dlArgs);
+            const writer = fs.createWriteStream(tempFilePath);
+            dlProcess.stdout.pipe(writer);
 
-            await new Promise<void>((resolve, reject) => {
-                const process = spawn(ytDlpPath, [
-                    '-f', formatStr,
-                    '-o', '-',
-                    '--no-playlist',
-                    url
-                ]);
-
-                const writer = fs.createWriteStream(currentFilePath);
-                process.stdout.pipe(writer);
-
-                process.stderr.on('data', (data) => {
-                    const msg = data.toString();
-                    if (msg.includes('ERROR:')) console.error(`[yt-dlp Error]: ${msg}`);
-                });
-
-                process.on('close', (code) => {
-                    if (code === 0) resolve();
-                    else reject(new Error(`yt-dlp exited with code ${code}`));
-                });
-
-                writer.on('error', (err) => reject(err));
-                process.on('error', (err) => reject(err));
+            dlProcess.stderr.on('data', (d) => {
+                const s = d.toString();
+                // Log errors but ignore routine info
+                if (s.includes('ERROR:')) console.error(`[yt-dlp]: ${s}`);
             });
 
-            const stats = fs.statSync(currentFilePath);
-            console.log(`[Vertex Audio] Attempt ${attempt} complete. Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+            dlProcess.on('close', (code) => {
+                if (code === 0) resolve();
+                else reject(new Error(`yt-dlp exited with ${code}`));
+            });
+            dlProcess.on('error', reject);
+            writer.on('error', reject);
+        });
 
-            if (stats.size <= 25 * 1024 * 1024) {
-                success = true;
-            } else if (attempt === 1) {
-                console.log(`[Vertex Audio] File too large (${(stats.size / 1024 / 1024).toFixed(2)} MB). Retrying with lower bitrate...`);
-                if (fs.existsSync(currentFilePath)) fs.unlinkSync(currentFilePath);
-                attempt++;
-            } else {
-                throw new Error(`Audio file still too large after compression (${(stats.size / 1024 / 1024).toFixed(2)} MB).`);
+        const stats = fs.statSync(tempFilePath);
+        console.log(`[Vertex Audio] Download Complete. Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+
+        // Warning if > 20MB (approx inline limit). Gemini might handle slightly more but 20MB is safe bet.
+        if (stats.size > 22 * 1024 * 1024) {
+            console.warn(`[Vertex Audio] Warning: File size ${(stats.size / 1024 / 1024).toFixed(2)}MB is large. Transcription might fail if over inline limit.`);
+        }
+
+        const audioBuffer = fs.readFileSync(tempFilePath);
+        const base64Audio = audioBuffer.toString('base64');
+
+        // Chunking Logic (Prompt-based)
+        const MAX_CHUNK_DURATION = 15 * 60; // 15 minutes
+        const OVERLAP = 60; // 60 seconds overlap
+
+        let transcript = '';
+
+        if (duration <= MAX_CHUNK_DURATION) {
+            // Single Pass
+            console.log(`[Vertex Audio] Processing Single Pass...`);
+            transcript = await generateWithPrompt(model, base64Audio, 0, undefined);
+        } else {
+            // Iterative Pass
+            let start = 0;
+            let chunkIndex = 1;
+
+            while (start < duration) {
+                let end = start + MAX_CHUNK_DURATION;
+                if (end >= duration) end = duration;
+
+                console.log(`[Vertex Audio] Processing Segment ${chunkIndex}: ${formatTime(start)} - ${formatTime(end)}`);
+                const chunkText = await generateWithPrompt(model, base64Audio, start, end);
+
+                transcript += (transcript ? ' ' : '') + chunkText;
+
+                // Advance start. Overlap logic is tricky via prompt as we don't know where it cut.
+                // Assuming "Transcribe X to Y" implies precise cut.
+                // To be safe, we just advance to End (minus small overlap if needed, but strict segmentation is cleaner here)
+                start = end;
+                chunkIndex++;
             }
         }
 
-        const audioBuffer = fs.readFileSync(currentFilePath);
-        const base64Audio = audioBuffer.toString('base64');
-
-        console.log(`[Vertex Audio] Generating transcript via Gemini 2.0 Flash...`);
-
-        const model = vertexAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-        const result = await model.generateContent({
-            contents: [{
-                role: 'user',
-                parts: [
-                    { text: "Transcribe the audio from this file accurately. Output ONLY the transcript text, no other commentary." },
-                    {
-                        inlineData: {
-                            mimeType: 'audio/mp4',
-                            data: base64Audio
-                        }
-                    }
-                ]
-            }]
-        });
-
-        const response = await result.response;
-        const text = response.candidates?.[0].content.parts[0].text || '';
-
-        console.log(`[Vertex Audio] Transcription complete. Length: ${text.length}`);
-
-        return text;
+        return transcript;
 
     } catch (error) {
         console.error('[Vertex Audio] Error:', error);

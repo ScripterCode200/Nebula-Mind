@@ -32,15 +32,30 @@ export async function GET() {
             const userId = user.userId || user.id || user.sub;
             const results = await TestResult.find({
                 userId: String(userId),
-                goalId: { $in: exams.map((e: any) => e._id.toString()) },
-                status: 'passed'
+                goalId: { $in: exams.map((e: any) => e._id.toString()) }
             }).lean();
-            completedExamIds = results.map((r: any) => r.goalId.toString());
+
+            const resultMap = new Map();
+            results.forEach((r: any) => resultMap.set(r.goalId.toString(), r));
+
+            const allExams = exams.map((exam: any) => {
+                const res = resultMap.get(exam._id.toString());
+                return {
+                    ...exam,
+                    id: exam._id.toString(),
+                    completed: res?.status === 'passed',
+                    status: res?.status || 'pending',
+                    cheatAttempts: res?.cheatAttempts || 0,
+                    maxAttempts: 3
+                };
+            });
+
+            return NextResponse.json({ exams: allExams });
         }
 
         const allExams = exams.map((exam: any) => ({
             ...exam,
-            completed: completedExamIds.includes(exam._id.toString())
+            completed: false
         }));
 
         return NextResponse.json({ exams: allExams });

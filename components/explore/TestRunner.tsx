@@ -35,7 +35,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     const [currentIndex, setCurrentIndex] = useState(0);
     const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
     const [markedForReview, setMarkedForReview] = useState<Record<number, boolean>>({});
-    const [isIndexOpen, setIsIndexOpen] = useState(false);
+    const [isIndexOpen, setIsIndexOpen] = useState(true);
     const [evaluations, setEvaluations] = useState<Record<number, any>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [timeElapsed, setTimeElapsed] = useState(0);
@@ -49,7 +49,10 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
 
     // Anti-Cheat State
     const [antiCheatEnabled, setAntiCheatEnabled] = useState(false);
-    const [isDisqualified, setIsDisqualified] = useState(false);
+    const [isDisqualified, setIsDisqualified] = useState(false); // Current session foul
+    const [isPermanentlyDisqualified, setIsPermanentlyDisqualified] = useState(false);
+    const [cheatAttempts, setCheatAttempts] = useState(0);
+    const [maxAttempts, setMaxAttempts] = useState(3);
     const [isLoadingStatus, setIsLoadingStatus] = useState(true);
 
     // Synchronize current text to global state whenever it changes 
@@ -93,31 +96,24 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     // Check for previous disqualification or completion
     useEffect(() => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         const checkStatus = async () => {
             try {
-                const data = await safeFetch<{ status: string }>(`/api/daily-goals/status?goalId=${goal.id}`, {
+                const data = await safeFetch<{ status: string, score: number, cheatAttempts: number, maxAttempts: number }>(`/api/daily-goals/status?goalId=${goal.id}&t=${Date.now()}`, {
                     signal: controller.signal
                 });
-                if (data.status === 'disqualified') {
-                    setIsDisqualified(true);
-                }
+                if (data.status === 'disqualified') setIsPermanentlyDisqualified(true);
+                if (data.cheatAttempts !== undefined) setCheatAttempts(data.cheatAttempts);
+                if (data.maxAttempts !== undefined) setMaxAttempts(data.maxAttempts);
             } catch (e: any) {
-                if (e.name === 'AbortError' || e.code === 'TIMEOUT') {
-                    console.warn("Status check timed out - allowing start by default");
-                    // toast.warning("Network slow, status check skipped.");
-                } else {
-                    console.error("Failed to check status", e);
-                }
+                console.warn("Status check failed or timed out", e);
             } finally {
                 clearTimeout(timeoutId);
                 setIsLoadingStatus(false);
             }
         };
         checkStatus();
-
-
         return () => {
             controller.abort();
             clearTimeout(timeoutId);
@@ -126,106 +122,62 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
 
     // Anti-Cheat Enforcement
     useEffect(() => {
-        if (testState !== 'active' || !antiCheatEnabled || isDisqualified) return;
+        if (testState !== 'active' || !antiCheatEnabled || isPermanentlyDisqualified) return;
 
-        // Stabilization: Wait 2 seconds before enforcing anti-cheat 
-        // to allow for full-screen transitions and window stabilization
         const stabilizationTimeout = setTimeout(() => {
             console.log("[Anti-Cheat] Enforcement Active");
-        }, 2000);
+        }, 1000);
 
         const reportDisqualification = async (reason: string) => {
             try {
-                await safeFetch('/api/daily-goals/evaluate', {
+                const data = await safeFetch<any>('/api/daily-goals/evaluate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        goalId: goal.id,
-                        isDisqualified: true
-                    })
+                    body: JSON.stringify({ goalId: goal.id, isDisqualified: true })
                 });
+                if (data.cheatAttempts !== undefined) setCheatAttempts(data.cheatAttempts);
+                if (data.isPermanentlyBlocked) setIsPermanentlyDisqualified(true);
+                return data;
             } catch (e) {
                 console.error("Failed to report disqualification", e);
+                return null;
             }
         };
 
-
-        const failTest = (reason: string) => {
-            // Check if stabilization period has passed
-            // If the user blurs/resizes immediately during start, we give them a pass 
-            // This prevents "Enter Full Screen" button itself from triggering a blur-fail
+        const failTest = async (reason: string) => {
             setIsDisqualified(true);
+            const data = await reportDisqualification(reason);
+            if (data?.cheatAttempts !== undefined) setCheatAttempts(data.cheatAttempts);
             setTestState('results');
             toast.error("Test Failed!", { description: reason });
-            reportDisqualification(reason);
+        };
+
+        const preventInspection = (e: MouseEvent | KeyboardEvent) => {
+            if (e.type === 'contextmenu') { e.preventDefault(); return; }
+            if (e instanceof KeyboardEvent) {
+                const isDevToolKey = e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || (e.ctrlKey && e.key === 'U');
+                if (isDevToolKey) { e.preventDefault(); failTest("DevTools access is prohibited."); }
+            }
         };
 
         let antiCheatTimeout: NodeJS.Timeout | null = null;
-
         const handleViolation = (reason: string) => {
-            // Add a small 1s grace period to prevent accidental triggers from 
-            // transient focus flickers or system notifications
             if (antiCheatTimeout) return;
-
-            console.warn(`[Anti-Cheat] Potential Violation: ${reason}. Grace period active...`);
-            antiCheatTimeout = setTimeout(() => {
-                failTest(reason);
-            }, 1000); // 1s grace period
+            antiCheatTimeout = setTimeout(() => failTest(reason), 1000);
         };
+        const clearViolation = () => { if (antiCheatTimeout) { clearTimeout(antiCheatTimeout); antiCheatTimeout = null; } };
 
-        const clearViolation = () => {
-            if (antiCheatTimeout) {
-                console.log("[Anti-Cheat] Violation cleared. Focus returned within grace period.");
-                clearTimeout(antiCheatTimeout);
-                antiCheatTimeout = null;
-            }
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                handleViolation("Anti-Cheat: Focus detected. Test disqualified.");
-            } else {
-                clearViolation();
-            }
-        };
-
-        const handleBlur = () => {
-            handleViolation("Anti-Cheat: Window focus lost. Test disqualified.");
-        };
-
-        const handleFocus = () => {
-            clearViolation();
-        };
-
+        const handleVisibilityChange = () => { if (document.hidden) handleViolation("Focus lost"); else clearViolation(); };
+        const handleBlur = () => handleViolation("Window blur");
+        const handleFocus = () => clearViolation();
         const handleResize = () => {
-            // Lenient resize check: allow changes within 15% range
-            // This prevents triggers from browser scrollbars appearing or chrome shifts
             const threshold = 0.15;
-            const isSignificantResize =
-                Math.abs(window.outerHeight - screen.availHeight) > screen.availHeight * threshold ||
-                Math.abs(window.outerWidth - screen.availWidth) > screen.availWidth * threshold;
-
-            if (isSignificantResize) {
-                handleViolation("Anti-Cheat: Browser window resized significantly. Test disqualified.");
-            } else {
-                clearViolation();
-            }
+            if (Math.abs(window.outerHeight - screen.availHeight) > screen.availHeight * threshold || Math.abs(window.outerWidth - screen.availWidth) > screen.availWidth * threshold) handleViolation("Window resized");
+            else clearViolation();
         };
+        const handleFullscreenChange = () => { if (!document.fullscreenElement) handleViolation("Exited Full Screen"); else clearViolation(); };
+        const preventCopyPaste = (e: Event) => { e.preventDefault(); toast.error("Copy/Paste is disabled."); };
 
-        const handleFullscreenChange = () => {
-            if (!document.fullscreenElement) {
-                handleViolation("Anti-Cheat: You exited Full Screen mode. Test disqualified.");
-            } else {
-                clearViolation();
-            }
-        };
-
-        const preventCopyPaste = (e: Event) => {
-            e.preventDefault();
-            toast.error("Action Prohibited", { description: "Copy/Paste is disabled." });
-        };
-
-        // Delay attachment of sensitive listeners
         const timer = setTimeout(() => {
             document.addEventListener('visibilitychange', handleVisibilityChange);
             window.addEventListener('blur', handleBlur);
@@ -235,8 +187,9 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             document.addEventListener('copy', preventCopyPaste);
             document.addEventListener('paste', preventCopyPaste);
             document.addEventListener('cut', preventCopyPaste);
-            document.addEventListener('contextmenu', preventCopyPaste);
-        }, 3000);
+            document.addEventListener('contextmenu', preventInspection as any);
+            document.addEventListener('keydown', preventInspection as any);
+        }, 1500);
 
         return () => {
             clearTimeout(stabilizationTimeout);
@@ -249,35 +202,22 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             document.removeEventListener('copy', preventCopyPaste);
             document.removeEventListener('paste', preventCopyPaste);
             document.removeEventListener('cut', preventCopyPaste);
-            document.removeEventListener('contextmenu', preventCopyPaste);
+            document.removeEventListener('contextmenu', preventInspection as any);
+            document.removeEventListener('keydown', preventInspection as any);
         };
-    }, [testState, antiCheatEnabled, isDisqualified, goal.id]);
+    }, [testState, antiCheatEnabled, isPermanentlyDisqualified, goal.id]);
 
     const handleNext = () => {
-        if (currentIndex < questions.length - 1) {
-            setCurrentIndex(prev => prev + 1);
-        } else {
-            handleSubmitTest();
-        }
+        if (currentIndex < questions.length - 1) setCurrentIndex(prev => prev + 1);
+        else handleSubmitTest();
     };
 
-    const handlePrev = () => {
-        if (currentIndex > 0) {
-            setCurrentIndex(currentIndex - 1);
-        }
-    };
+    const handlePrev = () => { if (currentIndex > 0) setCurrentIndex(currentIndex - 1); };
 
-    const jumpToQuestion = (index: number) => {
-        if (index >= 0 && index < questions.length) {
-            setCurrentIndex(index);
-        }
-    };
+    const jumpToQuestion = (index: number) => { if (index >= 0 && index < questions.length) setCurrentIndex(index); };
 
     const toggleMarkForReview = () => {
-        setMarkedForReview(prev => ({
-            ...prev,
-            [currentIndex]: !prev[currentIndex]
-        }));
+        setMarkedForReview(prev => ({ ...prev, [currentIndex]: !prev[currentIndex] }));
     };
 
     const handleInsertSymbol = (symbol: string) => {
@@ -285,13 +225,9 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
         const textarea = textareaRef.current;
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
-        const text = currentText;
-        const before = text.substring(0, start);
-        const after = text.substring(end);
-
+        const before = currentText.substring(0, start);
+        const after = currentText.substring(end);
         setCurrentText(before + symbol + after);
-
-        // Focus back and set cursor
         setTimeout(() => {
             textarea.focus();
             const newPos = start + symbol.length;
@@ -302,54 +238,40 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     const handleSubmitTest = async () => {
         const finalAnswers = { ...userAnswers, [currentIndex]: currentText };
         setUserAnswers(finalAnswers);
-
         setIsSubmitting(true);
         try {
             const submissions = Object.keys(finalAnswers).map(index => ({
                 questionIndex: parseInt(index),
                 userAnswer: finalAnswers[parseInt(index)]
             }));
-
             const data = await safeFetch<any>('/api/daily-goals/evaluate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    goalId: goal.id,
-                    submissions
-                })
+                body: JSON.stringify({ goalId: goal.id, submissions })
             });
-
             if (data.evaluations) {
                 const evalMap: Record<number, any> = {};
-                data.evaluations.forEach((evalItem: any) => {
-                    evalMap[evalItem.questionIndex] = evalItem;
-                });
+                data.evaluations.forEach((evalItem: any) => { evalMap[evalItem.questionIndex] = evalItem; });
                 setEvaluations(evalMap);
                 setRewardResult({ type: data.rewardType, value: data.rewardValue, label: data.rarityLabel });
+                if (data.cheatAttempts !== undefined) setCheatAttempts(data.cheatAttempts);
                 setTestState('results');
             } else {
                 toast.error("Failed to evaluate answers.");
             }
         } catch (error: any) {
             console.error(error);
-            const msg = error?.message || "An error occurred during evaluation.";
-            toast.error(msg);
+            toast.error(error?.message || "An error occurred.");
         } finally {
             setIsSubmitting(false);
         }
-
-
     };
 
     const closeTest = () => {
-        if (isDisqualified) {
-            onComplete(0, false);
-            return;
-        }
+        if (isDisqualified) return onComplete(0, false);
         const passedCount = Object.values(evaluations).filter((e: any) => e.isCorrect).length;
         const passed = (passedCount / questions.length) >= 0.6;
-        const totalScore = passedCount;
-        onComplete(totalScore, passed);
+        onComplete(passedCount, passed);
     };
 
     const formatTime = (seconds: number) => {
@@ -359,39 +281,31 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
     };
 
     const calculateResults = () => {
-        if (isDisqualified) {
-            return { totalEarnedPoints: 0, maxTotalPoints: questions.length * 10, awardedXP: 0, questionScores: [] };
-        }
-
+        if (isDisqualified) return { totalEarnedPoints: 0, maxTotalPoints: questions.length * 10, awardedXP: 0, questionScores: [] };
         let totalEarnedPoints = 0;
-        const maxPointsPerQuestion = 10;
         const questionScores = questions.map((_, idx) => {
             const ev = evaluations[idx];
             if (!ev) return 0;
             const avg = (ev.precisionScore + ev.keywordScore + ev.qualityScore) / 3;
             return Math.round(avg / 10);
         });
-
         totalEarnedPoints = questionScores.reduce((a, b) => a + b, 0);
-        const maxTotalPoints = questions.length * maxPointsPerQuestion;
+        const maxTotalPoints = questions.length * 10;
         const ratio = maxTotalPoints > 0 ? (totalEarnedPoints / maxTotalPoints) : 0;
         const awardedXP = Math.round(goal.xp * ratio);
-
         return { totalEarnedPoints, maxTotalPoints, awardedXP, questionScores };
     };
 
     const startTest = async () => {
-        try {
-            await document.documentElement.requestFullscreen();
-        } catch (err) {
-            console.error("Fullscreen request failed:", err);
-        }
+        try { await document.documentElement.requestFullscreen(); }
+        catch (err) { console.error("Fullscreen failed", err); }
         setTestState('active');
     };
 
     // Updated Start Button Logic
+    // Updated Start Button Logic
     if (testState === 'intro') {
-        const canStart = !isDisqualified && !isLoadingStatus;
+        const canStart = !isPermanentlyDisqualified && !isLoadingStatus;
 
         return (
             <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center p-4 overflow-y-auto no-scrollbar" data-lenis-prevent>
@@ -403,22 +317,31 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                     <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-blue-500 to-purple-500" />
 
                     {/* Disqualified Banner */}
-                    {isDisqualified && (
-                        <div className="absolute top-0 left-0 w-full bg-red-600/20 text-red-500 text-xs font-bold uppercase tracking-widest text-center py-1">
-                            Disqualified
+                    {isPermanentlyDisqualified && (
+                        <div className="absolute top-0 left-0 w-full bg-red-600/20 text-red-500 text-xs tracking-widest text-center py-1 font-black">
+                            Permanently Disqualified
+                        </div>
+                    )}
+                    {!isPermanentlyDisqualified && cheatAttempts > 0 && (
+                        <div className="absolute top-0 left-0 w-full bg-yellow-600/20 text-yellow-500 text-[10px] font-bold uppercase tracking-widest text-center py-1">
+                            Attempt {cheatAttempts}/{maxAttempts} Used
                         </div>
                     )}
 
                     <div className="text-center mb-6 pt-4">
                         <div className={cn(
                             "w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-4 border",
-                            isDisqualified ? "bg-red-500/10 border-red-500/20" : "bg-primary/10 border-primary/20"
+                            isPermanentlyDisqualified ? "bg-red-500/10 border-red-500/20" : "bg-primary/10 border-primary/20"
                         )}>
-                            {isDisqualified ? <Shield size={32} className="text-red-500" /> : <Brain size={32} className="text-primary" />}
+                            {isPermanentlyDisqualified ? <Shield size={32} className="text-red-500" /> : <Brain size={32} className="text-primary" />}
                         </div>
                         <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">{goal.title}</h2>
                         <p className="text-muted-foreground">
-                            {isDisqualified ? "You have been disqualified from this test." : "Ready to challenge yourself?"}
+                            {isPermanentlyDisqualified
+                                ? "You have been permanently disqualified from this test."
+                                : cheatAttempts > 0
+                                    ? `Careful! You've used ${cheatAttempts} of ${maxAttempts} attempts.`
+                                    : "Ready to challenge yourself?"}
                         </p>
                     </div>
 
@@ -442,19 +365,40 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                                     <Shield size={16} />
                                     Anti-Cheat Enabled
                                 </h3>
-                                <p className="text-xs text-red-300/80">
-                                    Strict mode active.
+                                <p className="text-xs text-red-300/80 leading-relaxed">
+                                    Strict mode active. Violation = 1 Attempt Loss.
                                     <br />
-                                    • Full Screen is REQUIRED.
+                                    • <span className="text-red-400 font-bold">Full Screen Required</span>: Do not exit until done.
                                     <br />
-                                    • Switching tabs/windows = Disqualification.
+                                    • <span className="text-red-400 font-bold">Focus Lock</span>: No tab/window switching.
                                     <br />
-                                    • Exiting Full Screen = Disqualification.
+                                    • <span className="text-red-400 font-bold">No Inspection</span>: Right-Click & DevTools (F12) are blocked.
+                                    <br />
+                                    • <span className="text-red-400 font-bold">Session Integrity</span>: Manipulating cookies or session will result in instant disqualification.
+                                    <br />
+                                    • <span className="text-red-400 font-bold">3 Strikes Policy</span>: Exhausting 3 attempts leads to permanent ban from this test.
                                 </p>
+                                <div className="mt-4 pt-4 border-t border-red-500/20">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs text-red-400 font-bold uppercase">Attempts Remaining</span>
+                                        <span className={cn(
+                                            "text-sm font-black px-2 py-0.5 rounded",
+                                            maxAttempts - cheatAttempts === 1 ? "bg-red-500 text-white animate-pulse" : "bg-red-500/20 text-red-500"
+                                        )}>
+                                            {maxAttempts - cheatAttempts} / {maxAttempts}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 h-1.5 bg-red-500/10 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-red-500 transition-all duration-500"
+                                            style={{ width: `${((maxAttempts - cheatAttempts) / maxAttempts) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         )}
 
-                        {!isDisqualified && (
+                        {!isPermanentlyDisqualified && (
                             <div className="bg-green-500/5 rounded-xl p-4 border border-green-500/10">
                                 <p className="text-sm text-green-400 text-center italic">
                                     "Theory is hard, but true mastery comes from deep understanding. You got this!"
@@ -463,13 +407,22 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                         )}
                     </div>
 
-                    <NeonButton
-                        className={cn("w-full justify-center", !canStart && "opacity-50 cursor-not-allowed hover:shadow-none hover:border-white/10 grayscale")}
-                        onClick={canStart ? startTest : undefined}
-                        disabled={!canStart}
-                    >
-                        {isLoadingStatus ? "Checking Status..." : (isDisqualified ? "Disqualified" : "Enter Full Screen & Start")}
-                    </NeonButton>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                            onClick={onClose}
+                            className="flex-1 px-6 py-3 rounded-xl border border-white/10 bg-white/5 text-white font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                        >
+                            <ArrowRight size={18} className="rotate-180" />
+                            Go Back
+                        </button>
+                        <NeonButton
+                            className={cn("flex-2 justify-center", !canStart && "opacity-50 cursor-not-allowed hover:shadow-none hover:border-white/10 grayscale")}
+                            onClick={canStart ? startTest : undefined}
+                            disabled={!canStart}
+                        >
+                            {isLoadingStatus ? "Checking Status..." : (isPermanentlyDisqualified ? "Permanently Disqualified" : "Enter Full Screen & Start")}
+                        </NeonButton>
+                    </div>
                 </motion.div>
             </div>
         );
@@ -496,7 +449,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                 >
                     <div className={cn(
                         "absolute top-0 left-0 w-full h-2 rounded-t-3xl",
-                        isDisqualified ? "bg-red-600" : (passed ? "bg-green-500" : "bg-red-500")
+                        isPermanentlyDisqualified ? "bg-red-600" : (passed ? "bg-green-500" : "bg-red-500")
                     )} />
 
                     <div className="flex-1 overflow-y-auto pr-2 no-scrollbar" data-lenis-prevent>
@@ -513,20 +466,27 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                         </div>
 
                         <h2 className="text-3xl font-bold mb-2 text-white">
-                            {isDisqualified
-                                ? "Disqualified!"
-                                : (passed
-                                    ? (goal.isExam ? "Exam Completed!" : "Goal Completed!")
-                                    : (goal.isExam ? "Exam Failed" : "Goal Failed")
+                            {isPermanentlyDisqualified
+                                ? "Permanently Disqualified!"
+                                : (isDisqualified
+                                    ? "Cheat Detected!"
+                                    : (passed
+                                        ? (goal.isExam ? "Exam Completed!" : "Goal Completed!")
+                                        : (goal.isExam ? "Exam Failed" : "Goal Failed")
+                                    )
                                 )
                             }
                         </h2>
                         <p className="text-muted-foreground mb-6">
-                            {isDisqualified
-                                ? "Anti-Cheat violation detected. Your test has been voided."
-                                : (passed
-                                    ? (goal.isExam ? "You passed the exam!" : `You mastered ${goal.title}!`)
-                                    : "Review your feedback and try again.")}
+                            {isPermanentlyDisqualified
+                                ? `Anti-Cheat violation detected. All ${maxAttempts} attempts have been exhausted. Permanent disqualification for this test.`
+                                : (isDisqualified
+                                    ? `Anti-Cheat violation detected! Attempt ${cheatAttempts}/${maxAttempts} consumed. You have ${maxAttempts - cheatAttempts} attempts left.`
+                                    : (passed
+                                        ? (goal.isExam ? "You passed the exam!" : `You mastered ${goal.title}!`)
+                                        : "Review your feedback and try again."
+                                    )
+                                )}
                         </p>
 
                         {/* XP & Score Summary */}
@@ -625,10 +585,6 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
             {/* Header */}
             <header className="h-20 border-b border-white/5 flex items-center justify-between px-6 md:px-12 relative z-10 bg-black/20 backdrop-blur-xl">
                 <div className="flex items-center gap-4">
-                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-                        <X size={20} className="text-muted-foreground" />
-                    </button>
-                    <div className="w-px h-8 bg-white/10 hidden md:block" />
                     <button
                         onClick={() => setIsIndexOpen(!isIndexOpen)}
                         className={cn(
@@ -758,7 +714,7 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                             >
                                 <div className="flex-1 text-center md:text-left">
                                     <div className="inline-block px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-[10px] font-bold text-primary uppercase tracking-widest mb-4">
-                                        Question {currentIndex + 1}
+                                        Question {currentIndex + 1} of {questions.length}
                                     </div>
                                     <h2 className="text-xl sm:text-2xl md:text-3xl font-bold leading-[1.2] tracking-tight bg-linear-to-b from-white to-white/70 bg-clip-text text-transparent">
                                         {currentQuestion.question}
@@ -868,21 +824,27 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                                     onClick={handlePrev}
                                     disabled={currentIndex === 0 || isSubmitting}
                                     className={cn(
-                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 w-full sm:w-auto justify-center",
-                                        (currentIndex === 0 || isSubmitting) ? "opacity-20 pointer-events-none" : "text-muted-foreground hover:text-white"
+                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all px-6 py-3 rounded-xl border w-full sm:w-auto justify-center",
+                                        (currentIndex === 0 || isSubmitting)
+                                            ? "opacity-20 border-white/5 text-muted-foreground pointer-events-none"
+                                            : "border-white/20 bg-white/5 text-white hover:bg-white/10 hover:border-white/40 shadow-sm"
                                     )}
                                 >
+                                    <ChevronRight size={16} className="rotate-180" />
                                     Prev
                                 </button>
                                 <button
                                     onClick={handleNext}
                                     disabled={currentIndex === questions.length - 1 || isSubmitting}
                                     className={cn(
-                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 w-full sm:w-auto justify-center",
-                                        (currentIndex === questions.length - 1 || isSubmitting) ? "opacity-20 pointer-events-none" : "text-muted-foreground hover:text-white"
+                                        "flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all px-8 py-3 rounded-xl w-full sm:w-auto justify-center",
+                                        (currentIndex === questions.length - 1 || isSubmitting)
+                                            ? "opacity-20 bg-white/5 text-muted-foreground pointer-events-none"
+                                            : "bg-primary text-black shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5 active:translate-y-0"
                                     )}
                                 >
                                     Next
+                                    <ChevronRight size={16} />
                                 </button>
                             </div>
 
@@ -891,13 +853,14 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                                     onClick={handleSubmitTest}
                                     disabled={isSubmitting || Object.values(userAnswers).filter(a => !!a.trim()).length === 0}
                                     className={cn(
-                                        "flex items-center gap-3 px-10 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all duration-500 shadow-lg w-full sm:w-auto justify-center",
-                                        "bg-linear-to-r from-primary to-blue-500 text-black shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5",
-                                        (isSubmitting || Object.values(userAnswers).filter(a => !!a.trim()).length === 0) && "opacity-20 grayscale pointer-events-none"
+                                        "flex items-center gap-3 px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all duration-300 w-full sm:w-auto justify-center border",
+                                        (isSubmitting || Object.values(userAnswers).filter(a => !!a.trim()).length === 0)
+                                            ? "opacity-20 border-white/5 text-muted-foreground pointer-events-none"
+                                            : "border-white/10 bg-white/5 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20"
                                     )}
                                 >
                                     Complete Session
-                                    <Zap size={14} fill="currentColor" />
+                                    <Zap size={14} className="opacity-50" />
                                 </button>
                             </div>
                         </div>

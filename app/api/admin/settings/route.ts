@@ -31,7 +31,8 @@ export async function GET() {
             key: 'global',
             value: 'system_global',
             maintenanceMode: false,
-            antiCheatEnabled: false
+            antiCheatEnabled: false,
+            enableDirectCaptions: false // Default OFF
         });
     }
     return NextResponse.json(setting);
@@ -43,13 +44,14 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { maintenanceMode, aiModel, antiCheatEnabled } = await req.json();
+        const { maintenanceMode, aiModel, antiCheatEnabled, enableDirectCaptions } = await req.json();
         await connectToDatabase();
 
         const updateData: any = {};
         if (maintenanceMode !== undefined) updateData.maintenanceMode = maintenanceMode;
         if (aiModel !== undefined) updateData.aiModel = aiModel;
         if (antiCheatEnabled !== undefined) updateData.antiCheatEnabled = antiCheatEnabled;
+        if (enableDirectCaptions !== undefined) updateData.enableDirectCaptions = enableDirectCaptions;
 
         // Ensure 'value' exists if upserting a new doc
         const setting = await SystemSetting.findOneAndUpdate(
@@ -58,11 +60,12 @@ export async function POST(req: Request) {
                 ...updateData,
                 $setOnInsert: { value: 'system_global' } // Satisfy required field on insert
             },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
+            { upsert: true, new: true, setDefaultsOnInsert: true, strict: false }
         );
 
         return NextResponse.json(setting);
     } catch (error) {
+        console.error("Admin Settings POST Error:", error);
         return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
     }
 }

@@ -9,7 +9,10 @@ export interface Exam {
     xp: number;
     rarity: Rarity;
     rarityPoints: number;
-    completed?: boolean;
+    completed: boolean;
+    status?: 'passed' | 'failed' | 'disqualified' | 'pending';
+    cheatAttempts?: number;
+    maxAttempts?: number;
 }
 
 export interface DailyGoal {
@@ -18,7 +21,10 @@ export interface DailyGoal {
     subject: string;
     description: string;
     xp: number;
-    completed?: boolean;
+    completed: boolean;
+    status?: 'passed' | 'failed' | 'disqualified' | 'pending';
+    cheatAttempts?: number;
+    maxAttempts?: number;
     duration: string;
     difficulty: 'Easy' | 'Medium' | 'Hard';
     questionsCount: number;

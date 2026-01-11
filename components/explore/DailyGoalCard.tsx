@@ -104,12 +104,28 @@ const DailyGoalCard = ({ goal, onStart }: DailyGoalCardProps) => {
                             <span className="text-xs font-bold uppercase tracking-wide">Done</span>
                         </div>
                     ) : (
-                        <button
-                            onClick={handleStart}
-                            className="flex-1 max-w-[120px] flex items-center justify-center gap-2 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 hover:shadow-[0_0_15px_rgba(0,240,255,0.2)] border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer group/btn">
-                            Start Test
-                            <ChevronRight size={14} className="group-hover/btn:translate-x-0.5 transition-transform" />
-                        </button>
+                        <div className="flex flex-col items-end gap-2 flex-1 max-w-[150px]">
+                            {goal.status === 'disqualified' ? (
+                                <div className="w-full text-center py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase tracking-wider">
+                                    Disqualified
+                                </div>
+                            ) : (
+                                <>
+                                    {goal.cheatAttempts !== undefined && goal.cheatAttempts > 0 && (
+                                        <span className="text-[10px] font-bold text-red-400/80 uppercase tracking-tighter">
+                                            Attempts: {goal.maxAttempts! - goal.cheatAttempts!}/{goal.maxAttempts}
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={handleStart}
+                                        className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 hover:shadow-[0_0_15px_rgba(0,240,255,0.2)] border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer group/btn"
+                                    >
+                                        {goal.cheatAttempts! > 0 ? "Retry" : "Start"}
+                                        <ChevronRight size={14} className="group-hover/btn:translate-x-0.5 transition-transform" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

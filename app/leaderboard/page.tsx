@@ -122,7 +122,11 @@ export default function LeaderboardPage() {
                                 >
                                     <Link href={`/user/${topThree[1].id}`} className="flex flex-col items-center group">
                                         <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-slate-300 bg-slate-900/50 backdrop-blur-md flex items-center justify-center mb-8 shadow-[0_0_20px_rgba(203,213,225,0.3)] relative cursor-pointer overflow-hidden">
-                                            <span className="text-2xl md:text-4xl font-bold text-slate-300">{topThree[1].avatar}</span>
+                                            {topThree[1].profileImage ? (
+                                                <img src={topThree[1].profileImage} alt={topThree[1].name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-2xl md:text-4xl font-bold text-slate-300">{topThree[1].avatar}</span>
+                                            )}
                                             <div className="absolute inset-0 bg-slate-300/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
                                         <div className="flex flex-col items-center p-6 bg-slate-900/40 backdrop-blur-xl border border-slate-500/30 rounded-t-3xl w-32 md:w-48 h-64 shadow-xl relative">
@@ -152,7 +156,11 @@ export default function LeaderboardPage() {
                                             <Crown className="w-12 h-12 text-yellow-400 fill-yellow-400/20 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
                                         </div>
                                         <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-yellow-400 bg-yellow-900/20 backdrop-blur-md flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(250,204,21,0.4)] relative cursor-pointer overflow-hidden ring-4 ring-yellow-400/20">
-                                            <span className="text-3xl md:text-5xl font-bold text-yellow-400">{topThree[0].avatar}</span>
+                                            {topThree[0].profileImage ? (
+                                                <img src={topThree[0].profileImage} alt={topThree[0].name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-3xl md:text-5xl font-bold text-yellow-400">{topThree[0].avatar}</span>
+                                            )}
                                             <div className="absolute inset-0 bg-yellow-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
                                         <div className="flex flex-col items-center p-8 bg-linear-to-b from-yellow-900/40 to-black/60 backdrop-blur-xl border border-yellow-500/30 rounded-t-3xl w-40 md:w-56 h-80 shadow-2xl relative">
@@ -182,7 +190,11 @@ export default function LeaderboardPage() {
                                 >
                                     <Link href={`/user/${topThree[2].id}`} className="flex flex-col items-center group">
                                         <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-amber-600 bg-amber-900/30 backdrop-blur-md flex items-center justify-center mb-8 shadow-[0_0_20px_rgba(217,119,6,0.3)] relative cursor-pointer overflow-hidden">
-                                            <span className="text-2xl md:text-4xl font-bold text-amber-600">{topThree[2].avatar}</span>
+                                            {topThree[2].profileImage ? (
+                                                <img src={topThree[2].profileImage} alt={topThree[2].name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-2xl md:text-4xl font-bold text-amber-600">{topThree[2].avatar}</span>
+                                            )}
                                             <div className="absolute inset-0 bg-amber-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
                                         <div className="flex flex-col items-center p-6 bg-amber-900/20 backdrop-blur-xl border border-amber-700/30 rounded-t-3xl w-32 md:w-48 h-56 shadow-xl relative">

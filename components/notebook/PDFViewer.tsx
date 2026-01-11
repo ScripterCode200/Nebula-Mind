@@ -5,7 +5,7 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import {
     RotateCw, Trash2, ChevronLeft, ChevronRight, Maximize2, Minimize2,
     Download, Settings, Share2, ZoomIn, ZoomOut, MousePointer2, Pen,
-    Highlighter, Eraser, Palette, Droplets, Sun,
+    Highlighter, Eraser, Palette, Droplets, Sun, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ResetAnnotationsModal from '@/components/modals/ResetAnnotationsModal';
@@ -55,6 +55,7 @@ const PDFViewer = ({ url, isMobile = false }: PDFViewerProps) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const [activePage, setActivePage] = useState<number>(1); // To track which page is active for Undo/Redo
+    const [currentPage, setCurrentPage] = useState<number>(1); // For display
 
     useEffect(() => {
         setNumPages(0);
@@ -201,7 +202,38 @@ const PDFViewer = ({ url, isMobile = false }: PDFViewerProps) => {
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 
     // Import PDFPage dynamically or normally? Normally is fine.
-    // Need to import PDFPage from './PDFPage'
+    // Page tracking intersection observer
+    useEffect(() => {
+        if (!numPages || !containerRef.current) return;
+
+        const observerOptions = {
+            root: containerRef.current,
+            threshold: 0.5, // 50% visibility
+        };
+
+        const callback = (entries: IntersectionObserverEntry[]) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    const pageNum = parseInt(entry.target.getAttribute('data-page-number') || '1');
+                    setCurrentPage(pageNum);
+                    setActivePage(pageNum);
+                }
+            });
+        };
+
+        const observer = new IntersectionObserver(callback, observerOptions);
+
+        // Wait for pages to render then observe
+        const timer = setTimeout(() => {
+            const pages = containerRef.current?.querySelectorAll('.pdf-page-container');
+            pages?.forEach(page => observer.observe(page));
+        }, 1000);
+
+        return () => {
+            clearTimeout(timer);
+            observer.disconnect();
+        };
+    }, [numPages, url]);
 
     return (
         <div className="flex flex-col h-full bg-[#0A0A0A] relative overflow-hidden group">
@@ -238,17 +270,22 @@ const PDFViewer = ({ url, isMobile = false }: PDFViewerProps) => {
                     >
                         {/* Render All Pages */}
                         {Array.from(new Array(numPages), (el, index) => (
-                            <PDFPage
+                            <div
                                 key={`page_${index + 1}`}
-                                pageNumber={index + 1}
-                                scale={scale}
-                                rotation={rotation}
-                                activeTool={activeTool}
-                                activeColor={activeColor}
-                                paths={paths[index + 1] || []}
-                                onPathsChange={(newPaths) => handlePathsChange(index + 1, newPaths)}
-                                onPageInteract={() => setActivePage(index + 1)}
-                            />
+                                className="pdf-page-container"
+                                data-page-number={index + 1}
+                            >
+                                <PDFPage
+                                    pageNumber={index + 1}
+                                    scale={scale}
+                                    rotation={rotation}
+                                    activeTool={activeTool}
+                                    activeColor={activeColor}
+                                    paths={paths[index + 1] || []}
+                                    onPathsChange={(newPaths) => handlePathsChange(index + 1, newPaths)}
+                                    onPageInteract={() => setActivePage(index + 1)}
+                                />
+                            </div>
                         ))}
                     </Document>
                 </div>
@@ -503,11 +540,26 @@ const PDFViewer = ({ url, isMobile = false }: PDFViewerProps) => {
                                                     </div>
 
                                                     <button onClick={() => setIsResetModalOpen(true)} className="p-3 rounded-xl bg-red-500/10 text-red-400"><Trash2 size={18} /></button>
+
+                                                    {/* Page Number Mobile */}
+                                                    <div className="flex flex-col items-center bg-white/5 px-4 py-2 rounded-xl min-w-[80px]">
+                                                        <span className="text-[9px] font-black text-primary uppercase tracking-widest leading-none mb-1">Page</span>
+                                                        <span className="text-sm font-black text-white leading-none">{currentPage} <span className="text-white/30 text-[10px]">/ {numPages}</span></span>
+                                                    </div>
                                                 </div>
                                             </>
                                         ) : (
                                             // DESKTOP LAYOUT (Original)
                                             <>
+                                                {/* Page Number Desktop */}
+                                                <div className="flex flex-col items-center px-3 border-r border-white/10 shrink-0">
+                                                    <span className="text-[8px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-1">Navigator</span>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="text-sm font-black text-white leading-none">{currentPage}</span>
+                                                        <span className="text-[10px] font-bold text-muted-foreground leading-none">/ {numPages}</span>
+                                                    </div>
+                                                </div>
+
                                                 {/* Zoom */}
                                                 <div className="flex items-center gap-0.5 md:gap-1 px-1 md:px-2 border-r border-white/10 shrink-0">
                                                     <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-1.5 md:p-2 rounded-xl hover:bg-white/10 text-white transition-colors">
@@ -581,6 +633,7 @@ const PDFViewer = ({ url, isMobile = false }: PDFViewerProps) => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
 
             {/* Show Toolbar Button (when hidden) */}
             {/* ... same ... */}

@@ -116,6 +116,7 @@ export default async function NotebookPage({ params }: PageProps) {
         })) : [],
         fileType: notebook.fileType || 'pdf',
         contentHtml: notebook.contentHtml || '',
+        contentKey: notebook.contentKey,
     };
 
 

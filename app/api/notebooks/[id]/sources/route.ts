@@ -40,26 +40,46 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         let finalContentKey = contentKeyInput;
 
         // 1. Handle File Upload (PDF)
-        // 1. Handle File (PDF)
+        // 1. Handle File (PDF or Docx)
         if (file) {
-            fileKey = `notebooks/${uuidv4()}.pdf`;
+            // Sanitize filename
+            const cleanName = (name || file.name)
+                .replace(/[^a-zA-Z0-9.\-_]/g, '')
+                .replace(/\s+/g, '_');
+
+            const extension = cleanName.split('.').pop()?.toLowerCase() || 'pdf';
+            const uuid = uuidv4();
+            fileKey = `notebooks/${uuid}.${extension}`;
+
+            let contentType = 'application/pdf';
+            if (extension === 'docx') {
+                contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            } else if (extension === 'doc') {
+                contentType = 'application/msword';
+            }
+
             const fileBuffer = Buffer.from(await file.arrayBuffer());
 
             await r2Client.send(new PutObjectCommand({
                 Bucket: R2_BUCKET_NAME,
                 Key: fileKey,
                 Body: fileBuffer,
-                ContentType: 'application/pdf',
+                ContentType: contentType,
+                ContentDisposition: `inline; filename="${cleanName}"`
             }));
         }
 
-        // 2. Handle Text Content (Fallback if no contentKey yet)
-        if (textContent && !finalContentKey) {
+        // 2. Handle Text Content
+        // If we have textContent, upload it.
+        // If we DON'T have textContent/contentKey but we processed a file, we MUST generate a contentKey for the schema.
+        if (!finalContentKey) {
             finalContentKey = `notebooks/${uuidv4()}_content.txt`;
+            const contentToUpload = textContent || '(No text content extracted)';
+
             await r2Client.send(new PutObjectCommand({
                 Bucket: R2_BUCKET_NAME,
                 Key: finalContentKey,
-                Body: textContent,
+                Body: contentToUpload,
                 ContentType: 'text/plain',
             }));
         }
@@ -69,7 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         // Legacy Migration
         if (notebook.sources.length === 0 && notebook.pdfUrl) {
             notebook.sources.push({
-                type: 'pdf',
+                type: notebook.fileType || 'pdf', // Fix: Use actual notebook type instead of hardcoded 'pdf'
                 name: notebook.title || 'Original Document',
                 fileKey: notebook.pdfKey,
                 contentKey: notebook.contentKey,
@@ -96,5 +116,136 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     } catch (error: any) {
         console.error('Add Source Error:', error);
         return NextResponse.json({ error: 'Failed to add source', details: error.message }, { status: 500 });
+    }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        await connectToDatabase();
+        const { id } = await params;
+        const { searchParams } = new URL(req.url);
+        const sourceId = searchParams.get('sourceId');
+
+        if (!sourceId) {
+            return NextResponse.json({ error: 'Missing sourceId' }, { status: 400 });
+        }
+
+        const notebook = await Notebook.findById(id);
+        if (!notebook) {
+            return NextResponse.json({ error: 'Notebook not found' }, { status: 404 });
+        }
+
+        // Find the source to get its keys for cleanup
+        const sourceToDelete = (notebook.sources as any[]).find(s => s._id.toString() === sourceId);
+
+        if (!sourceToDelete) {
+            return NextResponse.json({ error: 'Source not found in notebook' }, { status: 404 });
+        }
+
+        // 1. Remove from database
+        notebook.sources = notebook.sources.filter((s: any) => s._id.toString() !== sourceId);
+        await notebook.save();
+
+        // 2. Optional: Cleanup R2 files
+        try {
+            // Only delete File Key if present (User Uploads)
+            if (sourceToDelete.fileKey) {
+                const { DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+                await r2Client.send(new DeleteObjectCommand({
+                    Bucket: R2_BUCKET_NAME,
+                    Key: sourceToDelete.fileKey
+                }));
+            }
+
+            // Only delete Content Key if NOT a global cached transcript
+            if (sourceToDelete.contentKey) {
+                const CachedTranscript = (await import('@/models/CachedTranscript')).default;
+                const isCached = await CachedTranscript.exists({ r2Key: sourceToDelete.contentKey });
+
+                if (isCached) {
+                    console.log(`[DELETE CANCELED] Source ${sourceId} uses shared cache ${sourceToDelete.contentKey}. Retaining R2 file.`);
+                } else {
+                    const { DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+                    await r2Client.send(new DeleteObjectCommand({
+                        Bucket: R2_BUCKET_NAME,
+                        Key: sourceToDelete.contentKey
+                    }));
+                }
+            }
+        } catch (cleanupErr) {
+            console.error('Cleanup R2 error:', cleanupErr);
+            // Don't fail the request if cleanup fails
+        }
+
+        return NextResponse.json({ success: true });
+
+    } catch (error: any) {
+        console.error('Delete Source Error:', error);
+        return NextResponse.json({ error: 'Failed to delete source', details: error.message }, { status: 500 });
+    }
+}
+
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        await connectToDatabase();
+        const { id } = await params;
+        const { sourceId, textContent } = await req.json();
+
+        if (!sourceId || !textContent) {
+            return NextResponse.json({ error: 'Missing sourceId or textContent' }, { status: 400 });
+        }
+
+        const notebook = await Notebook.findById(id);
+        if (!notebook) {
+            return NextResponse.json({ error: 'Notebook not found' }, { status: 404 });
+        }
+
+        const sourceIndex = (notebook.sources as any[]).findIndex(s => s._id.toString() === sourceId);
+        if (sourceIndex === -1) {
+            return NextResponse.json({ error: 'Source not found' }, { status: 404 });
+        }
+
+        const source = notebook.sources[sourceIndex];
+        const currentKey = source.contentKey;
+
+        // Fork Logic
+        let newKey = currentKey;
+        let isShared = false;
+
+        // Check if shared
+        if (currentKey) {
+            const CachedTranscript = (await import('@/models/CachedTranscript')).default;
+            isShared = !!(await CachedTranscript.exists({ r2Key: currentKey }));
+        }
+
+        if (isShared || !currentKey) {
+            // FORK: Create new private key
+            const uuid = uuidv4();
+            newKey = `notebooks/${uuid}_fork.txt`;
+            console.log(`[Forking] Source ${sourceId} is shared. Creating private fork: ${newKey}`);
+        } else {
+            // PRIVATE: Overwrite existing
+            console.log(`[Overwriting] Source ${sourceId} is private. Updating: ${currentKey}`);
+        }
+
+        // Upload to R2
+        await r2Client.send(new PutObjectCommand({
+            Bucket: R2_BUCKET_NAME,
+            Key: newKey,
+            Body: textContent,
+            ContentType: 'text/plain',
+        }));
+
+        // Update Notebook source reference
+        notebook.sources[sourceIndex].contentKey = newKey;
+        // Mark as modified if schema supports it, or just for tracking
+        notebook.markModified('sources');
+        await notebook.save();
+
+        return NextResponse.json({ success: true, newKey });
+
+    } catch (error: any) {
+        console.error('Update Source Error:', error);
+        return NextResponse.json({ error: 'Failed to update source', details: error.message }, { status: 500 });
     }
 }

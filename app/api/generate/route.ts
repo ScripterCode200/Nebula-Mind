@@ -117,9 +117,8 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
                     console.log('[Generate API Helper] Falling back to gemini-2.0-flash...');
                     result = await runGenerate("gemini-2.0-flash");
                 } catch (e) {
-                    // 2. If 2.0 fails, try 1.5-flash-002 as last resort
-                    console.log('[Generate API Helper] Falling back to gemini-1.5-flash-002...');
-                    result = await runGenerate("gemini-1.5-flash-002");
+                    // 2. If 2.0 fails, throw
+                    throw e;
                 }
             } else {
                 // Legacy fallback for 2.0
@@ -127,8 +126,7 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
                     console.log('[Generate API Helper] Falling back to gemini-2.0-flash-001...');
                     result = await runGenerate("gemini-2.0-flash-001");
                 } catch (previewError: any) {
-                    console.log('[Generate API Helper] Falling back to gemini-1.5-flash-002...');
-                    result = await runGenerate("gemini-1.5-flash-002");
+                    throw previewError;
                 }
             }
         }

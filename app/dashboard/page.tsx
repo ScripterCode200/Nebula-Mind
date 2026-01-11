@@ -14,6 +14,8 @@ import Link from 'next/link';
 import { useUserStore } from '@/store/useUserStore';
 import RarityStats from '@/components/ui/RarityStats';
 
+import { toast } from 'sonner';
+
 export default function DashboardPage() {
     const { name } = useUserStore();
     const [loading, setLoading] = useState(true);
@@ -105,8 +107,7 @@ export default function DashboardPage() {
                                 onClick={() => {
                                     if (data?.user?._id) {
                                         navigator.clipboard.writeText(data.user._id);
-                                        // Ideally show a toast here, but for now simple feedback
-                                        alert('Nebula ID copied to clipboard!');
+                                        toast.success('text copied');
                                     }
                                 }}
                                 className="p-2 hover:bg-white/10 rounded-lg transition-colors text-muted-foreground hover:text-primary"

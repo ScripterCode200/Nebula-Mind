@@ -170,7 +170,8 @@ const CreateNotebookModal = ({ isOpen, onClose }: CreateNotebookModalProps) => {
                 }
 
                 // Optional: Save video ID/URL as metadata?
-                // formData.append('youtubeUrl', youtubeUrl);
+                formData.append('pdfUrl', youtubeUrl);
+                formData.append('type', 'youtube');
 
             } else {
                 // File/PDF Logic

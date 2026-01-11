@@ -20,6 +20,10 @@ const TestResultSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    cheatAttempts: {
+        type: Number,
+        default: 0
+    },
     completedAt: {
         type: Date,
         default: Date.now

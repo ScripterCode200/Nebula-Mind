@@ -59,8 +59,10 @@ export default function AdminPage() {
     const [users, setUsers] = useState<any[]>([]);
     const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [antiCheatEnabled, setAntiCheatEnabled] = useState(false);
+    const [enableDirectCaptions, setEnableDirectCaptions] = useState(false); // Strategy 1
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
 
     // Modal State
     const [modalConfig, setModalConfig] = useState<{
@@ -99,6 +101,7 @@ export default function AdminPage() {
                 const settings = await settingsRes.json();
                 setMaintenanceMode(settings.maintenanceMode);
                 setAntiCheatEnabled(settings.antiCheatEnabled);
+                setEnableDirectCaptions(settings.enableDirectCaptions ?? false); // Default OFF
             }
         } catch (error) {
             console.error('Failed to refresh admin data');
@@ -252,6 +255,37 @@ export default function AdminPage() {
         });
     };
 
+    const toggleDirectCaptionsClick = () => {
+        const newState = !enableDirectCaptions;
+        confirmAction({
+            title: newState ? 'ENABLE FAST SCRAPING' : 'DISABLE FAST SCRAPING',
+            message: newState
+                ? 'Enabling Strategy 1 (Direct Captions). Ensure compliance with YouTube ToS.'
+                : 'Disabling Strategy 1. System will fallback to AI-only transcription (Safer).',
+            type: newState ? 'warning' : 'info',
+            actionLabel: newState ? 'Enable' : 'Disable',
+            onConfirm: async () => {
+                try {
+                    setEnableDirectCaptions(newState);
+                    const res = await fetch('/api/admin/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enableDirectCaptions: newState })
+                    });
+                    if (res.ok) {
+                        toast.success(`Fast Scraping ${newState ? 'Enabled' : 'Disabled'}`);
+                    } else {
+                        setEnableDirectCaptions(!newState);
+                        toast.error('Failed to update setting');
+                    }
+                } catch (error) {
+                    setEnableDirectCaptions(!enableDirectCaptions);
+                    toast.error('Failed to update setting');
+                }
+            }
+        });
+    };
+
     const filteredUsers = users.filter(u =>
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -348,6 +382,20 @@ export default function AdminPage() {
                             Maintenance
                             <div className={cn("w-2 h-2 rounded-full ml-2 animate-pulse", maintenanceMode ? "bg-red-500 shadow-[0_0_10px_currentColor]" : "bg-white/20")} />
                         </button>
+
+                        <button
+                            onClick={toggleDirectCaptionsClick}
+                            className={cn(
+                                "flex items-center gap-3 px-6 py-3 rounded-lg border transition-all duration-300 font-mono text-sm uppercase tracking-wider relative overflow-hidden group",
+                                enableDirectCaptions
+                                    ? "bg-amber-500/10 border-amber-500/50 text-amber-400 shadow-[0_0_20px_-5px_rgba(251,191,36,0.3)]"
+                                    : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10"
+                            )}
+                        >
+                            <Zap size={18} />
+                            Fast Scraping
+                            <div className={cn("w-2 h-2 rounded-full ml-2", enableDirectCaptions ? "bg-amber-500 shadow-[0_0_10px_currentColor]" : "bg-white/20")} />
+                        </button>
                     </div>
 
                     {/* Search */}
@@ -388,7 +436,10 @@ export default function AdminPage() {
                                             initial={{ opacity: 0, x: -20 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             transition={{ delay: idx * 0.05 }}
-                                            className="border-b border-white/5 hover:bg-white/5 transition-colors group"
+                                            className={cn(
+                                                "border-b border-white/5 hover:bg-white/5 transition-colors group",
+                                                activeDropdownId === user._id ? "relative z-50 bg-white/5" : "relative z-0"
+                                            )}
                                         >
                                             <td className="p-4 md:p-6">
                                                 <div className="flex items-center gap-4">
@@ -418,6 +469,7 @@ export default function AdminPage() {
                                                     <FuturisticDropdown
                                                         value={user.role}
                                                         onChange={(val) => handleRoleUpdate(user._id, val)}
+                                                        onOpenChange={(open) => setActiveDropdownId(open ? user._id : null)}
                                                         options={[
                                                             { value: 'user', label: 'User', icon: <User size={12} />, color: 'blue' },
                                                             { value: 'editor', label: 'Editor', icon: <Edit size={12} />, color: 'purple' },

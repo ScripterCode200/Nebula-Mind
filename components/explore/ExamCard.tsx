@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Clock, Zap, Star } from 'lucide-react';
+import { Clock, Zap, Star, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Exam, Rarity } from '@/app/explore/types';
@@ -75,18 +75,40 @@ const ExamCard = ({ exam }: ExamCardProps) => {
                     </div>
                 </div>
 
-                <button
-                    onClick={() => !exam.completed && router.push(`/test/${exam.id}`)}
-                    disabled={exam.completed}
-                    className={cn(
-                        "w-full py-2.5 mt-2 rounded-xl font-semibold text-sm transition-colors",
-                        !exam.completed && "hover:brightness-110 active:scale-95 cursor-pointer",
-                        exam.completed
-                            ? "bg-green-500/10 border-green-500/20 text-green-500 cursor-not-allowed opacity-80"
-                            : "bg-black/50 border border-white/10 hover:bg-white/10 text-white"
-                    )}>
-                    {exam.completed ? "Completed" : "Start Exam"}
-                </button>
+                <div className="flex flex-col gap-2">
+                    {exam.completed ? (
+                        <div className="w-full py-2.5 mt-2 rounded-xl font-semibold text-sm bg-green-500/10 border border-green-500/20 text-green-500 flex items-center justify-center gap-2">
+                            <CheckCircle size={14} />
+                            Completed
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {exam.status === 'disqualified' ? (
+                                <div className="w-full py-2.5 mt-2 rounded-xl font-semibold text-sm bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center">
+                                    Permanently Disqualified
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">Attempts Remaining</span>
+                                        <span className={cn(
+                                            "text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider",
+                                            (exam.cheatAttempts || 0) >= 2 ? "bg-red-500 text-white" : "bg-white/10 text-white"
+                                        )}>
+                                            {3 - (exam.cheatAttempts || 0)}/3
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => router.push(`/test/${exam.id}`)}
+                                        className="w-full py-2.5 rounded-xl font-semibold text-sm transition-colors bg-black/50 border border-white/10 hover:bg-white/10 text-white hover:brightness-110 active:scale-95 cursor-pointer"
+                                    >
+                                        {(exam.cheatAttempts || 0) > 0 ? "Retry Exam" : "Start Exam"}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </motion.div>
     );

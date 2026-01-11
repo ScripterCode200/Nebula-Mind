@@ -41,12 +41,17 @@ export async function GET(request: Request) {
         // Standardize User ID
         const activeUserId = String(userPayload.userId || userPayload.id || userPayload.sub);
 
+        console.log(`[Status API] GoalId: ${goalId}, UserId: ${activeUserId}`);
+
         // Set a timeout for the DB query to prevent hanging
         const result = await TestResult.findOne({ userId: activeUserId, goalId }).maxTimeMS(3000);
+        console.log(`[Status API] Found result: ${!!result}, status: ${result?.status}, cheatAttempts: ${result?.cheatAttempts || 0}`);
 
         return NextResponse.json({
             status: result ? result.status : 'pending',
-            score: result ? result.score : 0
+            score: result ? result.score : 0,
+            cheatAttempts: result ? result.cheatAttempts : 0,
+            maxAttempts: 3
         });
 
     } catch (error) {

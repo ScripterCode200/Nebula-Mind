@@ -77,18 +77,28 @@ export async function GET() {
         console.log(`  Found Goals: ${goals.length}`);
 
         if (goals.length > 0) {
-            // Check Completion Status
+            // Check Status for all goals
             const results = await TestResult.find({
                 userId: userId,
-                goalId: { $in: goals.map((g: any) => g._id.toString()) },
-                status: 'passed'
+                goalId: { $in: goals.map((g: any) => g._id.toString()) }
             }).lean();
 
-            const completedIds = results.map((r: any) => r.goalId.toString());
+            const resultMap = new Map();
+            results.forEach((r: any) => resultMap.set(r.goalId.toString(), r));
 
-            const uncompletedGoals = goals.filter((g: any) => !completedIds.includes(g._id.toString()));
+            const goalsWithStatus = goals.map((g: any) => {
+                const res = resultMap.get(g._id.toString());
+                return {
+                    ...g,
+                    id: g._id.toString(),
+                    completed: res?.status === 'passed',
+                    status: res?.status || 'pending',
+                    cheatAttempts: res?.cheatAttempts || 0,
+                    maxAttempts: 3
+                };
+            });
 
-            return NextResponse.json({ goals: uncompletedGoals });
+            return NextResponse.json({ goals: goalsWithStatus });
         }
 
         // Return empty if no goals found (Frontend will handle generation)

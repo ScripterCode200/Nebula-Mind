@@ -387,7 +387,7 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
 
     return (
         <div className="h-full p-4 overflow-y-auto flex flex-col relative overflow-x-hidden overscroll-contain" data-lenis-prevent>
-            <div className="shrink-0 mb-4 flex justify-between items-center">
+            <div className="shrink-0 mb-4 flex justify-between items-center relative z-20">
                 <div>
                     <h2 className="text-lg font-bold mb-1 text-glow">Mock Test</h2>
                     <p className="text-muted text-xs">Test your knowledge with AI-generated questions.</p>

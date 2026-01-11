@@ -39,21 +39,51 @@ export async function POST(request: Request) {
         // Standardize User ID
         const activeUserId = String(userPayload.userId || userPayload.id || userPayload.sub);
 
-        // Check if already taken
+        console.log(`[Evaluate API] GoalId: ${goalId}, UserId: ${activeUserId}, isDisqualified: ${isDisqualified}`);
+
+        // Check if already passed or permanently disqualified
         const existingResult = await TestResult.findOne({ userId: activeUserId, goalId });
-        if (existingResult && existingResult.status === 'disqualified') {
-            return NextResponse.json({ error: 'You have been disqualified from this test.' }, { status: 403 });
+        console.log(`[Evaluate API] Existing result found: ${!!existingResult}, current cheatAttempts: ${existingResult?.cheatAttempts || 0}`);
+        if (existingResult) {
+            if (existingResult.status === 'disqualified') {
+                return NextResponse.json({
+                    error: 'You have been permanently disqualified from this test due to multiple anti-cheat violations.',
+                    isPermanentlyDisqualified: true
+                }, { status: 403 });
+            }
+            if (existingResult.status === 'passed') {
+                return NextResponse.json({
+                    error: 'You have already passed this test.',
+                    status: 'passed'
+                }, { status: 403 });
+            }
         }
 
-        // Handle Disqualification Submission
+        // Handle Disqualification Submission (One cheat detected)
         if (isDisqualified) {
-            await TestResult.create({
-                userId: activeUserId,
-                goalId,
-                status: 'disqualified',
-                score: 0
+            const currentAttempts = (existingResult?.cheatAttempts || 0) + 1;
+            const maxAttempts = 3;
+            const isPermanentlyBlocked = currentAttempts >= maxAttempts;
+
+            const updatedResult = await TestResult.findOneAndUpdate(
+                { userId: activeUserId, goalId },
+                {
+                    $set: {
+                        status: isPermanentlyBlocked ? 'disqualified' : 'failed',
+                        score: 0,
+                        completedAt: new Date()
+                    },
+                    $inc: { cheatAttempts: 1 }
+                },
+                { upsert: true, new: true }
+            );
+
+            return NextResponse.json({
+                message: isPermanentlyBlocked ? 'Permanently Disqualified' : 'Cheat Detected',
+                cheatAttempts: updatedResult.cheatAttempts,
+                maxAttempts,
+                isPermanentlyBlocked
             });
-            return NextResponse.json({ message: 'Disqualification recorded' });
         }
 
         if (!goalId || !submissions || !Array.isArray(submissions)) {
@@ -62,19 +92,13 @@ export async function POST(request: Request) {
 
         let goal = await DailyGoal.findById(goalId).lean();
         let isExam = false;
-
         if (!goal) {
             goal = await Exam.findById(goalId).lean();
-            if (goal) isExam = true;
+            isExam = true;
         }
 
-        // Robust check: if it has rarity, it's an exam
-        if (goal && (goal as any).rarity) {
-            isExam = true;
-            console.log("Identified as Exam via rarity:", (goal as any).rarity);
-        }
         if (!goal) {
-            return NextResponse.json({ error: 'Goal/Exam not found' }, { status: 404 });
+            return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
         }
 
         // Evaluation Logic
@@ -151,16 +175,21 @@ export async function POST(request: Request) {
         const passedCount = evaluations.filter((e: any) => e.isCorrect).length;
         const totalScore = passedCount;
         const passed = (passedCount / (goal as any).questions.length) >= 0.6;
+        const currentAttempts = (existingResult?.cheatAttempts || 0) + 1;
+        const maxAttempts = 3;
+        const isPermanentlyBlocked = currentAttempts >= maxAttempts && !passed;
 
-        // Update or Create Result
-        await TestResult.findOneAndUpdate(
+        const updatedResult = await TestResult.findOneAndUpdate(
             { userId: activeUserId, goalId },
             {
-                status: passed ? 'passed' : 'failed',
-                score: totalScore,
-                completedAt: new Date()
+                $set: {
+                    status: passed ? 'passed' : (isPermanentlyBlocked ? 'disqualified' : 'failed'),
+                    score: totalScore,
+                    completedAt: new Date()
+                },
+                $inc: { cheatAttempts: 1 }
             },
-            { upsert: true }
+            { upsert: true, new: true }
         );
 
         // Update User Stats (XP or Rarity Points)
@@ -200,11 +229,16 @@ export async function POST(request: Request) {
                     user.stats.level = calculateLevel(user.stats.xp);
                 }
                 await user.save();
-
             }
         }
 
-        return NextResponse.json({ evaluations, rewardType, rewardValue });
+        return NextResponse.json({
+            evaluations,
+            rewardType,
+            rewardValue,
+            cheatAttempts: updatedResult.cheatAttempts,
+            maxAttempts: 3
+        });
 
     } catch (error) {
         console.error('Error in evaluation API:', error);

@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
         const pdfUrlInput = formData.get('pdfUrl') as string;
         const fileKeyInput = formData.get('fileKey') as string;
         let finalContentKey = formData.get('contentKey') as string;
+        let incomingType = formData.get('type') as string;
 
         if (!title || (!file && !pdfUrlInput && !fileKeyInput && !finalContentKey)) {
             return NextResponse.json({ error: 'Title and either File, URL, FileKey, or ContentKey are required' }, { status: 400 });
@@ -46,11 +47,16 @@ export async function POST(req: NextRequest) {
         }
 
         let buffer: Buffer | undefined;
-        let fileType: 'pdf' | 'docx' | 'text' = finalContentKey ? 'text' : 'pdf';
+        let fileType: 'pdf' | 'docx' | 'text' | 'youtube' = finalContentKey ? 'text' : 'pdf';
+
+        if (incomingType === 'youtube' || (pdfUrlInput && (pdfUrlInput.includes('youtube.com') || pdfUrlInput.includes('youtu.be')))) {
+            fileType = 'youtube';
+        }
+
         let contentHtml = '';
         let pdfContent = '';
 
-        // 1. Get File Buffer
+        // 1. Get File Buffer (Skip for YouTube)
         if (file) {
             const arrayBuffer = await file.arrayBuffer();
             buffer = Buffer.from(arrayBuffer);
@@ -61,7 +67,7 @@ export async function POST(req: NextRequest) {
             if (isDocx) {
                 fileType = 'docx';
             }
-        } else if (pdfUrlInput) {
+        } else if (pdfUrlInput && fileType !== 'youtube') {
             // Fetch from URL
             const response = await fetch(pdfUrlInput);
             if (!response.ok) {

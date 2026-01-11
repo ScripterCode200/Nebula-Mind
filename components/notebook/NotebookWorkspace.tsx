@@ -7,6 +7,8 @@ import { ArrowLeft, Sparkles, PanelLeftClose, PanelLeftOpen, Share2, Menu, X, Fi
 import dynamic from 'next/dynamic';
 import AIToolsPanel from './AIToolsPanel';
 import ShareNotebookModal from './ShareNotebookModal';
+import DuplicateSourceModal from './DuplicateSourceModal'; // Added
+import { toast } from 'sonner';
 
 const PDFViewer = dynamic(() => import('./PDFViewer'), {
     ssr: false,
@@ -57,10 +59,11 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
         if (notebook.pdfUrl) {
             return [{
                 _id: 'default-source',
-                type: 'pdf',
+                type: notebook.fileType || 'pdf',
                 name: notebook.title || 'Main Document', // Use notebook title as default name
                 url: notebook.pdfUrl,
-                fileKey: (notebook as any).pdfKey, // Type assertion if key missing in type def
+                fileKey: (notebook as any).pdfKey,
+                contentKey: (notebook as any).contentKey,
                 addedAt: new Date().toISOString()
             }];
         }
@@ -101,7 +104,32 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
     }, [activeSourceId, sources]);
 
     const activePdfUrl = activeSource?.url || notebook.pdfUrl;
-    const activeSourceType = activeSource?.type || notebook.fileType || 'pdf';
+
+    // Robust Type Detection:
+    // If explicit type is set, use it.
+    // Fallback: If no fileKey but has contentKey, assume text (fixes migration bug).
+    // Default: 'pdf'
+    let derivedType = activeSource?.type || notebook.fileType || 'pdf';
+
+    // Fix for legacy items migrated with type='pdf' but are actually text/youtube
+    if (derivedType === 'pdf' && !activeSource?.fileKey && activeSource?.contentKey) {
+        derivedType = 'text';
+    }
+
+    const activeSourceType = derivedType;
+
+    const activeContentKey = activeSource?.contentKey || (activeSourceId === 'default-source' ? (notebook as any).contentKey : null);
+    const textViewerUrl = activeContentKey
+        ? `/api/r2/download?key=${encodeURIComponent(activeContentKey)}`
+        : activePdfUrl;
+
+    console.log('[NotebookWorkspace] Debug:', {
+        activeSourceId,
+        activeSourceType: activeSource?.type,
+        notebookFileType: notebook.fileType,
+        FINAL_TYPE: activeSourceType,
+        textViewerUrl
+    });
 
     React.useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -122,12 +150,70 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    const [duplicateSourceId, setDuplicateSourceId] = React.useState<string | null>(null);
+    const [isDuplicateModalOpen, setIsDuplicateModalOpen] = React.useState(false);
+    const [enableDirectCaptions, setEnableDirectCaptions] = React.useState(false);
+
+    // Load Global Settings
+    React.useEffect(() => {
+        fetch('/api/admin/settings')
+            .then(res => res.json())
+            .then(data => {
+                if (data.enableDirectCaptions !== undefined) {
+                    setEnableDirectCaptions(data.enableDirectCaptions);
+                }
+            })
+            .catch(err => console.error('Failed to load settings:', err));
+    }, []);
+
+    const toggleDirectCaptions = async () => {
+        const newState = !enableDirectCaptions;
+        setEnableDirectCaptions(newState); // Optimistic UI
+        try {
+            await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enableDirectCaptions: newState })
+            });
+            toast.success(`Fast Scraping ${newState ? 'Enabled' : 'Disabled'}`);
+        } catch (error) {
+            console.error('Failed to save setting:', error);
+            setEnableDirectCaptions(!newState); // Revert
+            toast.error('Failed to save setting');
+        }
+    };
+
+    // ... (rest of useEffects)
+
     const handleAddYoutube = async (url: string) => {
+        // 0. Duplicate Check
+        try {
+            // Dynamic import to avoid SSR issues if utility was heavy (it's not, but consistency)
+            const { extractVideoId } = await import('@/lib/youtube-utils');
+            const newVideoId = extractVideoId(url);
+
+            if (newVideoId) {
+                const existingSource = sources.find(s => {
+                    const sId = extractVideoId(s.url || '');
+                    return sId === newVideoId;
+                });
+
+                if (existingSource) {
+                    setDuplicateSourceId(existingSource._id);
+                    setIsDuplicateModalOpen(true);
+                    return; // STOP here
+                }
+            }
+        } catch (e) {
+            console.warn('Duplicate check failed, proceeding anyway', e);
+        }
+
         setIsAddingSource(true);
         setTranscribeProgress(0);
         setVideoInfo(null);
 
         try {
+            // ... (rest of function)
             // 1. Get Metadata
             setLoadingStep('Fetching Video Info...');
             const infoRes = await fetch('/api/transcribe/info', {
@@ -202,52 +288,122 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
 
     const handleAddSource = async (file: File) => {
         setIsAddingSource(true);
-        const formData = new FormData();
-        formData.append('file', file);
-        // ... (rest of existing logic)
-        formData.append('textContent', 'Extracting text on client is hard, ideally backend does it or we use pdfjs here.');
+        setTranscribeProgress(0);
 
         try {
-            // ... (existing PDF logic)
-            // Or better: Let's assume the user just wants the PDF for now and we'll fix text parsing later
-            // But the backend REQUIREMENTS say 'textContent' is needed.
-            // Let's implement a quick extract using the existing utility we have in CreateNotebookModal?
-            // Actually, we can't easily reuse that hook here without refactoring.
-            // For this iteration, we'll send a placeholder and maybe trigger a server-side parse if we had one.
-            // Or better, we import pdfjs dynamically here.
-            // ...
+            const isDocx = file.name.endsWith('.docx') || file.name.endsWith('.doc') || file.type.includes('word');
+            const fileType = isDocx ? 'docx' : 'pdf';
+            let uploadedText = '';
 
-            // Re-using existing simplified logic from original file for now to minimize diff risk
-            let text = "";
-            try {
-                const pdfjs = await import('pdfjs-dist');
-                pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjs.getDocument(arrayBuffer).promise;
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    text += content.items.map((item: any) => item.str).join(' ') + '\n';
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', fileType);
+            formData.append('name', file.name);
+
+            // Client-side text extraction
+            setLoadingStep(isDocx ? 'Extracting text...' : 'Processing PDF...');
+
+            if (isDocx) {
+                try {
+                    // Dynamic import mammoth to keep bundle size low
+                    const mammoth = await import('mammoth');
+                    const arrayBuffer = await file.arrayBuffer();
+
+                    // Simple timeout wrapper
+                    const extractPromise = mammoth.extractRawText({ arrayBuffer });
+                    const timeoutPromise = new Promise<{ value: string }>((_, reject) =>
+                        setTimeout(() => reject(new Error('Extraction timed out')), 10000)
+                    );
+
+                    const result = await Promise.race([extractPromise, timeoutPromise]);
+                    uploadedText = result.value;
+
+                    // Basic cleanup
+                    if (uploadedText) {
+                        uploadedText = uploadedText.replace(/\n\s*\n/g, '\n').trim();
+                    }
+
+                } catch (e) {
+                    console.error("Docx extraction failed:", e);
+                    toast.warning("Text extraction incomplete", {
+                        description: "The file will be uploaded, but AI features might be limited for this document."
+                    });
+                    uploadedText = "Text extraction failed or timed out.";
                 }
-            } catch (e) {
-                console.error("Client side PDF parse failed", e);
-                text = "Text extraction failed.";
+            } else {
+                // PDF Extraction (Simple / Placeholder for now as per previous logic)
+                // Re-using existing simplified logic from original file for now to minimize diff risk
+                try {
+                    const pdfjs = await import('pdfjs-dist');
+                    pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjs.getDocument(arrayBuffer).promise;
+                    // Limit pages to prevent browser crash on huge PDFs
+                    const maxPages = Math.min(pdf.numPages, 50);
+
+                    for (let i = 1; i <= maxPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        uploadedText += content.items.map((item: any) => item.str).join(' ') + '\n';
+                    }
+                } catch (e) {
+                    console.error("Client side PDF parse failed", e);
+                    uploadedText = "Text extraction failed.";
+                }
             }
 
-            formData.set('textContent', text);
+            formData.set('textContent', uploadedText);
 
+            setLoadingStep('Uploading...');
             const res = await fetch(`/api/notebooks/${notebook._id}/sources`, {
                 method: 'POST',
                 body: formData
             });
 
-            if (res.ok) {
-                window.location.reload();
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Upload failed');
             }
-        } catch (error) {
+
+            toast.success('Source added successfully');
+            window.location.reload();
+
+        } catch (error: any) {
             console.error("Failed to add source", error);
+            toast.error("Upload failed", {
+                description: error.message || "Please try again."
+            });
         } finally {
             setIsAddingSource(false);
+        }
+    };
+
+    const handleDeleteSource = async (sourceId: string) => {
+        try {
+            const res = await fetch(`/api/notebooks/${notebook._id}/sources?sourceId=${sourceId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Delete failed');
+            }
+
+            toast.success('Source removed');
+
+            // Update local state instead of reload if possible, but reload is safer for legacy consistency
+            setSources(prev => prev.filter(s => s._id !== sourceId));
+            setSelectedSourceIds(prev => prev.filter(id => id !== sourceId));
+            if (activeSourceId === sourceId) {
+                setActiveSourceId(sources.find(s => s._id !== sourceId)?._id || null);
+            }
+
+        } catch (error: any) {
+            console.error("Failed to delete source", error);
+            toast.error("Delete failed", {
+                description: error.message || "Please try again."
+            });
+            throw error; // Rethrow to let the sidebar handle the loading state cleanup
         }
     };
 
@@ -338,6 +494,7 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     onToggledSource={handleSourceToggle}
                     onAddSource={handleAddSource}
                     onAddYoutube={handleAddYoutube}
+                    onDeleteSource={handleDeleteSource}
                     isAddingSource={isAddingSource}
                     loadingStep={loadingStep}
                     transcribeProgress={transcribeProgress}
@@ -371,9 +528,18 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                 >
                     <div className="h-full w-full min-w-0">
                         {activeSourceType === 'docx' ? (
-                            <WordViewer contentHtml={notebook.contentHtml || ''} notebookId={notebook._id} />
+                            <WordViewer
+                                contentHtml={activeSourceId === 'default-source' || !activeSourceId ? (notebook.contentHtml || '') : undefined}
+                                url={activePdfUrl}
+                                notebookId={notebook._id}
+                                activeSourceId={activeSourceId}
+                            />
                         ) : activeSourceType === 'youtube' || activeSourceType === 'text' ? (
-                            <TextViewer url={activePdfUrl} />
+                            <TextViewer
+                                url={textViewerUrl}
+                                notebookId={notebook._id}
+                                activeSourceId={activeSourceId === 'default-source' ? null : activeSourceId}
+                            />
                         ) : (
                             <PDFViewer url={activePdfUrl} isMobile={isMobile} />
                         )}
@@ -423,6 +589,17 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     </button>
                 </div>
             )}
+
+            <DuplicateSourceModal
+                isOpen={isDuplicateModalOpen}
+                onClose={() => setIsDuplicateModalOpen(false)}
+                onSwitchToExisting={() => {
+                    if (duplicateSourceId) {
+                        setActiveSourceId(duplicateSourceId);
+                        if (isMobile) setIsSourceSidebarOpen(false);
+                    }
+                }}
+            />
         </div>
     );
 };
