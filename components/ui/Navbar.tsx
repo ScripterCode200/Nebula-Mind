@@ -122,11 +122,6 @@ export default function Navbar() {
         localStorage.removeItem('recentSearches');
     };
 
-    // Fetch user on mount
-    useEffect(() => {
-        console.log('[Navbar] Mount effect triggered');
-        useUserStore.getState().fetchUser();
-    }, []);
 
     // Scroll effect
     useEffect(() => {

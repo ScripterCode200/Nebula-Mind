@@ -18,6 +18,7 @@ interface UserState {
     university: string;
     deletionScheduledAt: Date | null;
     isAuthenticated: boolean;
+    isInitialized: boolean;
     savedAccounts: SavedAccount[]; // List of logged-in accounts
     setUser: (user: any) => void;
     updateProfile: (data: Partial<UserState>) => Promise<void>;
@@ -42,6 +43,7 @@ export const useUserStore = create<UserState>()(
             university: '',
             deletionScheduledAt: null,
             isAuthenticated: false,
+            isInitialized: false,
             savedAccounts: [],
             setUser: (user) => set({ user }),
             saveAccount: (account) => set((state) => {
@@ -160,6 +162,8 @@ export const useUserStore = create<UserState>()(
                 } catch (error) {
                     console.error('[useUserStore] Failed to fetch user', error);
                     set({ user: null, isAuthenticated: false });
+                } finally {
+                    set({ isInitialized: true });
                 }
             },
             logout: async () => {

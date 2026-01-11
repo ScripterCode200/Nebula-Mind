@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: '/favicon.svg?v=2',
+    icon: '/assets/NebulaIcon.ico',
   },
 };
 
@@ -69,6 +69,7 @@ import Footer from "@/components/ui/Footer";
 import SmoothScroll from "@/components/ui/SmoothScroll";
 
 import AuthGuard from "@/components/AuthGuard";
+import AuthInitializer from "@/components/AuthInitializer";
 import MaintenanceListener from "@/components/MaintenanceListener";
 import ActivityTracker from "@/components/ActivityTracker";
 import GlobalGoalManager from "@/components/GlobalGoalManager";
@@ -95,19 +96,21 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <AuthGuard>
-          <NetworkStatusHandler />
-          <MaintenanceListener />
-          <ActivityTracker />
-          <GlobalGoalManager />
-          <div className="flex min-h-screen">
-            <AppSidebar />
+          <AuthInitializer>
+            <NetworkStatusHandler />
+            <MaintenanceListener />
+            <ActivityTracker />
+            <GlobalGoalManager />
+            <div className="flex min-h-screen">
+              <AppSidebar />
 
-            <LayoutWrapper>
-              <Navbar />
-              {children}
-              <Footer />
-            </LayoutWrapper>
-          </div>
+              <LayoutWrapper>
+                <Navbar />
+                {children}
+                <Footer />
+              </LayoutWrapper>
+            </div>
+          </AuthInitializer>
         </AuthGuard>
         <Toaster position="top-center" theme="dark" />
       </body>
