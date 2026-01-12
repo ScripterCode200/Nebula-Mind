@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, GraduationCap, Search, Filter, X, ChevronDown, Check, Loader2 } from 'lucide-react';
+import { Target, GraduationCap, Search, Filter, X, ChevronDown, Check, Loader2, Settings } from 'lucide-react';
 import ExamCard from '@/components/explore/ExamCard';
 import DailyGoalCard from '@/components/explore/DailyGoalCard';
 
@@ -55,15 +55,17 @@ export default function ExplorePage() {
                     const data = await res.json();
                     if (data.exams) {
                         setDbExams(data.exams.map((e: any) => ({
-                            id: e._id,
+                            id: e._id || e.id,
                             title: e.title,
                             subject: e.subject,
                             description: e.description,
                             duration: e.duration,
-                            xp: e.rarity === 'Legendary' ? 5000 : e.rarity === 'Epic' ? 2500 : e.rarity === 'Rare' ? 1200 : 500, // XP Logic
+                            xp: e.xp || (e.rarity === 'Legendary' ? 5000 : e.rarity === 'Epic' ? 2500 : e.rarity === 'Rare' ? 1200 : 500),
                             rarity: e.rarity,
-                            rarityPoints: 100, // Default or logic
-                            completed: e.completed
+                            rarityPoints: 1, // Standardize to 1 point
+                            completed: e.completed || false,
+                            status: e.status || 'pending',
+                            cheatAttempts: e.cheatAttempts || 0
                         })));
                     }
                 }
@@ -164,9 +166,18 @@ export default function ExplorePage() {
                         <Target size={24} />
                     </div>
                     <h2 className="text-2xl font-bold text-white">Daily Goals</h2>
-                    <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-sm font-mono text-muted-foreground shadow-[0_0_10px_rgba(34,197,94,0.1)]">
-                        <span className="text-xs uppercase tracking-wider text-green-400/70 font-sans font-semibold mr-1">Reset in</span>
-                        <span className="text-green-400 font-bold">{timeLeft}</span>
+                    <div className="ml-auto flex items-center gap-2">
+                        <button
+                            onClick={() => window.location.href = '/settings?tab=daily-goals'}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                            <Settings size={14} />
+                            <span>Customize</span>
+                        </button>
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-sm font-mono text-muted-foreground shadow-[0_0_10px_rgba(34,197,94,0.1)]">
+                            <span className="text-xs uppercase tracking-wider text-green-400/70 font-sans font-semibold mr-1">Reset in</span>
+                            <span className="text-green-400 font-bold">{timeLeft}</span>
+                        </div>
                     </div>
                 </div>
 

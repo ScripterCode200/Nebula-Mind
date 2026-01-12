@@ -76,6 +76,14 @@ export const RANKS = [
         gradient: 'from-amber-200 via-yellow-500 to-orange-600',
         glow: 'rgba(251, 191, 36, 0.7)'
     },
+    {
+        name: 'Legend',
+        minXp: 980100, // Level 100
+        color: '#EF4444',
+        secondaryColor: '#B91C1C',
+        gradient: 'from-red-500 via-orange-500 to-yellow-500', // Vibrant Red-Orange
+        glow: 'rgba(239, 68, 68, 0.8)'
+    },
 ];
 
 export function getRank(xp: number) {
@@ -85,4 +93,23 @@ export function getRank(xp: number) {
         }
     }
     return RANKS[0];
+}
+
+export function getNextRank(xp: number) {
+    const currentRank = getRank(xp);
+    const currentIndex = RANKS.findIndex(r => r.name === currentRank.name);
+    if (currentIndex === -1 || currentIndex === RANKS.length - 1) return null;
+    return RANKS[currentIndex + 1];
+}
+
+export function calculateRankProgress(xp: number): number {
+    const currentRank = getRank(xp);
+    const nextRank = getNextRank(xp);
+
+    if (!nextRank) return 100; // Max rank reached
+
+    const xpInRank = xp - currentRank.minXp;
+    const xpNeededForRank = nextRank.minXp - currentRank.minXp;
+
+    return Math.min(100, Math.max(0, (xpInRank / xpNeededForRank) * 100));
 }

@@ -45,6 +45,10 @@ const DailyGoalSchema = new mongoose.Schema({
         type: String, // Changed from ObjectId to String to match our String(userId) logic
         required: false // Optional for now to support global goals if needed, or migration
     },
+    isTimeBound: {
+        type: Boolean,
+        default: true
+    },
     questions: [{
         question: { type: String, required: true },
         type: { type: String, enum: ['MCQ', 'LongAnswer'], default: 'LongAnswer' },

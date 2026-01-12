@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import NeonButton from './NeonButton';
+import LogoutModal from '../modals/LogoutModal';
 import { useUserStore } from '@/store/useUserStore';
 import { useUIStore } from '@/store/useUIStore';
 import { useGoalStore } from '@/store/useGoalStore';
@@ -61,10 +62,14 @@ export default function Navbar() {
     const [searchFocused, setSearchFocused] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
     const [recentSearches, setRecentSearches] = useState<any[]>([]);
     const [topNotebooks, setTopNotebooks] = useState<any[]>([]);
     const [isRankHovered, setIsRankHovered] = useState(false);
+
+    // Use global state from UI Store
+    const { hasUnreadNotifications, checkUnreadNotifications } = useUIStore();
 
     const defaultSettings = [
         { name: 'Account Settings', href: '/settings?tab=account', icon: User, desc: 'Manage your profile' },
@@ -106,8 +111,13 @@ export default function Navbar() {
                     }
                 })
                 .catch(err => console.error('Failed to fetch top notebooks', err));
+
+            // Initial check and polling via global store
+            checkUnreadNotifications();
+            const interval = setInterval(checkUnreadNotifications, 60000); // Poll every 1 minute
+            return () => clearInterval(interval);
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, checkUnreadNotifications]);
 
     const addToRecents = (item: any) => {
         const newRecents = [item, ...recentSearches.filter(r => r.name !== item.name)].slice(0, 5);
@@ -382,8 +392,8 @@ export default function Navbar() {
                             <div
                                 className="hidden xl:flex items-center gap-4 bg-black/40 backdrop-blur-3xl border rounded-2xl px-3.5 py-1.5 shadow-[0_0_30px_rgba(0,0,0,0.5)] relative group/stats_container transition-all duration-500"
                                 style={{
-                                    borderColor: `${getRank(user?.stats?.xp || 0).color}60`,
-                                    boxShadow: `0 0 20px ${getRank(user?.stats?.xp || 0).color}20`
+                                    borderColor: `${user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color}60`,
+                                    boxShadow: `0 0 20px ${user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color}20`
                                 }}
                             >
                                 {/* Animated Background Glow */}
@@ -395,7 +405,7 @@ export default function Navbar() {
                                         {/* Outer Neon Ring */}
                                         <div
                                             className="absolute -inset-1.5 rounded-full blur-sm opacity-30"
-                                            style={{ backgroundColor: getRank(user?.stats?.xp || 0).color }}
+                                            style={{ backgroundColor: user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color }}
                                         />
 
                                         <motion.div
@@ -409,7 +419,7 @@ export default function Navbar() {
                                             <div
                                                 className="absolute inset-[1.5px] opacity-60 blur-[1px]"
                                                 style={{
-                                                    backgroundColor: getRank(user?.stats?.xp || 0).color,
+                                                    backgroundColor: user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color,
                                                     clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)'
                                                 }}
                                             />
@@ -439,8 +449,8 @@ export default function Navbar() {
                                     <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] leading-none mb-0.5">Tier</span>
                                     <div
                                         style={{
-                                            '--glow': getRank(user?.stats?.xp || 0).color,
-                                            filter: `drop-shadow(0 0 3px ${getRank(user?.stats?.xp || 0).color}40)`
+                                            '--glow': user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color,
+                                            filter: `drop-shadow(0 0 3px ${user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color}40)`
                                         } as any}
                                         className={cn(
                                             "text-[10px] font-black bg-clip-text text-transparent bg-linear-to-r tracking-widest uppercase",
@@ -559,7 +569,9 @@ export default function Navbar() {
 
                             <Link href="/notifications" className="relative p-3 rounded-2xl text-muted/60 hover:text-primary hover:bg-primary/10 transition-all group overflow-hidden border border-transparent hover:border-primary/20">
                                 <Bell size={20} className="relative z-10" />
-                                <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-primary ring-2 ring-[#050505] z-20 shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+                                {hasUnreadNotifications && (
+                                    <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-primary ring-2 ring-[#050505] z-20 shadow-[0_0_8px_rgba(0,240,255,0.6)]" />
+                                )}
                                 <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </Link>
 
@@ -577,11 +589,11 @@ export default function Navbar() {
                                     {/* Animated Avatar Glow */}
                                     <div
                                         className="absolute -inset-1.5 rounded-2xl opacity-40 group-hover/avatar:opacity-100 transition-opacity blur-md"
-                                        style={{ backgroundColor: getRank(user?.stats?.xp || 0).color }}
+                                        style={{ backgroundColor: user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color }}
                                     />
                                     <div
                                         className="w-10 h-10 rounded-2xl bg-[#050505] p-0.5 border-2 transition-all relative z-10 overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)]"
-                                        style={{ borderColor: getRank(user?.stats?.xp || 0).color }}
+                                        style={{ borderColor: user?.preferences?.customThemeColor || getRank(user?.stats?.xp || 0).color }}
                                     >
                                         {user.profileImage ? (
                                             <img src={user.profileImage} alt={name} className="w-full h-full rounded-xl object-cover" />
@@ -627,7 +639,13 @@ export default function Navbar() {
                                                 </div>
 
                                                 <div className="h-px bg-white/5 my-2 mx-2" />
-                                                <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-sm text-red-400/80 hover:text-red-400 transition-all group/link">
+                                                <button
+                                                    onClick={() => {
+                                                        setIsLogoutModalOpen(true);
+                                                        setActiveDropdown(null);
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 text-sm text-red-400/80 hover:text-red-400 transition-all group/link"
+                                                >
                                                     <div className="w-8 h-8 rounded-lg bg-red-500/5 flex items-center justify-center group-hover/link:bg-red-500/10 transition-colors">
                                                         <LogOut size={16} />
                                                     </div>
@@ -664,6 +682,12 @@ export default function Navbar() {
                     </div>
                 </motion.div>
             )}
+
+            <LogoutModal
+                isOpen={isLogoutModalOpen}
+                onClose={() => setIsLogoutModalOpen(false)}
+                onConfirm={logout}
+            />
         </nav>
     );
 }

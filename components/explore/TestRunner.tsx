@@ -603,15 +603,17 @@ export default function TestRunner({ goal, onClose, onComplete }: TestRunnerProp
                     </div>
                 </div>
                 <div className="flex items-center gap-6">
-                    <div className="flex flex-col items-end">
-                        <div className="text-[10px] text-primary font-bold uppercase tracking-[0.2em] mb-0.5 opacity-80">
-                            Time Integrity
+                    {goal.isTimeBound !== false && (
+                        <div className="flex flex-col items-end">
+                            <div className="text-[10px] text-primary font-bold uppercase tracking-[0.2em] mb-0.5 opacity-80">
+                                Time Integrity
+                            </div>
+                            <div className="flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-xl border border-white/10 shadow-inner">
+                                <Clock size={14} className="text-primary animate-pulse" />
+                                <span className="text-sm font-mono font-bold tracking-wider">{formatTime(timeElapsed)}</span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-xl border border-white/10 shadow-inner">
-                            <Clock size={14} className="text-primary animate-pulse" />
-                            <span className="text-sm font-mono font-bold tracking-wider">{formatTime(timeElapsed)}</span>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </header>
 

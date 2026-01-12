@@ -1,6 +1,4 @@
-
 import genAI from '@/lib/gemini';
-import { Schema } from 'mongoose';
 
 export interface GoalPreference {
     id: number;
@@ -28,14 +26,49 @@ interface GeneratedGoal {
     }[];
 }
 
-export async function generateSingleGoal(preference: GoalPreference, aiModelName: string = 'gemini-2.5-flash'): Promise<GeneratedGoal> {
-    const prompt = `
+export async function generateSingleGoal(
+    preference: GoalPreference,
+    aiModelName: string = 'gemini-2.5-flash',
+    context?: string,
+    previousQuestions: string[] = []
+): Promise<GeneratedGoal> {
+
+    // Gemini 2.0 Flash has a 1M+ token window. 
+    // We set a safe character limit for PDF context to utilize the model's full reasoning potential.
+    const MAX_CONTEXT_LENGTH = 1000000;
+    const effectiveContext = context && context.length > MAX_CONTEXT_LENGTH
+        ? context.substring(0, MAX_CONTEXT_LENGTH) + "\n...[TRUNCATED FOR EFFICIENCY]"
+        : context;
+
+    let prompt = `
     Generate ONE study goal JSON object for: ${preference.topic || preference.subject}.
     Difficulty: ${preference.difficulty}.
     Subject: ${preference.subject}.
     Format: Long-Answer questions.
     Quantity: Generate EXACTLY 10 questions.
+    `;
 
+    if (effectiveContext) {
+        prompt += `
+        \n\nCONTEXT FROM UPLOADED PDF:
+        ${effectiveContext}
+        
+        IMPORTANT: Generate questions primarily based on the provided PDF context. 
+        Ensure questions test understanding of the specific content in the PDF.
+        `;
+    }
+
+    if (previousQuestions.length > 0) {
+        prompt += `
+        \n\nPREVIOUSLY GENERATED QUESTIONS (ONLY QUESTIONS, NO ANSWERS PROVIDED):
+        ${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+        
+        INSTRUCTION: You must generate 10 NEW unique questions that are distinct from the list above. 
+        Do not repeat or rephrase the questions listed in the history.
+        `;
+    }
+
+    prompt += `
     JSON OBJECT STRUCTURE:
     {
         "title": "Short catchy title",
@@ -60,7 +93,16 @@ export async function generateSingleGoal(preference: GoalPreference, aiModelName
     `;
 
     try {
-        const generativeModel = genAI.getGenerativeModel({ model: aiModelName });
+        // NOTE: generativeModel.generateContent is fundamentally STATELESS.
+        // It does not use previous chat history/context unless explicitly started with startChat().
+        // Context history length is effectively "0" as requested.
+        const generativeModel = genAI.getGenerativeModel({
+            model: aiModelName,
+            generationConfig: {
+                maxOutputTokens: 8192, // Max output for complex reasoning/long answers
+                temperature: 0.5 // Slightly increased for more variety
+            }
+        });
         const result = await generativeModel.generateContent(prompt);
         const response = await result.response;
 
@@ -86,9 +128,6 @@ export async function generateSingleGoal(preference: GoalPreference, aiModelName
 
         const jsonString = cleanText.substring(start, end + 1);
 
-        // Sanitize string: replace control characters (0-31) which are invalid in JSON string literals
-        // We replace them with a space to preserve separation if they were used as whitespace,
-        // and to prevent breaking the string if they were inside one.
         // Sanitize string: 
         // 1. Replace control characters (0-31)
         // 2. Fix invalid backslash escapes (commonly caused by LaTeX or paths in LLM output)

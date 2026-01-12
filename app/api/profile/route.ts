@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
         await connectToDatabase();
 
-        const user = await User.findById(userId).select('name email bio dob university stats achievements createdAt deletionScheduledAt profileImage');
+        const user = await User.findById(userId).select('name email bio dob university location socials academic interests status stats achievements createdAt deletionScheduledAt profileImage');
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
         // Define all possible achievements
@@ -51,6 +51,11 @@ export async function GET(req: NextRequest) {
                 bio: user.bio,
                 dob: user.dob,
                 university: user.university,
+                location: user.location,
+                socials: user.socials,
+                academic: user.academic,
+                interests: user.interests,
+                status: user.status,
                 joinedAt: user.createdAt,
                 deletionScheduledAt: user.deletionScheduledAt,
                 profileImage: user.profileImage,
@@ -79,7 +84,7 @@ export async function PUT(req: NextRequest) {
         const userId = payload.userId;
 
         const body = await req.json();
-        const { name, bio, dob, university } = body;
+        const { name, bio, dob, university, location, socials, academic, interests, status } = body;
 
         await connectToDatabase();
 
@@ -89,10 +94,15 @@ export async function PUT(req: NextRequest) {
                 name,
                 bio,
                 dob: dob ? new Date(dob) : undefined,
-                university
+                university,
+                location,
+                socials,
+                academic,
+                interests,
+                status
             },
             { new: true }
-        ).select('name email bio dob university stats achievements createdAt deletionScheduledAt profileImage');
+        ).select('name email bio dob university location socials academic interests status stats achievements createdAt deletionScheduledAt profileImage');
 
         if (!updatedUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -105,6 +115,11 @@ export async function PUT(req: NextRequest) {
                 bio: updatedUser.bio,
                 dob: updatedUser.dob,
                 university: updatedUser.university,
+                location: updatedUser.location,
+                socials: updatedUser.socials,
+                academic: updatedUser.academic,
+                interests: updatedUser.interests,
+                status: updatedUser.status,
                 joinedAt: updatedUser.createdAt,
                 deletionScheduledAt: updatedUser.deletionScheduledAt,
                 profileImage: updatedUser.profileImage,

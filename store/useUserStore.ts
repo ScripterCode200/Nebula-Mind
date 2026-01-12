@@ -16,6 +16,26 @@ interface UserState {
     bio: string;
     dob: Date | null;
     university: string;
+    location: string;
+    socials: {
+        linkedin: string;
+        github: string;
+        twitter: string;
+        website: string;
+    };
+    academic: {
+        year: string;
+        major: string;
+        cgpa: string;
+        institution: string;
+    };
+    interests: string[];
+    status: {
+        emoji: string;
+    };
+    preferences?: {
+        customThemeColor?: string;
+    };
     deletionScheduledAt: Date | null;
     isAuthenticated: boolean;
     isInitialized: boolean;
@@ -41,6 +61,11 @@ export const useUserStore = create<UserState>()(
             bio: '',
             dob: null,
             university: '',
+            location: '',
+            socials: { linkedin: '', github: '', twitter: '', website: '' },
+            academic: { year: '', major: '', cgpa: '', institution: '' },
+            interests: [],
+            status: { text: '', emoji: '' },
             deletionScheduledAt: null,
             isAuthenticated: false,
             isInitialized: false,
@@ -81,7 +106,11 @@ export const useUserStore = create<UserState>()(
             },
             updateProfile: async (data) => {
                 // Optimistic update
-                set((state) => ({ ...state, ...data }));
+                set((state) => ({
+                    ...state,
+                    ...data,
+                    user: state.user ? { ...state.user, ...data } : null
+                }));
 
                 try {
                     await fetch('/api/profile', {
@@ -115,6 +144,11 @@ export const useUserStore = create<UserState>()(
                                     bio: data.user.bio || '',
                                     dob: data.user.dob ? new Date(data.user.dob) : null,
                                     university: data.user.university || '',
+                                    location: data.user.location || '',
+                                    socials: data.user.socials || { linkedin: '', github: '', twitter: '', website: '' },
+                                    academic: data.user.academic || { year: '', major: '', cgpa: '', institution: '' },
+                                    interests: data.user.interests || [],
+                                    status: data.user.status || { text: '', emoji: '' },
                                     deletionScheduledAt: data.user.deletionScheduledAt ? new Date(data.user.deletionScheduledAt) : null,
                                     isAuthenticated: true,
                                 });

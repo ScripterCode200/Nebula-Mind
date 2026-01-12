@@ -27,7 +27,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params;
     await dbConnect();
 
-    const notification = await Notification.findOne({ _id: id, recipient: user.userId });
+    const userId = user.userId || user.id || user.sub;
+    const notification = await Notification.findOne({ _id: id, recipientId: String(userId) });
     if (!notification) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     notification.isRead = true;
@@ -43,7 +44,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { id } = await params;
     await dbConnect();
 
-    await Notification.deleteOne({ _id: id, recipient: user.userId });
+    const userId = user.userId || user.id || user.sub;
+    await Notification.deleteOne({ _id: id, recipientId: String(userId) });
 
     return NextResponse.json({ message: 'Deleted' });
 }

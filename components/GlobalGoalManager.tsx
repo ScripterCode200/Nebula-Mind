@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useGoalStore } from '@/store/useGoalStore';
 
 export default function GlobalGoalManager() {
+    const pathname = usePathname();
     const { dailyGoals, setDailyGoals, addDailyGoal, setIsLoading } = useGoalStore();
 
     useEffect(() => {
@@ -45,33 +47,28 @@ export default function GlobalGoalManager() {
                     }
                 }
 
-                if (currentGoals.length === 0) {
-                    try {
-                        const res = await fetch('/api/daily-goals', { signal: generationController.signal });
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.goals) {
-                                const mapped = data.goals.map((g: any) => ({
-                                    ...g,
-                                    id: String(g._id),
-                                    duration: g.estimatedTime || g.duration
-                                }));
+                // ALWAYS Fetch Fresh Data (Stale-While-Revalidate)
+                // This ensures statuses (attempts/completed) are up to date even if cache exists
+                try {
+                    const res = await fetch('/api/daily-goals', { signal: generationController.signal });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.goals) {
+                            const mapped = data.goals.map((g: any) => ({
+                                ...g,
+                                id: String(g._id),
+                                duration: g.estimatedTime || g.duration
+                            }));
 
-                                // Dedupe with existing currentGoals (which should be empty anyway)
-                                const uniqueMap = new Map();
-                                [...currentGoals, ...mapped].forEach(g => {
-                                    if (g.id) uniqueMap.set(g.id, g);
-                                });
-                                currentGoals = Array.from(uniqueMap.values());
+                            // Update store with fresh data (source of truth)
+                            setDailyGoals(mapped);
+                            currentGoals = mapped; // Update local ref for generation logic
 
-                                setDailyGoals(currentGoals);
-                                localStorage.setItem('dailyGoalsCache', JSON.stringify({ date: today, goals: currentGoals }));
-                            }
+                            localStorage.setItem('dailyGoalsCache', JSON.stringify({ date: today, goals: mapped }));
                         }
-                    } catch (fetchErr) {
-                        // ignore aborts
-                        console.log("Initial fetch error or abort", fetchErr);
                     }
+                } catch (fetchErr) {
+                    console.log("Background fetch error (using cache if available)", fetchErr);
                 }
 
                 const needed = 7 - currentGoals.length;
@@ -83,18 +80,22 @@ export default function GlobalGoalManager() {
                     for (let i = 0; i < needed; i++) {
                         if (generationController.signal.aborted) break;
 
-                        // Wait 1s
-                        if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
-                        if (generationController.signal.aborted) break;
-
-                        // Use actual current length to avoid overlapping indices
-                        const latestState = useGoalStore.getState();
-                        const offset = latestState.dailyGoals.length;
-
-                        // If we already have enough, stop
-                        if (offset >= 7) break;
-
                         try {
+                            // Use actual current length to avoid overlapping indices
+                            const latestState = useGoalStore.getState();
+                            const offset = latestState.dailyGoals.length;
+
+                            // If we already have enough, stop
+                            if (offset >= 7) break;
+
+                            // Enforce 62-second rest period between requests (as requested for API cooling)
+                            if (i > 0) {
+                                console.log(`[GlobalGoalManager] Entering 62s cooling period before slot ${offset}...`);
+                                await new Promise(resolve => setTimeout(resolve, 62000));
+                            }
+
+                            if (generationController.signal.aborted) break;
+
                             const genRes = await fetch('/api/daily-goals', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -157,7 +158,7 @@ export default function GlobalGoalManager() {
         fetchAndGenerate();
 
         return () => generationController.abort();
-    }, []); // Run once on mount
+    }, [pathname]); // Run on mount AND on path change (re-validation)
 
     return null; // Renderless component
 }

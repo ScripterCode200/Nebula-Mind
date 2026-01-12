@@ -199,9 +199,11 @@ export async function POST(request: Request) {
         if (passed) {
             const user = await User.findById(activeUserId);
             if (user) {
+                if (!user.stats) user.stats = {};
+
+                // 1. Rarity Points Reward (Exams Only)
                 if (isExam && (goal as any).rarity) {
                     const rarityKey = (goal as any).rarity.toLowerCase();
-                    if (!user.stats) user.stats = {};
                     if (!user.stats.rarityStats) user.stats.rarityStats = { uncommon: 0, rare: 0, epic: 0, legendary: 0 };
 
                     if (user.stats.rarityStats[rarityKey] !== undefined) {
@@ -209,25 +211,30 @@ export async function POST(request: Request) {
                         rewardType = 'Rarity';
                         rewardValue = (goal as any).rarity;
                     }
+                }
+
+                // 2. XP Reward (Daily Goals and Exams)
+                const xpToAdd = (goal as any).xp || 0;
+                user.stats.xp = (user.stats.xp || 0) + xpToAdd;
+
+                const today = new Date().toISOString().split('T')[0];
+                if (!user.dailyStats) user.dailyStats = [];
+                const dailyStat = user.dailyStats.find((d: any) => d.date === today);
+                if (dailyStat) {
+                    dailyStat.xpGained += xpToAdd;
                 } else {
-                    const xpToAdd = (goal as any).xp || 0;
-                    user.stats.xp = (user.stats.xp || 0) + xpToAdd;
+                    user.dailyStats.push({ date: today, timeSpent: 0, xpGained: xpToAdd });
+                }
 
-                    const today = new Date().toISOString().split('T')[0];
-                    if (!user.dailyStats) user.dailyStats = [];
-                    const dailyStat = user.dailyStats.find((d: any) => d.date === today);
-                    if (dailyStat) {
-                        dailyStat.xpGained += xpToAdd;
-                    } else {
-                        user.dailyStats.push({ date: today, timeSpent: 0, xpGained: xpToAdd });
-                    }
-
+                // If it wasn't an exam, we mark XP as the primary reward type for the UI
+                if (rewardType === 'none') {
                     rewardType = 'XP';
                     rewardValue = xpToAdd;
-
-                    // Update Level
-                    user.stats.level = calculateLevel(user.stats.xp);
                 }
+
+                // Update Level
+                user.stats.level = calculateLevel(user.stats.xp);
+
                 await user.save();
             }
         }

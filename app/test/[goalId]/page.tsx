@@ -32,10 +32,13 @@ export default async function TestPage({ params }: { params: Promise<{ goalId: s
     const { goalId } = await params;
     await connectToDatabase();
 
+    const userIdString = String(userPayload.userId || userPayload.id || userPayload.sub);
+
     // 1. Try Fetching Daily Goal (Personal)
+    // Explicitly cast userId to string to match creation logic
     let goalDoc = await DailyGoal.findOne({
         _id: goalId,
-        userId: userPayload.userId || userPayload.id || userPayload.sub
+        userId: userIdString
     }).lean();
 
     let isExam = false;
@@ -50,18 +53,19 @@ export default async function TestPage({ params }: { params: Promise<{ goalId: s
     }
 
     if (!goalDoc) {
+        // Log for debugging (server-side only)
+        console.error(`Goal/Exam ${goalId} not found for user ${userIdString}`);
         redirect('/explore');
     }
 
-    // Security: Prevent retaking passed tests
-    const userId = String(userPayload.userId || userPayload.id || userPayload.sub);
-    const previousResult = await TestResult.findOne({
-        userId: userId,
+    // Security: Prevent retaking passed or disqualified tests
+    const lockedResult = await TestResult.findOne({
+        userId: userIdString,
         goalId: goalDoc._id.toString(),
-        status: 'passed'
+        status: { $in: ['passed', 'disqualified'] }
     });
 
-    if (previousResult) {
+    if (lockedResult) {
         redirect('/explore');
     }
 
@@ -99,6 +103,7 @@ export default async function TestPage({ params }: { params: Promise<{ goalId: s
         // Sanitize Questions Array
         questions: questions,
         isExam: isExam,
+        isTimeBound: goalDoc.isTimeBound ?? true,
     } as any;
 
     return <TestRunnerWrapper goal={goal} />;

@@ -13,6 +13,24 @@ export interface IUser extends Document {
     bio?: string;
     dob?: Date;
     university?: string;
+    location?: string;
+    socials?: {
+        linkedin?: string;
+        github?: string;
+        twitter?: string;
+        website?: string;
+    };
+    academic?: {
+        year?: string;
+        major?: string;
+        cgpa?: string;
+        institution?: string;
+    };
+    interests?: string[];
+    status?: {
+        text?: string;
+        emoji?: string;
+    };
     // Account Deletion
     deletionScheduledAt?: Date;
     createdAt?: Date;
@@ -26,6 +44,9 @@ export interface IUser extends Document {
         topic: string;
         isTimeBound: boolean;
     }[];
+    preferences?: {
+        customThemeColor?: string;
+    };
 }
 
 const UserSchema: Schema = new Schema({
@@ -36,6 +57,24 @@ const UserSchema: Schema = new Schema({
     bio: { type: String, default: '' },
     dob: { type: Date },
     university: { type: String, default: '' },
+    location: { type: String, default: '' },
+    socials: {
+        linkedin: { type: String, default: '' },
+        github: { type: String, default: '' },
+        twitter: { type: String, default: '' },
+        website: { type: String, default: '' }
+    },
+    academic: {
+        year: { type: String, default: '' },
+        major: { type: String, default: '' },
+        cgpa: { type: String, default: '' },
+        institution: { type: String, default: '' }
+    },
+    interests: [{ type: String }],
+    status: {
+        text: { type: String, default: '' },
+        emoji: { type: String, default: '' }
+    },
     // Daily Goal Preferences
     dailyGoalPreferences: [{
         id: { type: Number },
@@ -45,6 +84,9 @@ const UserSchema: Schema = new Schema({
         topic: { type: String },
         isTimeBound: { type: Boolean, default: true }
     }],
+    preferences: {
+        customThemeColor: { type: String, default: '' }
+    },
     profileImage: { type: String, default: '' },
     imageKitFileId: { type: String, default: '' },
     // Account Deletion

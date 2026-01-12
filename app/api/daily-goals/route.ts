@@ -6,10 +6,14 @@ import DailyGoal from '@/models/DailyGoal';
 import User from '@/models/User';
 import TestResult from '@/models/TestResult';
 import SystemSetting from '@/models/SystemSetting';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, subDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
-import { generateSingleGoal } from '@/lib/ai/generator';
-import { GoalPreference } from '@/lib/ai/generator'; // Import the type if needed, or assume it matches
+import { generateSingleGoal, GoalPreference } from '@/lib/ai/generator';
+import UserPDF from '@/models/UserPDF';
+import { r2Client, R2_BUCKET_NAME } from '@/lib/r2';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { parsePDF } from '@/lib/pdf-parser';
+import { Readable } from 'stream';
 
 const IST_TIMEZONE = 'Asia/Kolkata';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
@@ -28,7 +32,7 @@ async function getUser() {
 }
 
 // Fallback preferences if user hasn't set any
-const DEFAULT_PREFERENCES = [
+const DEFAULT_PREFERENCES: GoalPreference[] = [
     { id: 1, enabled: true, subject: 'Physics', difficulty: 'Hard', topic: 'Quantum Mechanics', isTimeBound: true },
     { id: 2, enabled: true, subject: 'Math', difficulty: 'Hard', topic: 'Calculus', isTimeBound: true },
     { id: 3, enabled: true, subject: 'Chemistry', difficulty: 'Medium', topic: 'Organic Chemistry', isTimeBound: true },
@@ -37,6 +41,16 @@ const DEFAULT_PREFERENCES = [
     { id: 6, enabled: true, subject: 'History', difficulty: 'Easy', topic: 'World War II', isTimeBound: true },
     { id: 7, enabled: true, subject: 'English', difficulty: 'Easy', topic: 'Grammar', isTimeBound: true },
 ];
+
+// Helper to convert stream to buffer
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        const chunks: any[] = [];
+        stream.on('data', (chunk) => chunks.push(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+}
 
 export async function GET() {
     try {
@@ -77,16 +91,45 @@ export async function GET() {
         console.log(`  Found Goals: ${goals.length}`);
 
         if (goals.length > 0) {
-            // Check Status for all goals
+            // Self-Correction: Deduplicate by slotIndex
+            const uniqueGoals: any[] = [];
+            const duplicatesToDelete: string[] = [];
+            const seenSlots = new Set<number>();
+
+            // Sort by creation time (keep oldest or newest? Let's keep oldest stable)
+            goals.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+            goals.forEach((g: any) => {
+                if (typeof g.slotIndex === 'number') {
+                    if (seenSlots.has(g.slotIndex)) {
+                        duplicatesToDelete.push(g._id.toString());
+                    } else {
+                        seenSlots.add(g.slotIndex);
+                        uniqueGoals.push(g);
+                    }
+                } else {
+                    // Legacy goals without slotIndex: allow them but maybe limit total?
+                    // For now, just include them.
+                    uniqueGoals.push(g);
+                }
+            });
+
+            // Async cleanup (don't block response too long, but await to ensure safety)
+            if (duplicatesToDelete.length > 0) {
+                console.log(`[DailyGoals] Cleaning up ${duplicatesToDelete.length} duplicates...`);
+                await DailyGoal.deleteMany({ _id: { $in: duplicatesToDelete } });
+            }
+
+            // Check Status for UNIQUE goals
             const results = await TestResult.find({
                 userId: userId,
-                goalId: { $in: goals.map((g: any) => g._id.toString()) }
+                goalId: { $in: uniqueGoals.map((g: any) => g._id.toString()) }
             }).lean();
 
             const resultMap = new Map();
             results.forEach((r: any) => resultMap.set(r.goalId.toString(), r));
 
-            const goalsWithStatus = goals.map((g: any) => {
+            const goalsWithStatus = uniqueGoals.map((g: any) => {
                 const res = resultMap.get(g._id.toString());
                 return {
                     ...g,
@@ -94,14 +137,15 @@ export async function GET() {
                     completed: res?.status === 'passed',
                     status: res?.status || 'pending',
                     cheatAttempts: res?.cheatAttempts || 0,
-                    maxAttempts: 3
+                    maxAttempts: 3,
+                    isTimeBound: g.isTimeBound ?? true
                 };
             });
 
             return NextResponse.json({ goals: goalsWithStatus });
         }
 
-        // Return empty if no goals found (Frontend will handle generation)
+        // Return empty if no goals found
         return NextResponse.json({ goals: [] });
 
     } catch (error) {
@@ -179,6 +223,62 @@ export async function POST(request: Request) {
         // 2. Determine Preference for this Slot
         const prefIndex = index % prefsToUse.length;
         const pref = prefsToUse[prefIndex];
+        let contextText = undefined;
+        let finalSubject = pref.subject;
+
+        // Check if subject is a PDF reference
+        if (pref.subject && pref.subject.startsWith('PDF:')) {
+            try {
+                const pdfId = pref.subject.split('PDF:')[1];
+                console.log(`[DailyGoals] Slot ${index} uses PDF source: ${pdfId}`);
+
+                const pdfDoc = await UserPDF.findById(pdfId);
+                if (pdfDoc) {
+                    finalSubject = pdfDoc.filename; // Use filename as subject
+                    pref.subject = pdfDoc.filename; // Update pref object too for generator
+
+                    console.log(`[DailyGoals] Fetching PDF from R2: ${pdfDoc.r2Key}`);
+
+                    const pdfObj = await r2Client.send(new GetObjectCommand({
+                        Bucket: R2_BUCKET_NAME,
+                        Key: pdfDoc.r2Key
+                    }));
+
+                    if (pdfObj.Body) {
+                        const buffer = await streamToBuffer(pdfObj.Body as Readable);
+                        console.log(`[DailyGoals] Parsing PDF buffer: ${buffer.length} bytes`);
+                        contextText = await parsePDF(buffer);
+                        console.log(`[DailyGoals] Context extracted, length: ${contextText.length}`);
+                    }
+                } else {
+                    console.warn(`[DailyGoals] Referenced PDF ${pdfId} not found in DB`);
+                }
+            } catch (err) {
+                console.error(`[DailyGoals] Error processing PDF source:`, err);
+                // Fallback to generating without context, maybe set subject to "General"
+            }
+        }
+
+        // 2a. Check for duplicate usage of this PDF in the last 4 days
+        // This ensures the model rotates through different questions for the same content.
+        let previousQuestions: string[] = [];
+        if (pref.subject && pref.subject.startsWith('PDF:')) {
+            const historyStart = subDays(start, 3); // Look back 3 days + today = 4 days
+            const recentGoals = await DailyGoal.find({
+                userId: userId,
+                date: { $gte: historyStart, $lte: endOfDay(istDate) }
+            });
+
+            recentGoals.forEach((g: any) => {
+                if (g.subject === finalSubject && g.questions && Array.isArray(g.questions)) {
+                    g.questions.forEach((q: any) => {
+                        if (q.question) previousQuestions.push(q.question);
+                    });
+                }
+            });
+
+            console.log(`[DailyGoals] Found ${previousQuestions.length} historical questions for subject '${finalSubject}' in the last 4 days.`);
+        }
 
         console.log(`Generating single goal [slot ${index}] for user ${userId} using ${aiModel}...`);
 
@@ -188,7 +288,7 @@ export async function POST(request: Request) {
 
         while (attempts < 2 && !goal) {
             try {
-                goal = await generateSingleGoal(pref, aiModel);
+                goal = await generateSingleGoal(pref, aiModel, contextText, previousQuestions);
             } catch (err) {
                 attempts++;
                 console.warn(`Slot ${index} failed attempt ${attempts}:`, err);
@@ -207,7 +307,8 @@ export async function POST(request: Request) {
             ...goal,
             userId: finalUserId,
             date: start, // Force it to start of IST day
-            slotIndex: index // Save the slot index for future checks
+            slotIndex: index, // Save the slot index for future checks
+            isTimeBound: pref.isTimeBound ?? true
         };
 
         const savedGoal = await DailyGoal.create(newGoalData);

@@ -29,6 +29,7 @@ export interface DailyGoal {
     difficulty: 'Easy' | 'Medium' | 'Hard';
     questionsCount: number;
     isExam?: boolean;
+    isTimeBound?: boolean;
     questions: {
         question: string;
         type: 'MCQ' | 'LongAnswer';
