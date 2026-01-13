@@ -46,24 +46,65 @@ export async function generateSingleGoal(
     Subject: ${preference.subject}.
     Format: Long-Answer questions.
     Quantity: Generate EXACTLY 10 questions.
+
+    ---------------------------------------------------------
+    META-INSTRUCTION: DYNAMIC QUESTION STYLE ADAPTATION
+    ---------------------------------------------------------
+    You are an expert examiner. First, ANALYZE the nature of the Subject ("${preference.subject}") and Topic ("${preference.topic}") to determine the most effective assessment style.
+    
+    ADAPT YOUR GENERATION STRATEGY BASED ON YOUR ANALYSIS:
+
+    [CASE 1: PROGRAMMING & CODING SUBJECTS]
+    (e.g., Python, C++, React, Algorithms, System Design)
+    - QUESTIONS MUST BE PRACTICAL.
+    - Ask the user to WRITE CODE snippets, DEBUG functionality, or DESIGN systems.
+    - Focus on syntax, logic, time/space complexity (Big O), and implementation details.
+    - Example: "Write a function to equalize this histogram..." or "Find the memory leak in this pattern..."
+
+    [CASE 2: MATHEMATICS & QUANTITATIVE SUBJECTS]
+    (e.g., Calculus, Physics, Statistics, Accounting, Logic)
+    - QUESTIONS MUST BE NUMERICAL AND LOGICAL.
+    - Ask for STEP-BY-STEP SOLUTIONS, PROOFS, or DERIVATIONS.
+    - Provide specific numbers, variables, or equations to solve.
+    - Example: "Solve the differential equation..." or "Calculate the variance of..."
+
+    [CASE 3: THEORETICAL & ANALYTICAL SUBJECTS]
+    (e.g., History, Psychology, Literature, Business Theory, Biology)
+    - QUESTIONS MUST BE CRITICAL AND CONCEPTUAL.
+    - Ask for HYPOTHETICAL SCENARIOS, COMPARATIVE ANALYSIS, and ESSAY-STYLE reasoning.
+    - Avoid simple definition retrieval. Ask "Why" and "How", not just "What".
+    - Example: "Analyze the sociopolitical impact of..." or "Critique the methodology of..."
+
+    [CASE 4: HYBRID / MULTIDISCIPLINARY SUBJECTS]
+    (e.g., Computational Biology, Financial Engineering, SaaS Architecture)
+    - BLEND THE RULES ABOVE.
+    - Require both Domain Knowledge AND Technical Implementation.
+    - Example: "Derive the Black-Scholes formula AND write a Python script to model it."
+
+    ---------------------------------------------------------
+    GENERAL QUALITY STANDARDS (APPLIES TO ALL)
+    ---------------------------------------------------------
+    - mimics top-tier university exam problems or real-world professional interviews.
+    - Questions must be intellectually stimulating and require deep reasoning.
+    - NO retrieval-based "What is X?" questions.
     `;
 
     if (effectiveContext) {
         prompt += `
-        \n\nCONTEXT FROM UPLOADED PDF:
+    \n\nCONTEXT FROM UPLOADED PDF:
         ${effectiveContext}
-        
-        IMPORTANT: Generate questions primarily based on the provided PDF context. 
+
+    IMPORTANT: Generate questions primarily based on the provided PDF context. 
         Ensure questions test understanding of the specific content in the PDF.
         `;
     }
 
     if (previousQuestions.length > 0) {
         prompt += `
-        \n\nPREVIOUSLY GENERATED QUESTIONS (ONLY QUESTIONS, NO ANSWERS PROVIDED):
+    \n\nPREVIOUSLY GENERATED QUESTIONS(ONLY QUESTIONS, NO ANSWERS PROVIDED):
         ${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
-        
-        INSTRUCTION: You must generate 10 NEW unique questions that are distinct from the list above. 
+
+    INSTRUCTION: You must generate 10 NEW unique questions that are distinct from the list above. 
         Do not repeat or rephrase the questions listed in the history.
         `;
     }
@@ -72,21 +113,21 @@ export async function generateSingleGoal(
     JSON OBJECT STRUCTURE:
     {
         "title": "Short catchy title",
-        "description": "1-sentence summary",
-        "subject": "${preference.subject}",
-        "difficulty": "${preference.difficulty}",
-        "estimatedTime": "60m",
-        "questionsCount": 10,
-        "xp": 500,
-        "questions": [
-            {
-                "question": "The question text",
-                "type": "LongAnswer",
-                "idealAnswer": "Comprehensive model answer",
-                "keyPoints": ["point 1", "point 2"],
-                "explanation": "Brief explanation"
-            }
-        ]
+            "description": "1-sentence summary",
+                "subject": "${preference.subject}",
+                    "difficulty": "${preference.difficulty}",
+                        "estimatedTime": "60m",
+                            "questionsCount": 10,
+                                "xp": 500,
+                                    "questions": [
+                                        {
+                                            "question": "The question text",
+                                            "type": "LongAnswer",
+                                            "idealAnswer": "Comprehensive model answer",
+                                            "keyPoints": ["point 1", "point 2"],
+                                            "explanation": "Brief explanation"
+                                        }
+                                    ]
     }
 
     Return ONLY the JSON.
@@ -116,7 +157,7 @@ export async function generateSingleGoal(
         }
 
         // Robust JSON Extraction
-        let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        let cleanText = text.replace(/```json\s * /g, '').replace(/```\s*/g, '').trim();
 
         const start = cleanText.indexOf('{');
         const end = cleanText.lastIndexOf('}');

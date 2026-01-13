@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, GraduationCap, Search, Filter, X, ChevronDown, Check, Loader2, Settings } from 'lucide-react';
 import ExamCard from '@/components/explore/ExamCard';
@@ -167,13 +168,14 @@ export default function ExplorePage() {
                     </div>
                     <h2 className="text-2xl font-bold text-white">Daily Goals</h2>
                     <div className="ml-auto flex items-center gap-2">
-                        <button
-                            onClick={() => window.location.href = '/settings?tab=daily-goals'}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
+                        <Link
+                            href="/settings?tab=daily-goals"
+                            className="group relative flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:-translate-y-0.5 transition-all duration-300"
                         >
-                            <Settings size={14} />
-                            <span>Customize</span>
-                        </button>
+                            <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <Settings size={16} className="group-hover:rotate-90 transition-transform duration-500" />
+                            <span className="text-sm font-bold tracking-wide">Customise Goals</span>
+                        </Link>
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-sm font-mono text-muted-foreground shadow-[0_0_10px_rgba(34,197,94,0.1)]">
                             <span className="text-xs uppercase tracking-wider text-green-400/70 font-sans font-semibold mr-1">Reset in</span>
                             <span className="text-green-400 font-bold">{timeLeft}</span>

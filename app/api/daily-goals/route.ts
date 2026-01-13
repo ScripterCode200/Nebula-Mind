@@ -232,30 +232,55 @@ export async function POST(request: Request) {
                 const pdfId = pref.subject.split('PDF:')[1];
                 console.log(`[DailyGoals] Slot ${index} uses PDF source: ${pdfId}`);
 
+                // ---------------------------------------------------------
+                // NEW LOGIC: Fetch Text Context from R2
+                // ---------------------------------------------------------
                 const pdfDoc = await UserPDF.findById(pdfId);
+
                 if (pdfDoc) {
                     finalSubject = pdfDoc.filename; // Use filename as subject
                     pref.subject = pdfDoc.filename; // Update pref object too for generator
 
-                    console.log(`[DailyGoals] Fetching PDF from R2: ${pdfDoc.r2Key}`);
+                    console.log(`[DailyGoals] Found PDF Reference: ${pdfDoc.filename} (ID: ${pdfId})`);
+                    console.log(`[DailyGoals] R2 Key: ${pdfDoc.r2Key}`);
 
-                    const pdfObj = await r2Client.send(new GetObjectCommand({
-                        Bucket: R2_BUCKET_NAME,
-                        Key: pdfDoc.r2Key
-                    }));
+                    try {
+                        console.log(`[DailyGoals] Fetching text context from R2...`);
+                        const timeStart = Date.now();
 
-                    if (pdfObj.Body) {
-                        const buffer = await streamToBuffer(pdfObj.Body as Readable);
-                        console.log(`[DailyGoals] Parsing PDF buffer: ${buffer.length} bytes`);
-                        contextText = await parsePDF(buffer);
-                        console.log(`[DailyGoals] Context extracted, length: ${contextText.length}`);
+                        // Dynamically import GetObjectCommand to ensure it's available
+                        const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+
+                        const textObj = await r2Client.send(new GetObjectCommand({
+                            Bucket: R2_BUCKET_NAME,
+                            Key: pdfDoc.r2Key
+                        }));
+
+                        if (textObj.Body) {
+                            const chunks: any[] = [];
+                            const stream = textObj.Body as Readable;
+                            for await (const chunk of stream) chunks.push(chunk);
+                            contextText = Buffer.concat(chunks).toString('utf-8');
+
+                            const timeEnd = Date.now();
+                            console.log(`[DailyGoals] Context fetched successfully in ${timeEnd - timeStart}ms.`);
+                            console.log(`[DailyGoals] Context Length: ${contextText.length} characters.`);
+                            if (contextText.length > 0) {
+                                console.log(`[DailyGoals] Context Preview: ${contextText.substring(0, 100).replace(/\n/g, ' ')}...`);
+                            }
+                        } else {
+                            console.warn(`[DailyGoals] R2 object found but Body is empty.`);
+                        }
+                    } catch (r2Error) {
+                        console.error(`[DailyGoals] Failed to fetch context from R2:`, r2Error);
+                        // Continue without context rather than crashing
                     }
                 } else {
                     console.warn(`[DailyGoals] Referenced PDF ${pdfId} not found in DB`);
                 }
             } catch (err) {
                 console.error(`[DailyGoals] Error processing PDF source:`, err);
-                // Fallback to generating without context, maybe set subject to "General"
+                // Fallback to generating without context
             }
         }
 

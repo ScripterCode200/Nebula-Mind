@@ -5,6 +5,7 @@ export interface IUserPDF extends Document {
     filename: string;
     r2Key: string;
     fileSize: number;
+    extractedText?: string;
     uploadedAt: Date;
 }
 

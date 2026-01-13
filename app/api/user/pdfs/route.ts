@@ -3,8 +3,10 @@ import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import connectToDatabase from '@/lib/db';
 import UserPDF from '@/models/UserPDF';
-import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { r2Client, R2_BUCKET_NAME } from '@/lib/r2';
+import { parsePDF } from '@/lib/pdf-parser';
+import { Readable } from 'stream';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-prod';
 
@@ -59,12 +61,83 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Maximum limit of 7 PDFs reached' }, { status: 403 });
         }
 
+        console.log(`[PDF Upload] Processing file: ${filename} (Key: ${r2Key})`);
+
+        // 1. Fetch PDF from R2
+        let pdfBuffer: Buffer;
+        try {
+            console.log('[PDF Upload] Fetching original PDF from R2...');
+            const pdfObj = await r2Client.send(new GetObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: r2Key
+            }));
+
+            if (!pdfObj.Body) throw new Error("Empty PDF body from R2");
+
+            const chunks: any[] = [];
+            const stream = pdfObj.Body as Readable;
+            for await (const chunk of stream) chunks.push(chunk);
+            pdfBuffer = Buffer.concat(chunks);
+            console.log(`[PDF Upload] PDF fetched. Size: ${pdfBuffer.length} bytes.`);
+        } catch (fetchError) {
+            console.error('[PDF Upload] Failed to fetch PDF from R2:', fetchError);
+            return NextResponse.json({ error: 'Failed to retrieve uploaded file' }, { status: 500 });
+        }
+
+        // 2. Extract Text
+        let extractedText = "";
+        try {
+            console.log('[PDF Upload] Extracting text...');
+            extractedText = await parsePDF(pdfBuffer);
+            console.log(`[PDF Upload] Extraction complete. Length: ${extractedText.length} chars.`);
+        } catch (extractError) {
+            console.error('[PDF Upload] Text extraction failed:', extractError);
+            extractedText = "Error extracting text from this PDF.";
+        }
+
+        // 3. Upload Extracted Text to R2 (Replace PDF)
+        // We'll rename the key from .pdf to .txt
+        const textKey = r2Key.replace(/\.pdf$/i, '') + '.txt';
+
+        try {
+            console.log(`[PDF Upload] Uploading extracted text to R2 key: ${textKey}`);
+            // Dynamic Import for PutObject to avoid top-level issues if any
+            const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+
+            await r2Client.send(new PutObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: textKey,
+                Body: extractedText,
+                ContentType: 'text/plain'
+            }));
+            console.log('[PDF Upload] Text file uploaded successfully.');
+        } catch (uploadError) {
+            console.error('[PDF Upload] Failed to upload text file to R2:', uploadError);
+            return NextResponse.json({ error: 'Failed to save extracted text' }, { status: 500 });
+        }
+
+        // 4. Delete Original PDF from R2
+        try {
+            console.log('[PDF Upload] Deleting original PDF from R2...');
+            await r2Client.send(new DeleteObjectCommand({
+                Bucket: R2_BUCKET_NAME,
+                Key: r2Key
+            }));
+            console.log('[PDF Upload] Original PDF deleted.');
+        } catch (deleteError) {
+            console.warn('[PDF Upload] Warning: Failed to delete original PDF (non-critical):', deleteError);
+            // Proceed anyway, as we have the text
+        }
+
+        // 5. Save Metadata to DB (Pointing to the TEXT file now)
         const newPDF = await UserPDF.create({
             userId,
-            filename,
-            r2Key,
-            fileSize
+            filename, // Keep original filename for display
+            r2Key: textKey, // POINT TO .TXT FILE
+            fileSize // Use original size or text size? Keeping original gives user context of what they uploaded.
         });
+
+        console.log('[PDF Upload] Database record created.');
 
         return NextResponse.json({ pdf: newPDF });
     } catch (error) {

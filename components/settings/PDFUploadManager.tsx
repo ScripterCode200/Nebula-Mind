@@ -137,6 +137,21 @@ export default function PDFUploadManager({ onUpdate }: PDFUploadManagerProps) {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
+                {/* Hidden Input moved here for stability */}
+                {pdfs.length < 7 && (
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="application/pdf"
+                        onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                                handleFileUpload(e.target.files[0]);
+                                e.target.value = ''; // Reset to allow same file selection again
+                            }
+                        }}
+                    />
+                )}
                 <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-500/70">
                     Source Contexts <span className="text-white/20 ml-2">[{pdfs.length}/7]</span>
                 </h3>
@@ -182,21 +197,14 @@ export default function PDFUploadManager({ onUpdate }: PDFUploadManagerProps) {
                         {/* Scanning Line Effect */}
                         {(isDragging || isUploading) && (
                             <motion.div
-                                className="absolute left-0 right-0 h-0.5 bg-linear-to-r from-transparent via-cyan-500 to-transparent z-10"
+                                className="absolute left-0 right-0 h-0.5 bg-linear-to-r from-transparent via-cyan-500 to-transparent z-10 pointer-events-none"
                                 animate={{ top: ["0%", "100%", "0%"] }}
                                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                             />
                         )}
 
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept="application/pdf"
-                            onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-                        />
 
-                        <div className="relative">
+                        <div className="relative pointer-events-none">
                             <AnimatePresence mode="wait">
                                 {isUploading ? (
                                     <motion.div
@@ -228,7 +236,7 @@ export default function PDFUploadManager({ onUpdate }: PDFUploadManagerProps) {
                             </AnimatePresence>
                         </div>
 
-                        <div className="text-center z-10">
+                        <div className="text-center z-10 pointer-events-none">
                             <p className="text-sm font-bold tracking-tight text-white group-hover:text-cyan-400 transition-colors">
                                 {isUploading ? 'SYNCHRONIZING TARGET...' : 'UPLINK NEW PDF CONTEXT'}
                             </p>
