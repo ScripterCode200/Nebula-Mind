@@ -32,7 +32,8 @@ export async function GET() {
             value: 'system_global',
             maintenanceMode: false,
             antiCheatEnabled: false,
-            enableDirectCaptions: false // Default OFF
+            enableDirectCaptions: false, // Default OFF
+            enableAutoDailyGoals: true
         });
     }
     return NextResponse.json(setting);
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { maintenanceMode, aiModel, antiCheatEnabled, enableDirectCaptions } = await req.json();
+        const { maintenanceMode, aiModel, antiCheatEnabled, enableDirectCaptions, enableAutoDailyGoals } = await req.json();
         await connectToDatabase();
 
         const updateData: any = {};
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
         if (aiModel !== undefined) updateData.aiModel = aiModel;
         if (antiCheatEnabled !== undefined) updateData.antiCheatEnabled = antiCheatEnabled;
         if (enableDirectCaptions !== undefined) updateData.enableDirectCaptions = enableDirectCaptions;
+        if (enableAutoDailyGoals !== undefined) updateData.enableAutoDailyGoals = enableAutoDailyGoals;
 
         // Ensure 'value' exists if upserting a new doc
         const setting = await SystemSetting.findOneAndUpdate(

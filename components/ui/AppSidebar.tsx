@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
     Layout, BookOpen, Compass, Settings, Shield,
-    FileEdit, LogOut, ChevronLeft, User, CreditCard, Brain, PanelLeftClose, X, Trophy
+    FileEdit, LogOut, ChevronLeft, User, CreditCard, Brain, PanelLeftClose, X, Trophy, Rocket
 } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -54,6 +54,7 @@ export default function AppSidebar() {
         { name: 'Dashboard', href: '/dashboard', icon: Layout },
         { name: 'My Notebooks', href: '/notebook', icon: BookOpen },
         { name: 'Explore', href: '/explore', icon: Compass },
+        // { name: 'Play Zone', href: '/learning-booster', icon: Rocket }, // Temporarily removed
         { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
         { name: 'Profile', href: '/profile', icon: User },
     ];

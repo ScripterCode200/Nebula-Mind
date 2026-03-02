@@ -6,37 +6,29 @@ import {
     Activity, Clock, Zap, BookOpen,
     TrendingUp, Calendar, ArrowRight,
     MoreHorizontal, Star, PieChart,
-    BarChart2, Target, Award, MessageSquare, Copy
+    BarChart2, Target, Award, MessageSquare, Copy,
+    Database, ExternalLink, Search,
+    AlertCircle, ChevronDown, FileText, Youtube, Trash2
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
 import Link from 'next/link';
 import { useUserStore } from '@/store/useUserStore';
+import { useDashboardStore } from '@/store/useDashboardStore';
 import RarityStats from '@/components/ui/RarityStats';
+import { AnimatePresence } from 'framer-motion';
 
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
     const { name } = useUserStore();
-    const [loading, setLoading] = useState(true);
-    const [data, setData] = useState<any>(null);
+    const { data, isLoading, fetchDashboardData, removeSource, setData } = useDashboardStore();
+    const [searchQuery, setSearchQuery] = useState('');
+    const [visibleCount, setVisibleCount] = useState(6);
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const res = await fetch('/api/dashboard');
-                if (res.ok) {
-                    const json = await res.json();
-                    setData(json);
-                }
-            } catch (error) {
-                console.error('Failed to fetch dashboard data', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+        fetchDashboardData();
+    }, [fetchDashboardData]);
 
     const stats = [
         { label: 'Study Streak', value: data?.stats?.streak || '0 Days', icon: Zap, color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
@@ -65,7 +57,7 @@ export default function DashboardPage() {
     // Smooth curve approximation (simplified)
     const chartPath = chartData.length > 1 ? `M0,300 L${chartPoints} L800,300 Z` : "M0,300 L800,300 Z";
 
-    if (loading) {
+    if (!data && isLoading) {
         return (
             <div className="min-h-screen bg-[#050505] flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -381,6 +373,178 @@ export default function DashboardPage() {
                             </GlassCard>
                         ))}
                     </div>
+                </motion.div>
+
+                {/* --- NEW SECTION: SOURCE VAULT --- */}
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.8, delay: 0.9 }}
+                    className="mb-12"
+                >
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 uppercase tracking-tighter">
+                        <div className="space-y-1">
+                            <h3 className="text-3xl font-black flex items-center gap-3">
+                                <Database size={28} className="text-primary text-glow-primary" />
+                                Source Vault
+                            </h3>
+                            <p className="text-xs text-muted-foreground font-bold tracking-[0.2em] ml-1">Centralized Neural Data Repository</p>
+                        </div>
+
+                        <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-2 pl-4 w-full md:w-auto">
+                            <Search size={16} className="text-muted-foreground" />
+                            <input
+                                type="text"
+                                placeholder="FILTER SOURCES..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="bg-transparent border-none outline-none text-xs font-bold w-full md:w-64"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <AnimatePresence mode="popLayout">
+                            {(() => {
+                                const filteredSources = (data?.allSources || [])
+                                    .filter((s: any) =>
+                                        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        s.notebookTitle.toLowerCase().includes(searchQuery.toLowerCase())
+                                    );
+
+                                if (filteredSources.length === 0) {
+                                    return (
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className="col-span-1 md:col-span-3 h-48 flex items-center justify-center bg-white/5 border border-dashed border-white/10 rounded-[32px]"
+                                        >
+                                            <p className="text-muted-foreground font-black italic uppercase tracking-widest flex items-center gap-3">
+                                                <AlertCircle size={20} /> Data Vault is Empty
+                                            </p>
+                                        </motion.div>
+                                    );
+                                }
+
+                                return filteredSources.slice(0, visibleCount).map((source: any, i: number) => {
+                                    const Icon = source.type === 'youtube' ? Youtube : FileText;
+                                    const isExternal = source.type === 'youtube';
+
+                                    return (
+                                        <motion.div
+                                            key={source._id}
+                                            layout
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
+                                            transition={{ duration: 0.4, delay: i * 0.05 }}
+                                        >
+                                            <GlassCard className="p-6 h-full relative group overflow-hidden hover:border-primary/50 transition-all duration-500 bg-black/40!">
+                                                <div className="absolute inset-0 bg-radial-at-tr from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                                                <div className="flex justify-between items-start mb-6">
+                                                    <div className="p-3 bg-white/5 rounded-2xl group-hover:bg-primary/20 group-hover:text-primary transition-all duration-500 shadow-xl border border-white/5">
+                                                        <Icon size={24} />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (confirm('Permanently wipe this source from the vault?')) {
+                                                                    const prevData = data;
+                                                                    // Optimistic delete
+                                                                    removeSource(source._id);
+
+                                                                    try {
+                                                                        const res = await fetch(`/api/notebooks/${source.notebookId}/sources?sourceId=${source._id}`, {
+                                                                            method: 'DELETE'
+                                                                        });
+                                                                        if (res.ok) {
+                                                                            toast.success('Source Purged from Data Bank');
+                                                                        } else {
+                                                                            throw new Error('Failed to delete');
+                                                                        }
+                                                                    } catch (e) {
+                                                                        // Rollback
+                                                                        setData(prevData as any);
+                                                                        toast.error('Purge Failed - Restored Data');
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="p-2.5 rounded-xl bg-white/5 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all"
+                                                            title="Delete Source"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                        {isExternal && source.url && (
+                                                            <a
+                                                                href={source.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-2.5 rounded-xl bg-white/5 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                                                            >
+                                                                <ExternalLink size={16} />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <h4 className="text-lg font-black italic tracking-tight uppercase truncate">{source.name}</h4>
+
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-white/5 p-2 rounded-lg border border-white/5">
+                                                            <span className="text-muted/40">Origin</span>
+                                                            <Link href={`/notebook/${source.notebookId}`} className="text-primary hover:underline group-hover:text-glow-primary">
+                                                                {source.notebookTitle}
+                                                            </Link>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-white/5 p-2 rounded-lg border border-white/5">
+                                                            <span className="text-muted/40">Timestamp</span>
+                                                            <span className="text-white/60">{new Date(source.addedAt).toLocaleDateString()}</span>
+                                                        </div>
+                                                        {source.size > 0 && (
+                                                            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-white/5 p-2 rounded-lg border border-white/5">
+                                                                <span className="text-muted/40">Payload</span>
+                                                                <span className="text-white/60">{(source.size / 1024 / 1024).toFixed(2)} MB</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </GlassCard>
+                                        </motion.div>
+                                    );
+                                });
+                            })()}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Load More Button */}
+                    {(() => {
+                        const filteredCount = (data?.allSources || [])
+                            .filter((s: any) =>
+                                s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                s.notebookTitle.toLowerCase().includes(searchQuery.toLowerCase())
+                            ).length;
+
+                        if (filteredCount > visibleCount) {
+                            return (
+                                <div className="mt-12 flex flex-col items-center gap-4">
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => setVisibleCount(prev => prev + 6)}
+                                        className="px-8 py-4 bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-2xl text-primary text-xs font-black uppercase tracking-widest flex items-center gap-3 transition-all"
+                                    >
+                                        <ChevronDown size={16} /> Load More Neural Data
+                                    </motion.button>
+                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-40">
+                                        Showing {visibleCount} of {filteredCount} Sources
+                                    </p>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })()}
                 </motion.div>
             </div>
         </main>

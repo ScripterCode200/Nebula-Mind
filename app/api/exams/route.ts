@@ -25,7 +25,7 @@ export async function GET() {
         await connectToDatabase();
         const exams = await Exam.find({ isActive: true }).sort({ createdAt: -1 }).lean();
 
-        let completedExamIds: string[] = [];
+        const completedExamIds: string[] = [];
         const user = await getUser();
 
         if (user) {

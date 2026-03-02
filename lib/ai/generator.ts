@@ -157,7 +157,7 @@ export async function generateSingleGoal(
         }
 
         // Robust JSON Extraction
-        let cleanText = text.replace(/```json\s * /g, '').replace(/```\s*/g, '').trim();
+        const cleanText = text.replace(/```json\s * /g, '').replace(/```\s*/g, '').trim();
 
         const start = cleanText.indexOf('{');
         const end = cleanText.lastIndexOf('}');

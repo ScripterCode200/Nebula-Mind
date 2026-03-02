@@ -150,13 +150,13 @@ export default function SettingsPage() {
             bio: bio || '',
             dob: dob ? new Date(dob).toISOString().split('T')[0] : '',
             university: university || '',
-            location: user?.location || '',
-            socials: user?.socials || { linkedin: '', github: '', twitter: '', website: '' },
-            academic: user?.academic || { year: '', major: '', cgpa: '', institution: '' },
-            interests: user?.interests || [],
-            status: user?.status || { text: '', emoji: '' }
+            location: location || '',
+            socials: socials || { linkedin: '', github: '', twitter: '', website: '' },
+            academic: academic || { year: '', major: '', cgpa: '', institution: '' },
+            interests: interests || [],
+            status: status || { text: '', emoji: '' }
         });
-    }, [name, email, bio, dob, university, user]);
+    }, [name, email, bio, dob, university, location, socials, academic, interests, status]);
 
     useEffect(() => {
         if (!deletionScheduledAt) {
@@ -361,14 +361,16 @@ export default function SettingsPage() {
                                             className="space-y-12"
                                         >
                                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                                                <div className="space-y-1">
-                                                    <h2 className="text-4xl font-black text-white tracking-tighter flex items-center gap-4">
+                                                <div className="space-y-1 w-full md:w-auto">
+                                                    <h2 className="text-2xl md:text-4xl font-black text-white tracking-tighter flex flex-col md:flex-row items-start md:items-center gap-4">
                                                         <div className="p-3 rounded-2xl bg-cyan-500/20 text-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.4)] animate-pulse">
                                                             <User size={28} strokeWidth={3} />
                                                         </div>
-                                                        IDENTITY <span className="text-cyan-500">NODE</span>
+                                                        <div className="flex flex-col md:flex-row items-start md:items-center gap-0 md:gap-4">
+                                                            IDENTITY <span className="text-cyan-500">PROFILE</span>
+                                                        </div>
                                                     </h2>
-                                                    <p className="text-white/30 text-xs font-black uppercase tracking-[0.4em] ml-1">Configure your digital footprint</p>
+                                                    <p className="text-white/30 text-xs font-black uppercase tracking-[0.4em] ml-1 md:ml-[4.5rem]">Manage your personal details</p>
                                                 </div>
                                                 <div className="flex items-center gap-4">
                                                     <NeonButton
@@ -384,9 +386,9 @@ export default function SettingsPage() {
                                                 {/* Card 1: Visual Identity & Status (Spans 4) */}
                                                 <motion.div
                                                     whileHover={{ y: -5, scale: 1.01 }}
-                                                    className="md:col-span-4 space-y-8"
+                                                    className="md:col-span-4 space-y-6 md:space-y-8"
                                                 >
-                                                    <div className="relative group p-10 rounded-[3rem] border border-white/10 bg-linear-to-br from-cyan-500/15 via-black/60 to-blue-600/10 backdrop-blur-3xl transition-all hover:shadow-[0_0_60px_rgba(6,182,212,0.2)] hover:border-cyan-500/30">
+                                                    <div className="relative group p-6 md:p-10 rounded-3xl md:rounded-[3rem] border border-white/10 bg-linear-to-br from-cyan-500/15 via-black/60 to-blue-600/10 backdrop-blur-3xl transition-all hover:shadow-[0_0_60px_rgba(6,182,212,0.2)] hover:border-cyan-500/30">
                                                         <div className="flex flex-col items-center text-center space-y-8">
                                                             <div className="relative w-full flex justify-center">
                                                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-cyan-500/30 blur-[60px] rounded-full opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -400,21 +402,28 @@ export default function SettingsPage() {
 
                                                             <div className="w-full space-y-6">
                                                                 <div className="space-y-3 text-left">
-                                                                    <label className="text-[10px] font-black text-cyan-400/60 uppercase tracking-[0.4em] block ml-2">Presence Status</label>
+
+                                                                    <label className="text-[10px] font-black text-cyan-400/60 uppercase tracking-[0.4em] block ml-2">Status</label>
                                                                     <div className="flex items-center gap-3 p-2 bg-black/80 rounded-4xl border border-white/10 group-focus-within:border-cyan-500/50 group-focus-within:bg-black transition-all shadow-inner overflow-hidden">
-                                                                        <input
-                                                                            type="text"
-                                                                            value={formData.status.emoji}
-                                                                            onChange={(e) => setFormData({ ...formData, status: { ...formData.status, emoji: e.target.value } })}
-                                                                            className="w-14 h-12 text-center bg-white/5 rounded-xl border-none text-2xl focus:ring-2 focus:ring-cyan-500/30 transition-all font-emoji shrink-0"
-                                                                            placeholder="✨"
-                                                                        />
+                                                                        {/* Custom Emoji Container */}
+                                                                        <div className="relative shrink-0 group/emoji">
+                                                                            <div className="w-12 h-12 md:w-14 md:h-12 flex items-center justify-center bg-white/5 rounded-2xl border border-white/5 text-2xl transition-all group-hover/emoji:bg-white/10 group-focus-within/emoji:border-cyan-500/50 group-focus-within/emoji:shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                                                                                {formData.status.emoji || '✨'}
+                                                                            </div>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={formData.status.emoji}
+                                                                                onChange={(e) => setFormData({ ...formData, status: { ...formData.status, emoji: e.target.value } })}
+                                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-center"
+                                                                            />
+                                                                        </div>
+
                                                                         <input
                                                                             type="text"
                                                                             value={formData.status.text}
                                                                             onChange={(e) => setFormData({ ...formData, status: { ...formData.status, text: e.target.value } })}
-                                                                            className="flex-1 min-w-0 bg-transparent border-none py-3 text-sm text-white focus:ring-0 placeholder:text-white/10 font-bold tracking-wide truncat"
-                                                                            placeholder="Broadcasting..."
+                                                                            className="flex-1 min-w-0 bg-transparent border-none py-3 text-sm text-white focus:ring-0 placeholder:text-white/10 font-bold tracking-wide truncate"
+                                                                            placeholder="What's on your mind?"
                                                                         />
                                                                     </div>
                                                                 </div>
@@ -424,51 +433,51 @@ export default function SettingsPage() {
 
                                                     <motion.div
                                                         whileHover={{ y: -5 }}
-                                                        className="p-10 rounded-[3rem] border border-white/10 bg-linear-to-br from-white/5 via-black/40 to-white/1 backdrop-blur-3xl hover:border-white/20 transition-all shadow-2xl"
+                                                        className="p-6 md:p-10 rounded-3xl md:rounded-[3rem] border border-white/10 bg-linear-to-br from-white/5 via-black/40 to-white/1 backdrop-blur-3xl hover:border-white/20 transition-all shadow-2xl"
                                                     >
                                                         <div className="flex items-center gap-3 mb-6">
                                                             <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
                                                                 <BookOpen size={18} />
                                                             </div>
-                                                            <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Synapse Bio</span>
+                                                            <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Bio</span>
                                                         </div>
                                                         <textarea
                                                             rows={6}
                                                             value={formData.bio}
                                                             onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                                                             className="w-full bg-black/40 border border-white/5 rounded-3xl px-6 py-5 text-sm text-white/70 focus:outline-none focus:border-cyan-500/60 focus:bg-cyan-500/3 transition-all resize-none placeholder:text-white/5 leading-relaxed font-medium"
-                                                            placeholder="Define your existence..."
+                                                            placeholder="Tell us about yourself..."
                                                         />
                                                     </motion.div>
                                                 </motion.div>
 
                                                 {/* Card 2: Core Data (Spans 8) */}
-                                                <div className="md:col-span-8 space-y-8">
+                                                <div className="md:col-span-8 space-y-6 md:space-y-8">
                                                     <motion.div
                                                         whileHover={{ y: -5 }}
-                                                        className="p-10 rounded-[3.5rem] border border-white/10 bg-linear-to-br from-indigo-600/15 via-black/80 to-purple-700/10 backdrop-blur-3xl hover:border-indigo-500/40 hover:shadow-[0_0_80px_rgba(99,102,241,0.15)] transition-all"
+                                                        className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-white/10 bg-linear-to-br from-indigo-600/15 via-black/80 to-purple-700/10 backdrop-blur-3xl hover:border-indigo-500/40 hover:shadow-[0_0_80px_rgba(99,102,241,0.15)] transition-all"
                                                     >
                                                         <div className="flex items-center gap-4 mb-10">
                                                             <div className="p-3 rounded-2xl bg-indigo-500/20 text-indigo-400 shadow-lg">
                                                                 <Target size={22} />
                                                             </div>
-                                                            <h3 className="text-lg font-black text-white uppercase tracking-[0.3em]">Core Parameters</h3>
+                                                            <h3 className="text-lg font-black text-white uppercase tracking-[0.3em]">Basic Info</h3>
                                                         </div>
 
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                                             <div className="space-y-6">
                                                                 <div className="space-y-3 group">
-                                                                    <label className="text-[10px] uppercase font-black text-white/30 tracking-[0.3em] ml-2 group-focus-within:text-indigo-400 transition-colors">Handle</label>
+                                                                    <label className="text-[10px] uppercase font-black text-white/30 tracking-[0.3em] ml-2 group-focus-within:text-indigo-400 transition-colors">Name</label>
                                                                     <input
                                                                         type="text"
                                                                         value={formData.name}
                                                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                                         className="w-full bg-black/50 border-2 border-white/5 rounded-3xl px-8 py-5 text-white text-lg focus:outline-none focus:border-indigo-500/50 focus:bg-indigo-500/10 transition-all outline-none font-black tracking-tight shadow-inner"
-                                                                        placeholder="Identifier"
+                                                                        placeholder="Your Name"
                                                                     />
                                                                 </div>
                                                                 <div className="space-y-3">
-                                                                    <label className="text-[10px] uppercase font-black text-white/10 tracking-[0.3em] ml-2">Secure Link</label>
+                                                                    <label className="text-[10px] uppercase font-black text-white/10 tracking-[0.3em] ml-2">Email Address</label>
                                                                     <div className="w-full bg-black/30 border border-white/5 rounded-3xl px-8 py-5 text-white/20 cursor-not-allowed italic font-mono text-xs flex items-center gap-3">
                                                                         <Lock size={12} className="opacity-50" />
                                                                         {formData.email}
@@ -478,7 +487,7 @@ export default function SettingsPage() {
 
                                                             <div className="space-y-6">
                                                                 <div className="space-y-3 group">
-                                                                    <label className="text-[10px] uppercase font-black text-white/30 tracking-[0.3em] ml-2 group-focus-within:text-purple-400 transition-colors">Origin Cycle</label>
+                                                                    <label className="text-[10px] uppercase font-black text-white/30 tracking-[0.3em] ml-2 group-focus-within:text-purple-400 transition-colors">Date of Birth</label>
                                                                     <input
                                                                         type="date"
                                                                         value={formData.dob}
@@ -487,7 +496,7 @@ export default function SettingsPage() {
                                                                     />
                                                                 </div>
                                                                 <div className="space-y-3 group">
-                                                                    <label className="text-[10px] uppercase font-black text-white/30 tracking-[0.3em] ml-2 group-focus-within:text-cyan-400 transition-colors">Sector</label>
+                                                                    <label className="text-[10px] uppercase font-black text-white/30 tracking-[0.3em] ml-2 group-focus-within:text-cyan-400 transition-colors">Location</label>
                                                                     <div className="relative">
                                                                         <MapPin size={18} className="absolute left-6 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-cyan-400 transition-colors" />
                                                                         <input
@@ -507,13 +516,13 @@ export default function SettingsPage() {
                                                         {/* Academic Card */}
                                                         <motion.div
                                                             whileHover={{ y: -5 }}
-                                                            className="p-8 rounded-[3rem] border border-white/10 bg-linear-to-br from-pink-500/10 via-black/40 to-purple-500/5 backdrop-blur-3xl hover:border-pink-500/30 transition-all"
+                                                            className="p-6 md:p-8 rounded-3xl md:rounded-[3rem] border border-white/10 bg-linear-to-br from-pink-500/10 via-black/40 to-purple-500/5 backdrop-blur-3xl hover:border-pink-500/30 transition-all"
                                                         >
                                                             <div className="flex items-center gap-4 mb-6">
                                                                 <div className="p-2 rounded-lg bg-pink-500/20 text-pink-400">
                                                                     <GraduationCap size={20} />
                                                                 </div>
-                                                                <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Academic Node</h3>
+                                                                <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Academic Info</h3>
                                                             </div>
                                                             <div className="space-y-4">
                                                                 <input
@@ -545,13 +554,13 @@ export default function SettingsPage() {
                                                         {/* Tags Card */}
                                                         <motion.div
                                                             whileHover={{ y: -5 }}
-                                                            className="p-8 rounded-[3rem] border border-white/10 bg-linear-to-br from-emerald-500/10 via-black/40 to-teal-500/5 backdrop-blur-3xl hover:border-emerald-500/30 transition-all flex flex-col"
+                                                            className="p-6 md:p-8 rounded-3xl md:rounded-[3rem] border border-white/10 bg-linear-to-br from-emerald-500/10 via-black/40 to-teal-500/5 backdrop-blur-3xl hover:border-emerald-500/30 transition-all flex flex-col"
                                                         >
                                                             <div className="flex items-center gap-4 mb-6">
                                                                 <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
                                                                     <Hash size={20} />
                                                                 </div>
-                                                                <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Neural Tags</h3>
+                                                                <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Interests</h3>
                                                             </div>
                                                             <div className="flex-1 space-y-4">
                                                                 <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto no-scrollbar">
@@ -582,7 +591,7 @@ export default function SettingsPage() {
                                                 <div className="md:col-span-12">
                                                     <motion.div
                                                         whileHover={{ y: -5 }}
-                                                        className="p-8 md:p-10 rounded-[3.5rem] border border-white/10 bg-linear-to-br from-cyan-500/5 via-black/40 to-blue-500/5 backdrop-blur-3xl transition-all relative overflow-hidden"
+                                                        className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-white/10 bg-linear-to-br from-cyan-500/5 via-black/40 to-blue-500/5 backdrop-blur-3xl transition-all relative overflow-hidden"
                                                     >
                                                         {/* Subtle Background Glow */}
                                                         <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[100px] pointer-events-none" />
@@ -592,8 +601,8 @@ export default function SettingsPage() {
                                                                 <Link2 size={24} />
                                                             </div>
                                                             <div>
-                                                                <h3 className="text-lg font-black text-white uppercase tracking-[0.3em]">Broadcast Channels</h3>
-                                                                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-bold mt-1">External Data Links & Neural Presences</p>
+                                                                <h3 className="text-lg font-black text-white uppercase tracking-[0.3em]">Social Profiles</h3>
+                                                                <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-bold mt-1">Connect your social accounts</p>
                                                             </div>
                                                         </div>
 
@@ -606,7 +615,7 @@ export default function SettingsPage() {
                                                             ].map((social) => (
                                                                 <div key={social.key} className="flex flex-col gap-2 group">
                                                                     <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40 ml-4 group-within:text-white/60 transition-colors">
-                                                                        {social.label} Pattern
+                                                                        {social.label}
                                                                     </label>
                                                                     <div className={cn(
                                                                         "flex items-center gap-3 p-2 bg-black/60 rounded-4xl border border-white/5 transition-all duration-300 min-w-0 overflow-hidden isolate relative",

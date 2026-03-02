@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         const pdfUrlInput = formData.get('pdfUrl') as string;
         const fileKeyInput = formData.get('fileKey') as string;
         let finalContentKey = formData.get('contentKey') as string;
-        let incomingType = formData.get('type') as string;
+        const incomingType = formData.get('type') as string;
 
         if (!title || (!file && !pdfUrlInput && !fileKeyInput && !finalContentKey)) {
             return NextResponse.json({ error: 'Title and either File, URL, FileKey, or ContentKey are required' }, { status: 400 });
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
                 }
             } else if (fileType === 'pdf') {
                 console.log('Starting PDF parsing...');
-                let clientPdfContent = formData.get('pdfContent') as string || '';
+                const clientPdfContent = formData.get('pdfContent') as string || '';
 
                 if (clientPdfContent) {
                     pdfContent = clientPdfContent;
@@ -189,18 +189,23 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '9');
+        const search = searchParams.get('search') || '';
         const skip = (page - 1) * limit;
 
         await connectToDatabase();
 
-        console.log(`Fetching notebooks for user: ${userId}, Page: ${page}, Limit: ${limit}`);
+        console.log(`Fetching notebooks for user: ${userId}, Page: ${page}, Limit: ${limit}${search ? `, Search: ${search}` : ''}`);
 
-        const query = {
+        const query: any = {
             $or: [
                 { userId: userId },
                 { 'sharedWith.userId': userId }
             ]
         };
+
+        if (search) {
+            query.title = { $regex: search, $options: 'i' };
+        }
 
         // Get Total Count
         const total = await Notebook.countDocuments(query);

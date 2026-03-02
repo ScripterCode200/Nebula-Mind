@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
+import { getProxyList } from '@/lib/proxies';
 
 const ytDlpPath = path.join(process.cwd(), 'scripts', 'yt-dlp.exe');
 
@@ -57,11 +58,94 @@ function parseVtt(vttContent: string): string {
         textLines.push(line);
     }
 
-    // Join with spaces for flow, or newlines? 
-    // Captions are often short phrases. Joining with space usually makes a readable paragraph.
     return textLines.join(' ');
 }
 
+/**
+ * Internal function to fetch captions with a specific proxy (or directly).
+ */
+async function _fetchCaptionsInternal(url: string, videoId: string, proxy: string | null): Promise<{ success: boolean; text: string | null; error?: any; type?: 'BLOCK' | 'UNAVAILABLE' | 'OTHER' }> {
+    const tempDir = os.tmpdir();
+    const uniqueId = uuidv4();
+    const outputPrefix = path.join(tempDir, uniqueId);
+
+    const args = [
+        '--skip-download',
+        '--write-subs',
+        '--write-auto-subs',
+        '--sub-lang', 'en,en-orig,en-US,en-GB',
+        '--sub-format', 'vtt',
+        '--output', `${outputPrefix}.%(ext)s`,
+        '--socket-timeout', '5', // Fail fast on dead proxies
+        url
+    ];
+
+    if (proxy) {
+        args.splice(1, 0, '--proxy', proxy);
+    }
+
+    // console.log(`[yt-dlp-captions] Spawning yt-dlp for ${videoId} | Proxy: ${proxy ? 'YES' : 'NO'}...`);
+    // Mask proxy details in logs
+    const logProxy = proxy ? `...${proxy.slice(-5)}` : 'DIRECT';
+    console.log(`[yt-dlp-captions] Spawning yt-dlp... Proxy: ${logProxy}`);
+
+    return new Promise((resolve) => {
+        const process = spawn(ytDlpPath, args);
+        let errorOutput = '';
+
+        process.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+        });
+
+        process.on('close', async (code) => {
+            // Check specific yt-dlp errors from stderr
+            if (errorOutput.includes('Video unavailable') || errorOutput.includes('Private video') || errorOutput.includes('404 Not Found')) {
+                return resolve({ success: false, text: null, error: 'Video Unavailable', type: 'UNAVAILABLE' });
+            }
+            if (errorOutput.includes('Sign in to confirm') || errorOutput.includes('HTTP Error 429') || errorOutput.includes('bot')) {
+                return resolve({ success: false, text: null, error: 'Blocked/Bot Detected', type: 'BLOCK' });
+            }
+
+            // Attempt to find the generated file
+            try {
+                const files = fs.readdirSync(tempDir);
+                const captionFile = files.find(f => f.startsWith(uniqueId) && f.endsWith('.vtt'));
+
+                if (!captionFile) {
+                    // If blocked or network error, code usually != 0
+                    if (code !== 0) {
+                        // Double check if it looks like a block or network issue
+                        return resolve({ success: false, text: null, error: `Exit Code ${code}: ${errorOutput.slice(0, 100)}...`, type: 'OTHER' });
+                    }
+                    // console.warn('[yt-dlp-captions] No VTT file generated, but no obvious error.');
+                    return resolve({ success: false, text: null, error: 'No VTT generated', type: 'OTHER' });
+                }
+
+                const fullPath = path.join(tempDir, captionFile);
+                const content = fs.readFileSync(fullPath, 'utf8');
+                fs.unlinkSync(fullPath);
+
+                const parsedText = parseVtt(content);
+                if (!parsedText || parsedText.length < 50) {
+                    return resolve({ success: false, text: null, error: 'Transcript too short', type: 'OTHER' });
+                }
+
+                resolve({ success: true, text: parsedText });
+
+            } catch (err) {
+                resolve({ success: false, text: null, error: err, type: 'OTHER' });
+            }
+        });
+
+        process.on('error', (err) => {
+            resolve({ success: false, text: null, error: err, type: 'OTHER' });
+        });
+    });
+}
+
+/**
+ * Public function to fetch captions with robust proxy rotation and retries.
+ */
 export async function fetchCaptionsWithYtDlp(url: string): Promise<string | null> {
     const videoId = extractVideoId(url);
     if (!videoId) {
@@ -69,78 +153,47 @@ export async function fetchCaptionsWithYtDlp(url: string): Promise<string | null
         return null;
     }
 
-    const tempDir = os.tmpdir();
-    const uniqueId = uuidv4();
-    // Prefix for output files: tempDir/uuid
-    const outputPrefix = path.join(tempDir, uniqueId);
+    const proxies = getProxyList();
+    // Shuffle proxies for better distribution
+    const shuffledProxies = [...proxies].sort(() => 0.5 - Math.random());
 
-    // yt-dlp will append .en.vtt or .vtt depending on what it finds
-    // We use -o to control the filename base.
-    // Argument order:
-    // --skip-download: Don't get the video
-    // --write-subs: Get manual subs
-    // --write-auto-subs: Get auto subs if manual not found (default behavior with specific flags?)
-    // Actually you usually pass both to get what's available. 
-    // --sub-lang en: Prefer English
-    // --sub-format vtt: Ensure VTT format
+    // Attempt list: proxies first, then direct as fallback (optional, maybe direct is blocked too)
+    // If user specifically bought proxies to avoid blocking, maybe we should ONLY use proxies?
+    // But if they all fail, trying direct is a valid last resort.
+    const attemptList = [...shuffledProxies];
+    if (attemptList.length > 0) {
+        attemptList.push(null as unknown as string); // Add null for direct
+    } else {
+        attemptList.push(null as unknown as string);
+    }
 
-    const args = [
-        '--skip-download',
-        '--write-subs',
-        '--write-auto-subs',
-        '--sub-lang', 'en,en-orig,en-US,en-GB', // Try various english codes
-        '--sub-format', 'vtt',
-        '--output', `${outputPrefix}.%(ext)s`,
-        url
-    ];
+    // Cap attempts
+    const MAX_ATTEMPTS = Math.min(attemptList.length, 6); // Try up to 6 distinct IPs
 
-    console.log(`[yt-dlp-captions] Spawning yt-dlp for ${videoId}...`);
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        const proxy = attemptList[i];
+        // console.log(`\n[Transcribe] Attempt ${i + 1}/${MAX_ATTEMPTS} | Proxy: ${proxy ? '***' : 'DIRECT'}`);
 
-    return new Promise<string | null>((resolve, reject) => {
-        const process = spawn(ytDlpPath, args);
+        const result = await _fetchCaptionsInternal(url, videoId, proxy);
 
-        process.on('close', async (code) => {
-            if (code !== 0) {
-                console.warn(`[yt-dlp-captions] yt-dlp exited with code ${code}`);
-                // Proceed to check for files anyway? Sometimes it errors on other things.
-            }
+        if (result.success && result.text) {
+            console.log(`[Transcribe] Success on attempt ${i + 1}`);
+            return result.text;
+        }
 
-            // Find the generated file
-            // It should be named uniqueId.en.vtt or something similar.
-            try {
-                const files = fs.readdirSync(tempDir);
-                const captionFile = files.find(f => f.startsWith(uniqueId) && f.endsWith('.vtt'));
+        console.warn(`[Transcribe] Attempt ${i + 1} Failed: ${typeof result.error === 'string' ? result.error : 'Unknown Error'}`);
 
-                if (!captionFile) {
-                    console.warn('[yt-dlp-captions] No VTT file generated.');
-                    return resolve(null);
-                }
+        if (result.type === 'UNAVAILABLE') {
+            console.error('[Transcribe] Video is unavailable (404/403). Aborting retries.');
+            return null; // Don't retry for purely content errors
+        }
 
-                const fullPath = path.join(tempDir, captionFile);
-                console.log(`[yt-dlp-captions] Found caption file: ${fullPath}`);
+        // If BLOCK or OTHER (Network), continue
+        if (i < MAX_ATTEMPTS - 1) {
+            console.log('[Transcribe] Switching logic...');
+        }
+    }
 
-                const content = fs.readFileSync(fullPath, 'utf8');
-
-                // Cleanup
-                fs.unlinkSync(fullPath);
-
-                const parsedText = parseVtt(content);
-                if (!parsedText || parsedText.length < 50) {
-                    console.warn('[yt-dlp-captions] Parsed text too short or empty.');
-                    return resolve(null);
-                }
-
-                resolve(parsedText);
-
-            } catch (err) {
-                console.error('[yt-dlp-captions] Error processing file:', err);
-                resolve(null); // Fallback gracefully
-            }
-        });
-
-        process.on('error', (err) => {
-            console.error('[yt-dlp-captions] Spawn error:', err);
-            resolve(null);
-        });
-    });
+    console.error('[Transcribe] All attempts failed.');
+    return null;
 }

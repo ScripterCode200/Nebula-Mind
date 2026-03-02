@@ -31,6 +31,7 @@ interface UserState {
     };
     interests: string[];
     status: {
+        text: string;
         emoji: string;
     };
     preferences?: {

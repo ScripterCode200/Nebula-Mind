@@ -8,6 +8,7 @@ export interface ISystemSetting extends Document {
     aiModel?: string; // Added
     antiCheatEnabled?: boolean; // Added
     enableDirectCaptions?: boolean; // Strategy 1 Toggle
+    enableAutoDailyGoals?: boolean; // Added for Automatic Goal Generation Control
 }
 
 const SystemSettingSchema: Schema = new Schema({
@@ -17,7 +18,8 @@ const SystemSettingSchema: Schema = new Schema({
     maintenanceMode: { type: Boolean, default: false }, // Added
     aiModel: { type: String, default: 'gemini-2.5-flash' }, // Added
     antiCheatEnabled: { type: Boolean, default: true }, // Added - Default ON
-    enableDirectCaptions: { type: Boolean, default: false } // Compliance Default: OFF
+    enableDirectCaptions: { type: Boolean, default: false }, // Compliance Default: OFF
+    enableAutoDailyGoals: { type: Boolean, default: true } // Default ON
 });
 
 export default mongoose.models.SystemSetting || mongoose.model<ISystemSetting>('SystemSetting', SystemSettingSchema);

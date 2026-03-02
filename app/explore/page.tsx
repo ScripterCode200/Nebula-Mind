@@ -132,14 +132,14 @@ export default function ExplorePage() {
     const activeFiltersCount = (selectedSubject ? 1 : 0) + (selectedRarity ? 1 : 0);
 
     return (
-        <div className="min-h-screen pt-24 pb-20 px-4 md:px-8 max-w-7xl mx-auto">
+        <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 md:px-8 max-w-[1440px] mx-auto">
 
             {/* Header */}
-            <div className="mb-12">
+            <div className="mb-10 sm:mb-12">
                 <motion.h1
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-white/60 mb-4"
+                    className="text-3xl sm:text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-white/60 mb-3 sm:mb-4"
                 >
                     Explore
                 </motion.h1>
@@ -148,7 +148,7 @@ export default function ExplorePage() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="text-muted-foreground text-lg max-w-xl"
+                        className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl leading-relaxed"
                     >
                         Discover new challenges, achieve daily goals, and earn rewards to level up your knowledge.
                     </motion.p>
@@ -162,22 +162,24 @@ export default function ExplorePage() {
                 animate="show"
                 className="mb-16"
             >
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 rounded-lg bg-green-500/10 text-green-400">
-                        <Target size={24} />
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 sm:mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-green-500/10 text-green-400 shrink-0">
+                            <Target size={24} />
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-bold text-white whitespace-nowrap">Daily Goals</h2>
                     </div>
-                    <h2 className="text-2xl font-bold text-white">Daily Goals</h2>
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-3 sm:ml-auto w-full sm:w-auto">
                         <Link
                             href="/settings?tab=daily-goals"
-                            className="group relative flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:-translate-y-0.5 transition-all duration-300"
+                            className="group relative flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:-translate-y-0.5 transition-all duration-300 flex-1 sm:flex-none justify-center"
                         >
                             <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <Settings size={16} className="group-hover:rotate-90 transition-transform duration-500" />
-                            <span className="text-sm font-bold tracking-wide">Customise Goals</span>
+                            <Settings size={16} className="group-hover:rotate-90 transition-transform duration-500 hidden xs:block" />
+                            <span className="text-xs sm:text-sm font-bold tracking-wide">Customise</span>
                         </Link>
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-sm font-mono text-muted-foreground shadow-[0_0_10px_rgba(34,197,94,0.1)]">
-                            <span className="text-xs uppercase tracking-wider text-green-400/70 font-sans font-semibold mr-1">Reset in</span>
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-xs sm:text-sm font-mono text-muted-foreground shadow-[0_0_10px_rgba(34,197,94,0.1)] flex-1 sm:flex-none justify-center">
+                            <span className="text-[10px] uppercase tracking-wider text-green-400/70 font-sans font-semibold mr-1 hidden xs:inline">Reset in</span>
                             <span className="text-green-400 font-bold">{timeLeft}</span>
                         </div>
                     </div>
@@ -197,7 +199,7 @@ export default function ExplorePage() {
                         <p className="relative z-10 text-sm text-muted-foreground">AI is crafting your daily challenges...</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                         {dailyGoals.map((goal) => (
                             <motion.div
                                 key={goal.id}
@@ -223,18 +225,18 @@ export default function ExplorePage() {
                 className="space-y-6"
             >
                 {/* Modern Section Header with Enhanced Search & Filter */}
-                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 p-1 relative z-20">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-1 relative z-20">
                     <div className="flex items-center gap-3 pl-2">
-                        <div className="p-2.5 rounded-xl bg-linear-to-br from-primary/20 to-secondary/20 text-white shadow-lg shadow-primary/10 border border-white/10">
+                        <div className="p-2.5 rounded-xl bg-linear-to-br from-primary/20 to-secondary/20 text-white shadow-lg shadow-primary/10 border border-white/10 shrink-0">
                             <GraduationCap size={24} />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-bold text-white">Available Exams</h2>
+                            <h2 className="text-xl sm:text-2xl font-bold text-white">Available Exams</h2>
                             <p className="text-xs text-muted-foreground">Find your next challenge</p>
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto min-w-[300px] lg:min-w-[600px]">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto min-w-0 sm:min-w-[400px] lg:min-w-[500px]">
                         {/* Search Input */}
                         <div className="relative flex-1 group">
                             <div className="absolute inset-0 bg-linear-to-r from-primary/20 to-secondary/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
@@ -245,7 +247,7 @@ export default function ExplorePage() {
                                     placeholder="Search exams..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full h-12 bg-black/40 border border-white/10 rounded-xl py-2 pl-12 pr-4 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:bg-black/60 transition-all duration-300 shadow-inner"
+                                    className="w-full h-12 bg-black/40 border border-white/10 rounded-xl py-2 pl-12 pr-10 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:bg-black/60 transition-all duration-300 shadow-inner"
                                 />
                                 {searchQuery && (
                                     <button
@@ -259,14 +261,14 @@ export default function ExplorePage() {
                         </div>
 
                         {/* Filter Dropdown */}
-                        <div className="relative">
+                        <div className="relative w-full sm:w-auto">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setIsFilterOpen(!isFilterOpen);
                                 }}
                                 className={cn(
-                                    "h-12 px-4 rounded-xl border flex items-center gap-2 text-sm font-medium transition-all duration-300 min-w-[140px] justify-between",
+                                    "h-12 px-4 rounded-xl border flex items-center gap-2 text-sm font-medium transition-all duration-300 w-full sm:min-w-[140px] justify-between",
                                     isFilterOpen || activeFiltersCount > 0
                                         ? "bg-primary/10 border-primary/50 text-white shadow-[0_0_15px_rgba(0,240,255,0.15)]"
                                         : "bg-black/40 border-white/10 text-muted-foreground hover:text-white hover:bg-white/5"
@@ -288,7 +290,7 @@ export default function ExplorePage() {
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="absolute top-full right-0 mt-2 w-72 bg-[#0A0A0A] border border-white/10 rounded-xl p-4 shadow-2xl backdrop-blur-xl z-50 overflow-hidden"
+                                        className="absolute top-full right-0 mt-2 w-full sm:w-72 bg-[#0A0A0A] border border-white/10 rounded-xl p-4 shadow-2xl backdrop-blur-xl z-50 overflow-hidden"
                                     >
                                         <div className="space-y-4">
                                             {/* Subject Filter */}
@@ -357,7 +359,7 @@ export default function ExplorePage() {
                 </div>
 
                 {/* Results Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     <AnimatePresence mode="popLayout">
                         {filteredExams.length > 0 ? (
                             filteredExams.map((exam) => (

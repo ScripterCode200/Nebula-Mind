@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useGoalStore } from '@/store/useGoalStore';
-
+import { toast } from 'sonner';
 export default function GlobalGoalManager() {
     const pathname = usePathname();
     const { dailyGoals, setDailyGoals, addDailyGoal, setIsLoading } = useGoalStore();
@@ -47,12 +47,18 @@ export default function GlobalGoalManager() {
                     }
                 }
 
+                let autoGenerateEnabled = true;
+
                 // ALWAYS Fetch Fresh Data (Stale-While-Revalidate)
                 // This ensures statuses (attempts/completed) are up to date even if cache exists
                 try {
                     const res = await fetch('/api/daily-goals', { signal: generationController.signal });
                     if (res.ok) {
                         const data = await res.json();
+                        if (data.autoGenerateEnabled !== undefined) {
+                            autoGenerateEnabled = data.autoGenerateEnabled;
+                        }
+
                         if (data.goals) {
                             const mapped = data.goals.map((g: any) => ({
                                 ...g,
@@ -75,6 +81,12 @@ export default function GlobalGoalManager() {
                 if (currentGoals.length > 0) setIsLoading(false);
 
                 if (needed > 0) {
+                    if (!autoGenerateEnabled) {
+                        console.log(`[GlobalGoalManager] Automatic generation is disabled by Admin. Setup paused.`);
+                        setIsLoading(false);
+                        return; // Exit early if automatic generation is globally disabled
+                    }
+
                     console.log(`[GlobalGoalManager] Needs ${needed} more goals. triggering background generation...`);
 
                     for (let i = 0; i < needed; i++) {
@@ -103,7 +115,16 @@ export default function GlobalGoalManager() {
                                 signal: generationController.signal
                             });
 
-                            if (!genRes.ok) continue;
+                            if (!genRes.ok) {
+                                const errData = await genRes.json().catch(() => ({}));
+                                if (genRes.status === 402 || genRes.status === 403 || (errData.error && errData.error.toLowerCase().includes('billing'))) {
+                                    console.error("Billing error from API.");
+                                    setIsLoading(false);
+                                    toast.error(errData.error || "AI Generation failed: Billing required.");
+                                    break;
+                                }
+                                continue;
+                            }
 
                             const genData = await genRes.json();
                             if (genData.goal) {

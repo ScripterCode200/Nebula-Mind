@@ -58,8 +58,39 @@ export async function GET(req: NextRequest) {
             return { title, action, icon, date: log.createdAt };
         });
 
-        // 2. Notebook Count
-        const notebookCount = await Notebook.countDocuments({ userId });
+        // 2. Notebooks & Sources Consolidation
+        const notebooks = await Notebook.find({ userId }).lean();
+        const notebookCount = notebooks.length;
+
+        const allSources: any[] = [];
+        notebooks.forEach((nb: any) => {
+            if (nb.sources && Array.isArray(nb.sources) && nb.sources.length > 0) {
+                nb.sources.forEach((source: any) => {
+                    allSources.push({
+                        ...source,
+                        notebookId: nb._id,
+                        notebookTitle: nb.title
+                    });
+                });
+            } else if (nb.pdfUrl || nb.pdfKey || nb.url) {
+                // FALLBACK: Treat legacy notebook as its own source
+                allSources.push({
+                    _id: nb._id, // Use notebook ID as source ID fallback
+                    type: nb.fileType || 'pdf',
+                    name: nb.title || 'Original Document',
+                    fileKey: nb.pdfKey || '',
+                    contentKey: nb.contentKey || '',
+                    addedAt: nb.createdAt || new Date(),
+                    size: 0,
+                    url: nb.pdfUrl || nb.url || '',
+                    notebookId: nb._id,
+                    notebookTitle: nb.title
+                });
+            }
+        });
+
+        // Sort sources by addedAt descending
+        allSources.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
 
         // 3. Format Stats
         const stats = {
@@ -70,7 +101,6 @@ export async function GET(req: NextRequest) {
         };
 
         // 4. Daily Stats (for Chart)
-        // Ensure we send last 7 days at least, filling gaps with 0
         const chartData = user.dailyStats || [];
 
         return NextResponse.json({
@@ -78,6 +108,7 @@ export async function GET(req: NextRequest) {
             rarityStats: user.stats?.rarityStats || { uncommon: 0, rare: 0, epic: 0, legendary: 0 },
             recentActivity,
             chartData,
+            allSources,
             achievements: user.achievements,
             user: { _id: user._id, name: user.name, email: user.email }
         });

@@ -18,8 +18,9 @@ interface NotebookState {
     isLoading: boolean;
     total: number;
     isInitialized: boolean;
+    currentSearchQuery: string;
 
-    fetchNotebooks: (reset?: boolean) => Promise<void>;
+    fetchNotebooks: (reset?: boolean, searchQuery?: string) => Promise<void>;
     addNotebook: (notebook: Notebook) => void;
     removeNotebook: (id: string) => void;
     updateNotebook: (id: string, updates: Partial<Notebook>) => void;
@@ -34,24 +35,38 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     isLoading: false,
     total: 0,
     isInitialized: false,
+    currentSearchQuery: '',
 
-    fetchNotebooks: async (reset = false) => {
-        const { page, limit, hasMore, isLoading, isInitialized } = get();
+    fetchNotebooks: async (reset = false, searchQuery?: string) => {
+        const { page, limit, hasMore, isLoading, isInitialized, currentSearchQuery } = get();
+
+        // If explicitly providing a search query, it's a reset operation
+        const isSearchReset = searchQuery !== undefined && searchQuery !== currentSearchQuery;
+        const actualReset = reset || isSearchReset;
+        const effectiveSearch = searchQuery !== undefined ? searchQuery : currentSearchQuery;
 
         // If not resetting and already loading or no more items (and already initialized), do nothing
-        if (!reset && (isLoading || (!hasMore && isInitialized))) return;
+        if (!actualReset && (isLoading || (!hasMore && isInitialized))) return;
 
-        set({ isLoading: true });
+        set({
+            isLoading: true,
+            currentSearchQuery: effectiveSearch
+        });
 
         try {
-            const currentPage = reset ? 1 : page;
-            const res = await fetch(`/api/notebooks?page=${currentPage}&limit=${limit}`);
+            const currentPage = actualReset ? 1 : page;
+            let url = `/api/notebooks?page=${currentPage}&limit=${limit}`;
+            if (effectiveSearch) {
+                url += `&search=${encodeURIComponent(effectiveSearch)}`;
+            }
+
+            const res = await fetch(url);
 
             if (res.ok) {
                 const data = await res.json();
 
                 set(state => ({
-                    notebooks: reset
+                    notebooks: actualReset
                         ? data.notebooks
                         : [...state.notebooks, ...data.notebooks],
                     page: currentPage + 1,

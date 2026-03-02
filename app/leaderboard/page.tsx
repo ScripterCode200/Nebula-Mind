@@ -73,7 +73,7 @@ export default function LeaderboardPage() {
     const displayList = isSearching ? filteredData : standardList;
 
     return (
-        <div className="min-h-screen pt-24 pb-20 px-4 md:px-8 max-w-7xl mx-auto overflow-hidden relative">
+        <div className="min-h-screen pt-24 pb-20 px-4 md:px-8 max-w-[1440px] mx-auto overflow-hidden relative">
 
             {/* Background Ambience */}
             <div className="fixed inset-0 pointer-events-none">
@@ -82,17 +82,17 @@ export default function LeaderboardPage() {
             </div>
 
             {/* Header */}
-            <div className={`relative z-10 ${isSearching ? 'mb-12' : 'mb-32'}`}>
+            <div className={`relative z-10 ${isSearching ? 'mb-8 sm:mb-12' : 'mb-20 sm:mb-32'}`}>
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center"
                 >
-                    <h1 className="text-4xl md:text-6xl font-black bg-clip-text text-transparent bg-linear-to-r from-yellow-200 via-yellow-400 to-yellow-600 mb-4 drop-shadow-sm flex items-center justify-center gap-4">
-                        <Trophy className="text-yellow-400 w-10 h-10 md:w-16 md:h-16" />
+                    <h1 className="text-3xl sm:text-4xl md:text-6xl font-black bg-clip-text text-transparent bg-linear-to-r from-yellow-200 via-yellow-400 to-yellow-600 mb-3 sm:mb-4 drop-shadow-sm flex items-center justify-center gap-2 sm:gap-4">
+                        <Trophy className="text-yellow-400 w-8 h-8 sm:w-10 sm:h-10 md:w-16 md:h-16" />
                         Leaderboard
                     </h1>
-                    <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                    <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto px-4">
                         Celebrate the top performers and see where you stand among the elite.
                     </p>
                 </motion.div>
@@ -111,66 +111,99 @@ export default function LeaderboardPage() {
                 <>
                     {/* Top 3 Podium - Only show when NOT searching */}
                     {!isSearching && topThree.length > 0 && (
-                        <div className="mb-16 relative z-10 flex justify-center items-end gap-4 md:gap-8 min-h-[400px]">
+                        <div className="mb-12 sm:mb-16 relative z-10 flex flex-col md:flex-row justify-center items-center md:items-end gap-6 md:gap-8 md:min-h-[400px]">
+                            {/* Mobile 1st Place (Shows first on small screens) */}
+                            {topThree[0] && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.1 }}
+                                    className="md:hidden relative flex flex-col items-center z-20 w-full max-w-[280px]"
+                                >
+                                    <Link href={`/user/${topThree[0].id}`} className="flex flex-col items-center group w-full">
+                                        <div className="absolute -top-12 animate-bounce">
+                                            <Crown className="w-10 h-10 text-yellow-400 fill-yellow-400/20 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
+                                        </div>
+                                        <div className="w-24 h-24 rounded-full border-4 border-yellow-400 bg-yellow-900/20 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(250,204,21,0.4)] relative overflow-hidden ring-4 ring-yellow-400/20">
+                                            {topThree[0].profileImage ? (
+                                                <img src={topThree[0].profileImage} alt={topThree[0].name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-3xl font-bold text-yellow-400">{topThree[0].avatar}</span>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col items-center p-6 bg-linear-to-b from-yellow-900/40 to-black/60 border border-yellow-500/30 rounded-2xl w-full shadow-2xl relative">
+                                            <div className="absolute -top-6">
+                                                <Medal className="w-12 h-12 text-yellow-400 drop-shadow-lg" />
+                                            </div>
+                                            <div className="mt-4 text-center">
+                                                <div className="text-xl font-bold text-white mb-1 truncate px-2">{topThree[0].name}</div>
+                                                <div className="text-sm text-yellow-400 font-mono font-bold">{topThree[0].xp.toLocaleString()} XP</div>
+                                            </div>
+                                            <div className="absolute top-4 right-4 text-4xl font-black text-yellow-500/20 select-none">1</div>
+                                        </div>
+                                    </Link>
+                                </motion.div>
+                            )}
+
                             {/* 2nd Place */}
                             {topThree[1] && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 50 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.2 }}
-                                    className="relative order-1 md:order-1 flex flex-col items-center"
+                                    className="relative order-1 flex flex-col items-center w-full md:w-auto max-w-[280px] md:max-w-none"
                                 >
-                                    <Link href={`/user/${topThree[1].id}`} className="flex flex-col items-center group">
-                                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-slate-300 bg-slate-900/50 backdrop-blur-md flex items-center justify-center mb-8 shadow-[0_0_20px_rgba(203,213,225,0.3)] relative cursor-pointer overflow-hidden">
+                                    <Link href={`/user/${topThree[1].id}`} className="flex md:flex-col items-center group w-full md:w-auto bg-slate-900/40 md:bg-transparent border border-slate-500/30 md:border-none rounded-2xl md:rounded-none p-4 md:p-0 relative overflow-hidden">
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 md:hidden text-6xl font-black text-slate-500/20 select-none">2</div>
+                                        <div className="w-16 h-16 md:w-32 md:h-32 rounded-full border-2 md:border-4 border-slate-300 bg-slate-900/50 flex items-center justify-center md:mb-8 shadow-[0_0_20px_rgba(203,213,225,0.3)] relative overflow-hidden shrink-0">
                                             {topThree[1].profileImage ? (
                                                 <img src={topThree[1].profileImage} alt={topThree[1].name} className="w-full h-full object-cover" />
                                             ) : (
-                                                <span className="text-2xl md:text-4xl font-bold text-slate-300">{topThree[1].avatar}</span>
+                                                <span className="text-xl md:text-4xl font-bold text-slate-300">{topThree[1].avatar}</span>
                                             )}
-                                            <div className="absolute inset-0 bg-slate-300/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
-                                        <div className="flex flex-col items-center p-6 bg-slate-900/40 backdrop-blur-xl border border-slate-500/30 rounded-t-3xl w-32 md:w-48 h-64 shadow-xl relative">
-                                            <div className="absolute -top-6">
+                                        <div className="flex-1 md:flex-none flex flex-col items-start md:items-center ml-4 md:ml-0 md:p-6 md:bg-slate-900/40 md:border md:border-slate-500/30 md:rounded-t-3xl md:w-48 md:h-64 relative z-10 w-full">
+                                            <div className="hidden md:block absolute -top-6">
                                                 <Medal className="w-12 h-12 text-slate-300 drop-shadow-lg" />
                                             </div>
-                                            <div className="mt-6 text-center">
-                                                <div className="text-xl font-bold text-white mb-1 line-clamp-1 px-2">{topThree[1].name}</div>
-                                                <div className="text-sm text-slate-400 font-mono">{topThree[1].xp.toLocaleString()} XP</div>
+                                            <div className="md:mt-6 text-left md:text-center w-full">
+                                                <div className="text-lg md:text-xl font-bold text-white mb-0.5 md:mb-1 truncate md:px-2">{topThree[1].name}</div>
+                                                <div className="text-xs md:text-sm text-slate-400 font-mono">{topThree[1].xp.toLocaleString()} XP</div>
                                             </div>
-                                            <div className="absolute bottom-4 text-6xl font-black text-slate-800/50 select-none">2</div>
+                                            <div className="hidden md:block absolute bottom-4 text-6xl font-black text-slate-800/50 select-none">2</div>
                                         </div>
                                     </Link>
                                 </motion.div>
                             )}
 
-                            {/* 1st Place */}
+                            {/* Desktop 1st Place (Hidden on small screens, shown in middle on desktop) */}
                             {topThree[0] && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 50 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.1 }}
-                                    className="relative order-2 md:order-2 flex flex-col items-center z-20 -mt-12"
+                                    className="hidden md:flex relative order-2 flex-col items-center z-20 -mt-12"
                                 >
                                     <Link href={`/user/${topThree[0].id}`} className="flex flex-col items-center group">
                                         <div className="absolute -top-16 animate-bounce">
                                             <Crown className="w-12 h-12 text-yellow-400 fill-yellow-400/20 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
                                         </div>
-                                        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-yellow-400 bg-yellow-900/20 backdrop-blur-md flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(250,204,21,0.4)] relative cursor-pointer overflow-hidden ring-4 ring-yellow-400/20">
+                                        <div className="w-40 h-40 rounded-full border-4 border-yellow-400 bg-yellow-900/20 backdrop-blur-md flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(250,204,21,0.4)] relative overflow-hidden ring-4 ring-yellow-400/20">
                                             {topThree[0].profileImage ? (
                                                 <img src={topThree[0].profileImage} alt={topThree[0].name} className="w-full h-full object-cover" />
                                             ) : (
-                                                <span className="text-3xl md:text-5xl font-bold text-yellow-400">{topThree[0].avatar}</span>
+                                                <span className="text-5xl font-bold text-yellow-400">{topThree[0].avatar}</span>
                                             )}
                                             <div className="absolute inset-0 bg-yellow-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
-                                        <div className="flex flex-col items-center p-8 bg-linear-to-b from-yellow-900/40 to-black/60 backdrop-blur-xl border border-yellow-500/30 rounded-t-3xl w-40 md:w-56 h-80 shadow-2xl relative">
+                                        <div className="flex flex-col items-center p-8 bg-linear-to-b from-yellow-900/40 to-black/60 backdrop-blur-xl border border-yellow-500/30 rounded-t-3xl w-56 h-80 shadow-2xl relative">
                                             <div className="absolute -top-8">
                                                 <Medal className="w-16 h-16 text-yellow-400 drop-shadow-lg" />
                                             </div>
                                             <div className="mt-8 text-center">
-                                                <div className="text-2xl font-bold text-white mb-1 line-clamp-1 px-2">{topThree[0].name}</div>
+                                                <div className="text-2xl font-bold text-white mb-1 truncate px-2 w-full">{topThree[0].name}</div>
                                                 <div className="text-base text-yellow-400 font-mono font-bold">{topThree[0].xp.toLocaleString()} XP</div>
-                                                <div className="mt-2 px-3 py-1 bg-yellow-400/20 rounded-full text-xs text-yellow-300 border border-yellow-400/30 flex items-center gap-1 justify-center">
+                                                <div className="mt-2 px-3 py-1 bg-yellow-400/20 rounded-full text-xs text-yellow-300 border border-yellow-400/30 flex items-center gap-1 justify-center mx-auto w-fit">
                                                     <Sparkles size={12} /> Elite
                                                 </div>
                                             </div>
@@ -186,26 +219,26 @@ export default function LeaderboardPage() {
                                     initial={{ opacity: 0, y: 50 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.3 }}
-                                    className="relative order-3 md:order-3 flex flex-col items-center"
+                                    className="relative order-3 flex flex-col items-center w-full md:w-auto max-w-[280px] md:max-w-none"
                                 >
-                                    <Link href={`/user/${topThree[2].id}`} className="flex flex-col items-center group">
-                                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-amber-600 bg-amber-900/30 backdrop-blur-md flex items-center justify-center mb-8 shadow-[0_0_20px_rgba(217,119,6,0.3)] relative cursor-pointer overflow-hidden">
+                                    <Link href={`/user/${topThree[2].id}`} className="flex md:flex-col items-center group w-full md:w-auto bg-amber-900/20 md:bg-transparent border border-amber-700/30 md:border-none rounded-2xl md:rounded-none p-4 md:p-0 relative overflow-hidden">
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 md:hidden text-6xl font-black text-amber-500/10 select-none">3</div>
+                                        <div className="w-16 h-16 md:w-32 md:h-32 rounded-full border-2 md:border-4 border-amber-600 bg-amber-900/30 flex items-center justify-center md:mb-8 shadow-[0_0_20px_rgba(217,119,6,0.3)] relative overflow-hidden shrink-0">
                                             {topThree[2].profileImage ? (
                                                 <img src={topThree[2].profileImage} alt={topThree[2].name} className="w-full h-full object-cover" />
                                             ) : (
-                                                <span className="text-2xl md:text-4xl font-bold text-amber-600">{topThree[2].avatar}</span>
+                                                <span className="text-xl md:text-4xl font-bold text-amber-600">{topThree[2].avatar}</span>
                                             )}
-                                            <div className="absolute inset-0 bg-amber-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                         </div>
-                                        <div className="flex flex-col items-center p-6 bg-amber-900/20 backdrop-blur-xl border border-amber-700/30 rounded-t-3xl w-32 md:w-48 h-56 shadow-xl relative">
-                                            <div className="absolute -top-6">
+                                        <div className="flex-1 md:flex-none flex flex-col items-start md:items-center ml-4 md:ml-0 md:p-6 md:bg-amber-900/20 md:border md:border-amber-700/30 md:rounded-t-3xl md:w-48 md:h-56 relative z-10 w-full">
+                                            <div className="hidden md:block absolute -top-6">
                                                 <Medal className="w-12 h-12 text-amber-600 drop-shadow-lg" />
                                             </div>
-                                            <div className="mt-6 text-center">
-                                                <div className="text-xl font-bold text-white mb-1">{topThree[2].name}</div>
-                                                <div className="text-sm text-amber-500 font-mono">{topThree[2].xp.toLocaleString()} XP</div>
+                                            <div className="md:mt-6 text-left md:text-center w-full">
+                                                <div className="text-lg md:text-xl font-bold text-white mb-0.5 md:mb-1 truncate md:px-2">{topThree[2].name}</div>
+                                                <div className="text-xs md:text-sm text-amber-500 font-mono">{topThree[2].xp.toLocaleString()} XP</div>
                                             </div>
-                                            <div className="absolute bottom-4 text-6xl font-black text-amber-800/50 select-none">3</div>
+                                            <div className="hidden md:block absolute bottom-4 text-6xl font-black text-amber-800/50 select-none">3</div>
                                         </div>
                                     </Link>
                                 </motion.div>
@@ -230,10 +263,10 @@ export default function LeaderboardPage() {
 
                     {/* List Header */}
                     {displayList.length > 0 && (
-                        <div className="max-w-4xl mx-auto px-6 py-2 grid grid-cols-12 gap-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider relative z-10 mb-2">
-                            <div className="col-span-2 md:col-span-1 text-center">Rank</div>
-                            <div className="col-span-6 md:col-span-7">User</div>
-                            <div className="col-span-4 md:col-span-4 text-right">XP</div>
+                        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-2 grid grid-cols-12 gap-3 sm:gap-4 text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider relative z-10 mb-2">
+                            <div className="col-span-2 sm:col-span-1 text-center">Rank</div>
+                            <div className="col-span-6 sm:col-span-7">User</div>
+                            <div className="col-span-4 sm:col-span-4 text-right">XP</div>
                         </div>
                     )}
 
@@ -254,10 +287,10 @@ export default function LeaderboardPage() {
                                 >
                                     <Link href={`/user/${user.id}`}>
                                         <div className="absolute inset-0 bg-white/5 rounded-2xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-md" />
-                                        <div className="grid grid-cols-12 gap-4 items-center bg-black/40 border border-white/5 p-4 rounded-2xl hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.01] hover:shadow-lg backdrop-blur-sm">
-                                            <div className="col-span-2 md:col-span-1 flex justify-center">
+                                        <div className="grid grid-cols-12 gap-3 sm:gap-4 items-center bg-black/40 border border-white/5 p-3 sm:p-4 rounded-xl sm:rounded-2xl hover:border-white/20 transition-all duration-300 hover:transform hover:scale-[1.01] hover:shadow-lg backdrop-blur-sm">
+                                            <div className="col-span-2 sm:col-span-1 flex justify-center">
                                                 <span className={cn(
-                                                    "w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold font-mono",
+                                                    "w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full text-xs sm:text-sm font-bold font-mono",
                                                     user.rank === 1 ? "bg-yellow-500/20 text-yellow-500" :
                                                         user.rank === 2 ? "bg-slate-300/20 text-slate-300" :
                                                             user.rank === 3 ? "bg-amber-600/20 text-amber-600" :
@@ -266,26 +299,28 @@ export default function LeaderboardPage() {
                                                     {user.rank}
                                                 </span>
                                             </div>
-                                            <div className="col-span-6 md:col-span-7 flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md overflow-hidden relative">
+                                            <div className="col-span-6 sm:col-span-7 flex items-center gap-2 sm:gap-4 min-w-0">
+                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-md overflow-hidden relative shrink-0">
                                                     {user.profileImage ? (
                                                         <img src={user.profileImage} alt={user.name} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <span>{user.avatar}</span>
                                                     )}
                                                 </div>
-                                                <div>
-                                                    <span className="text-white font-medium block">{user.name}</span>
-                                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                                        {user.trend === 'up' && <TrendingUp size={12} className="text-green-400" />}
-                                                        {user.trend === 'down' && <TrendingUp size={12} className="text-red-400 rotate-180" />}
-                                                        {user.trend === 'up' ? "Rising" : user.trend === 'down' ? "Falling" : "Stable"}
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-sm sm:text-base text-white font-medium block truncate">{user.name}</span>
+                                                    <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+                                                        {user.trend === 'up' && <TrendingUp size={10} className="text-green-400 sm:w-3 sm:h-3" />}
+                                                        {user.trend === 'down' && <TrendingUp size={10} className="text-red-400 rotate-180 sm:w-3 sm:h-3" />}
+                                                        <span className="hidden sm:inline">
+                                                            {user.trend === 'up' ? "Rising" : user.trend === 'down' ? "Falling" : "Stable"}
+                                                        </span>
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div className="col-span-4 md:col-span-4 text-right">
-                                                <span className="text-primary font-bold font-mono">{user.xp.toLocaleString()}</span>
-                                                <span className="text-xs text-muted-foreground ml-1">XP</span>
+                                            <div className="col-span-4 sm:col-span-4 text-right">
+                                                <span className="text-sm sm:text-base text-primary font-bold font-mono">{user.xp.toLocaleString()}</span>
+                                                <span className="text-[10px] sm:text-xs text-muted-foreground ml-0.5 sm:ml-1 hidden sm:inline">XP</span>
                                             </div>
                                         </div>
                                     </Link>

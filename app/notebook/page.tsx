@@ -53,6 +53,17 @@ export default function Dashboard() {
         }
     }, [isInitialized, fetchNotebooks]);
 
+    // Implementation of Search Debouncing
+    useEffect(() => {
+        if (!isInitialized) return; // Don't trigger on initial mount if already handled
+
+        const timer = setTimeout(() => {
+            fetchNotebooks(true, searchQuery);
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, fetchNotebooks, isInitialized]);
+
     const handleShareClick = (e: React.MouseEvent, notebook: Notebook) => {
         e.preventDefault();
         e.stopPropagation();
@@ -88,9 +99,8 @@ export default function Dashboard() {
         }
     };
 
-    const filteredNotebooks = notebooks.filter(notebook =>
-        notebook.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Search is now handled server-side in the useNotebookStore
+    // filteredNotebooks logic removed to use store notebooks directly
 
     return (
         <main className="min-h-screen bg-[#050505] text-white overflow-x-hidden selection:bg-primary/30 relative">
@@ -171,7 +181,7 @@ export default function Dashboard() {
                             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                         >
                             <AnimatePresence mode='popLayout'>
-                                {filteredNotebooks.map((notebook, index) => (
+                                {notebooks.map((notebook, index) => (
                                     <motion.div
                                         layout
                                         key={notebook._id}
@@ -258,7 +268,7 @@ export default function Dashboard() {
 
 
                             {/* Empty State */}
-                            {!isLoading && filteredNotebooks.length === 0 && (
+                            {!isLoading && notebooks.length === 0 && (
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}

@@ -60,6 +60,7 @@ export default function AdminPage() {
     const [maintenanceMode, setMaintenanceMode] = useState(false);
     const [antiCheatEnabled, setAntiCheatEnabled] = useState(false);
     const [enableDirectCaptions, setEnableDirectCaptions] = useState(false); // Strategy 1
+    const [enableAutoDailyGoals, setEnableAutoDailyGoals] = useState(true);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export default function AdminPage() {
                 setMaintenanceMode(settings.maintenanceMode);
                 setAntiCheatEnabled(settings.antiCheatEnabled);
                 setEnableDirectCaptions(settings.enableDirectCaptions ?? false); // Default OFF
+                setEnableAutoDailyGoals(settings.enableAutoDailyGoals ?? true);
             }
         } catch (error) {
             console.error('Failed to refresh admin data');
@@ -286,6 +288,37 @@ export default function AdminPage() {
         });
     };
 
+    const toggleAutoGoalsClick = () => {
+        const newState = !enableAutoDailyGoals;
+        confirmAction({
+            title: newState ? 'ENABLE AUTO GOALS' : 'DISABLE AUTO GOALS',
+            message: newState
+                ? 'Automatic Daily Goal Generation will be enabled for all users.'
+                : 'Automatic Daily Goal Generation will be suspended. Users must generate them manually.',
+            type: newState ? 'success' : 'warning',
+            actionLabel: newState ? 'Enable' : 'Disable',
+            onConfirm: async () => {
+                try {
+                    setEnableAutoDailyGoals(newState);
+                    const res = await fetch('/api/admin/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enableAutoDailyGoals: newState })
+                    });
+                    if (res.ok) {
+                        toast.success(`Auto Goals ${newState ? 'Enabled' : 'Disabled'}`);
+                    } else {
+                        setEnableAutoDailyGoals(!newState);
+                        toast.error('Failed to update setting');
+                    }
+                } catch (error) {
+                    setEnableAutoDailyGoals(!enableAutoDailyGoals);
+                    toast.error('Failed to update setting');
+                }
+            }
+        });
+    };
+
     const filteredUsers = users.filter(u =>
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -395,6 +428,20 @@ export default function AdminPage() {
                             <Zap size={18} />
                             Fast Scraping
                             <div className={cn("w-2 h-2 rounded-full ml-2", enableDirectCaptions ? "bg-amber-500 shadow-[0_0_10px_currentColor]" : "bg-white/20")} />
+                        </button>
+
+                        <button
+                            onClick={toggleAutoGoalsClick}
+                            className={cn(
+                                "flex items-center gap-3 px-6 py-3 rounded-lg border transition-all duration-300 font-mono text-sm uppercase tracking-wider relative overflow-hidden group",
+                                enableAutoDailyGoals
+                                    ? "bg-blue-500/10 border-blue-500/50 text-blue-400 shadow-[0_0_20px_-5px_rgba(59,130,246,0.3)]"
+                                    : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10"
+                            )}
+                        >
+                            <Target size={18} />
+                            Auto Goals
+                            <div className={cn("w-2 h-2 rounded-full ml-2", enableAutoDailyGoals ? "bg-blue-500 shadow-[0_0_10px_currentColor]" : "bg-white/20")} />
                         </button>
                     </div>
 

@@ -76,7 +76,7 @@ export async function GET() {
         console.log(`[DailyGoals GET] Searching for goals with userId: ${userId} (type: ${typeof userId})`);
 
         // Check if goals exist for today (in IST) for THIS USER
-        let goals = await DailyGoal.find({
+        const goals = await DailyGoal.find({
             userId: userId,
             date: {
                 $gte: start,
@@ -142,11 +142,17 @@ export async function GET() {
                 };
             });
 
-            return NextResponse.json({ goals: goalsWithStatus });
+            const getSystemSetting = await SystemSetting.findOne({ key: 'global' });
+            const autoGenerateEnabled = getSystemSetting?.enableAutoDailyGoals !== false;
+
+            return NextResponse.json({ goals: goalsWithStatus, autoGenerateEnabled });
         }
 
         // Return empty if no goals found
-        return NextResponse.json({ goals: [] });
+        const fallbackSystemSetting = await SystemSetting.findOne({ key: 'global' });
+        const autoGenerateEnabled = fallbackSystemSetting?.enableAutoDailyGoals !== false;
+
+        return NextResponse.json({ goals: [], autoGenerateEnabled });
 
     } catch (error) {
         console.error('Error fetching/seeding daily goals:', error);
@@ -162,13 +168,21 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { index } = body;
+        const { index, manual } = body; // Add manual flag
 
         if (typeof index !== 'number') {
             return NextResponse.json({ error: 'Invalid index' }, { status: 400 });
         }
 
         await connectToDatabase();
+
+        const systemSetting = await SystemSetting.findOne({ key: 'global' });
+
+        // Check if automatic generation is disabled
+        // If manual is true, we bypass this check so users can still generate goals manually
+        if (systemSetting?.enableAutoDailyGoals === false && !manual) {
+            return NextResponse.json({ error: 'Automatic daily goal generation is currently disabled by Administrators.' }, { status: 403 });
+        }
 
         // Get current time in IST
         const now = new Date();
@@ -204,8 +218,7 @@ export async function POST(request: Request) {
         const activePrefs = preferences.filter((p: any) => p.enabled);
         const prefsToUse = activePrefs.length > 0 ? activePrefs : DEFAULT_PREFERENCES;
 
-        const systemSetting = await SystemSetting.findOne({ key: 'global' });
-        // Use Gemini 2.0 Flash as the default stable model
+        // Use the already fetched systemSetting from line 179
         const DEFAULT_MODEL = 'gemini-2.0-flash';
         let aiModel = systemSetting?.aiModel || DEFAULT_MODEL;
 
@@ -286,7 +299,7 @@ export async function POST(request: Request) {
 
         // 2a. Check for duplicate usage of this PDF in the last 4 days
         // This ensures the model rotates through different questions for the same content.
-        let previousQuestions: string[] = [];
+        const previousQuestions: string[] = [];
         if (pref.subject && pref.subject.startsWith('PDF:')) {
             const historyStart = subDays(start, 3); // Look back 3 days + today = 4 days
             const recentGoals = await DailyGoal.find({
@@ -311,16 +324,43 @@ export async function POST(request: Request) {
         let attempts = 0;
         let goal: any = null;
 
+        let lastError: any = null;
         while (attempts < 2 && !goal) {
             try {
                 goal = await generateSingleGoal(pref, aiModel, contextText, previousQuestions);
-            } catch (err) {
+            } catch (err: any) {
+                lastError = err;
                 attempts++;
-                console.warn(`Slot ${index} failed attempt ${attempts}:`, err);
+
+                const isBillingError = err?.status === 'PERMISSION_DENIED' ||
+                    (err?.message && err.message.toLowerCase().includes('billing'));
+
+                if (isBillingError) {
+                    console.warn(`[DailyGoals] Slot ${index} failed attempt ${attempts}: AI Billing Error (Google Cloud)`);
+                    break; // No need to retry if it's a hard billing error
+                } else {
+                    console.warn(`Slot ${index} failed attempt ${attempts}:`, err);
+                }
             }
         }
 
         if (!goal) {
+            const isBillingError = lastError?.status === 'PERMISSION_DENIED' ||
+                (lastError?.message && lastError.message.toLowerCase().includes('billing'));
+
+            if (isBillingError) {
+                console.error("[DailyGoals] Failed to generate goal: Google Cloud Billing Disabled. Auto-disabling AI goal generation.");
+
+                // CRITICAL NO-SPAM MEASURE: Automatically disable future generations
+                await SystemSetting.findOneAndUpdate(
+                    { key: 'global' },
+                    { enableAutoDailyGoals: false }
+                );
+
+                return NextResponse.json({ error: 'AI Billing Error: Please enable billing in Google Cloud Console.' }, { status: 402 });
+            }
+
+            console.error("Failed to generate goal. Last Error:", lastError);
             throw new Error("Failed to generate goal after retries");
         }
 
