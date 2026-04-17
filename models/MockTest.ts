@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IMockTest extends Document {
     notebookId: mongoose.Schema.Types.ObjectId;
+    language?: string;
     questions: {
         question: string;
         options?: string[];
@@ -11,11 +12,13 @@ export interface IMockTest extends Document {
     userAnswers?: Record<string, string>;
     gradingResults?: Record<string, { score: number; feedback: string }>;
     score?: number;
+    feedbackSummary?: string;
     createdAt: Date;
 }
 
 const MockTestSchema: Schema = new Schema({
     notebookId: { type: mongoose.Schema.Types.ObjectId, ref: 'Notebook', required: true },
+    language: { type: String, default: 'English' },
     questions: [{
         question: { type: String, required: true },
         options: [String],
@@ -25,6 +28,7 @@ const MockTestSchema: Schema = new Schema({
     userAnswers: { type: Map, of: String }, // Map of question index to user answer
     gradingResults: { type: Map, of: new Schema({ score: Number, feedback: String }) }, // Map of question index to result
     score: { type: Number },
+    feedbackSummary: { type: String },
     createdAt: { type: Date, default: Date.now },
 });
 

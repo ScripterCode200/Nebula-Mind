@@ -68,6 +68,13 @@ export async function POST(req: NextRequest) {
                 fileType = 'docx';
             }
         } else if (pdfUrlInput && fileType !== 'youtube') {
+            // Dedocde fileType from URL
+            if (pdfUrlInput.toLowerCase().endsWith('.docx')) {
+                fileType = 'docx';
+            } else if (pdfUrlInput.toLowerCase().endsWith('.pdf')) {
+                fileType = 'pdf';
+            }
+
             // Fetch from URL
             const response = await fetch(pdfUrlInput);
             if (!response.ok) {
@@ -80,8 +87,11 @@ export async function POST(req: NextRequest) {
             // Try to deduce fileType from key
             if (fileKeyInput.toLowerCase().endsWith('.docx')) {
                 fileType = 'docx';
+            } else if (fileKeyInput.toLowerCase().endsWith('.pdf')) {
+                fileType = 'pdf';
             }
         }
+
 
         // We already extracted finalContentKey from formData at the top
         // let finalContentKey = formData.get('contentKey') as string | undefined;
@@ -94,8 +104,21 @@ export async function POST(req: NextRequest) {
                 try {
                     const result = await mammoth.convertToHtml({ buffer });
                     contentHtml = result.value;
-                    const textResult = await mammoth.extractRawText({ buffer });
-                    pdfContent = textResult.value;
+                    
+                    let htmlText = contentHtml;
+                    htmlText = htmlText.replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n');
+                    htmlText = htmlText.replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n');
+                    htmlText = htmlText.replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n');
+                    htmlText = htmlText.replace(/<strong>(.*?)<\/strong>/gi, '**$1**');
+                    htmlText = htmlText.replace(/<b>(.*?)<\/b>/gi, '**$1**');
+                    htmlText = htmlText.replace(/<em>(.*?)<\/em>/gi, '*$1*');
+                    htmlText = htmlText.replace(/<i>(.*?)<\/i>/gi, '*$1*');
+                    htmlText = htmlText.replace(/<li>(.*?)<\/li>/gi, '- $1\n');
+                    htmlText = htmlText.replace(/<p>(.*?)<\/p>/gi, '$1\n\n');
+                    htmlText = htmlText.replace(/<br\s*\/?>/gi, '\n');
+                    htmlText = htmlText.replace(/<[^>]+>/g, ''); 
+                    
+                    pdfContent = htmlText.replace(/\n\s*\n/g, '\n\n').trim();
                 } catch (err) {
                     console.error('Error parsing DOCX:', err);
                     pdfContent = 'Error extracting text from Word document.';

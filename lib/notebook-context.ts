@@ -27,6 +27,10 @@ export async function getNotebookContent(notebook: any, selectedSourceIds?: stri
         console.log(`[Context] Fetching content for ${sourcesToFetch.length} sources...`);
 
         const contentPromises = sourcesToFetch.map(async (source: any) => {
+            if (source.contentKey && source.contentKey.startsWith('legacy_migration_')) {
+                // Return legacy MongoDB text for migrated single-source un-formatted notebooks
+                return `--- SOURCE: ${source.name} ---\n${notebook.pdfContent || ''}\n`;
+            }
             try {
                 const command = new GetObjectCommand({
                     Bucket: R2_BUCKET_NAME,

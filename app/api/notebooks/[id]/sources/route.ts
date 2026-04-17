@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 type: notebook.fileType || 'pdf', // Fix: Use actual notebook type instead of hardcoded 'pdf'
                 name: notebook.title || 'Original Document',
                 fileKey: notebook.pdfKey,
-                contentKey: notebook.contentKey,
+                contentKey: notebook.contentKey || `legacy_migration_${uuidv4()}.txt`,
                 addedAt: notebook.createdAt || new Date(),
                 size: 0
             });
@@ -115,6 +115,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     } catch (error: any) {
         console.error('Add Source Error:', error);
+        
+        // Debugging injection to catch mystery 500 error
+        const fs = require('fs');
+        fs.writeFileSync('C:\\Users\\ASUST\\.gemini\\antigravity\\scratch\\notebook_lm_app2\\backend_error_log.txt', error.stack || error.message || 'Unknown error');
+        
         return NextResponse.json({ error: 'Failed to add source', details: error.message }, { status: 500 });
     }
 }

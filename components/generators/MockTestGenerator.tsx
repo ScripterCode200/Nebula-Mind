@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, CheckCircle, XCircle, ChevronRight, ChevronLeft, RotateCcw, Clock, AlertCircle, StopCircle, History, Calendar, Trophy, X, Timer, Pause, PlayCircle } from 'lucide-react';
+import { Play, CheckCircle, XCircle, ChevronRight, ChevronLeft, RotateCcw, Clock, AlertCircle, StopCircle, History, Calendar, Trophy, X, Timer, Pause, PlayCircle, Sparkles } from 'lucide-react';
 import NeonButton from '@/components/ui/NeonButton';
 import GlassCard from '@/components/ui/GlassCard';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import FuturisticLoader from '@/components/ui/FuturisticLoader';
+import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
 
 interface MockTestGeneratorProps {
     notebookId: string;
@@ -24,10 +25,13 @@ interface Question {
 
 interface MockTest {
     _id: string;
+    language?: string;
     questions: Question[];
     createdAt?: string;
     score?: number;
     userAnswers?: Record<string, string>;
+    gradingResults?: Record<string, GradingResult>;
+    feedbackSummary?: string;
 }
 
 interface GradingResult {
@@ -38,6 +42,7 @@ interface GradingResult {
 const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGeneratorProps) => {
     const [step, setStep] = useState<'config' | 'loading' | 'test' | 'grading' | 'result'>('config');
     const [config, setConfig] = useState({
+        language: 'English',
         count: 5,
         difficulty: 'Medium',
         questionTypes: ['mcq', 'true-false'],
@@ -108,6 +113,15 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
         setRetakeTimeMode(config.durationMode);
         setRetakeCustomDuration(config.customDuration);
         setRetakeModalOpen(true);
+    };
+
+    const viewResults = (pastTest: MockTest) => {
+        setTest(pastTest);
+        setScore(pastTest.score || 0);
+        setGradingResults(pastTest.gradingResults || {});
+        setUserAnswers(pastTest.userAnswers || {});
+        setStep('result');
+        setShowHistory(false);
     };
 
     const confirmRetake = () => {
@@ -216,6 +230,7 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                         count: config.count,
                         difficulty: config.difficulty,
                         questionTypes: config.questionTypes,
+                        language: config.language,
                         sourceIds // Pass selected sources
                     },
                     modelProvider,
@@ -355,6 +370,35 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
         const finalScore = Math.round(calculatedScore * 10) / 10;
         setScore(finalScore);
         setGradingResults(newGradingResults);
+
+        // Generate final feedback summary
+        let finalSummary = '';
+        try {
+            const sumRes = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    notebookId,
+                    type: 'mocktest-summary',
+                    config: {
+                        questions: test.questions,
+                        userAnswers: currentAnswers,
+                        gradingResults: newGradingResults,
+                        score: finalScore,
+                        language: test.language || config.language
+                    },
+                    modelProvider,
+                }),
+            });
+            if (sumRes.ok) {
+                const sumData = await sumRes.json();
+                finalSummary = sumData.summary;
+                setTest(prev => prev ? { ...prev, feedbackSummary: finalSummary } : prev);
+            }
+        } catch (e) {
+            console.error('Summary generation failed:', e);
+        }
+
         setStep('result');
 
         // Save results to database
@@ -366,10 +410,11 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                     testId: test._id,
                     userAnswers: currentAnswers,
                     gradingResults: newGradingResults,
-                    score: finalScore
+                    score: finalScore,
+                    feedbackSummary: finalSummary
                 })
             });
-            toast.success('Test results saved!');
+            toast.success('Test results and summary saved!');
         } catch (error) {
             console.error('Failed to save test results:', error);
             toast.error('Failed to save results');
@@ -461,14 +506,26 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                                 <p className="text-sm font-medium">{pastTest.questions.length} Questions</p>
                                             </div>
 
-                                            <NeonButton
-                                                onClick={() => initiateRetake(pastTest)}
-                                                className="w-full text-xs h-8"
-                                                variant="secondary"
-                                            >
-                                                <RotateCcw size={12} className="mr-1.5" />
-                                                Retake Test
-                                            </NeonButton>
+                                            <div className="flex gap-2">
+                                                <NeonButton
+                                                    onClick={() => initiateRetake(pastTest)}
+                                                    className="flex-1 text-xs h-8 px-2"
+                                                    variant="secondary"
+                                                >
+                                                    <RotateCcw size={12} className="mr-1.5 shrink-0" />
+                                                    Retake
+                                                </NeonButton>
+                                                {pastTest.score !== undefined && pastTest.gradingResults && (
+                                                    <NeonButton
+                                                        onClick={() => viewResults(pastTest)}
+                                                        className="flex-1 text-xs h-8 px-2"
+                                                        variant="primary"
+                                                    >
+                                                        <CheckCircle size={12} className="mr-1.5 shrink-0" />
+                                                        Results
+                                                    </NeonButton>
+                                                )}
+                                            </div>
                                         </GlassCard>
                                     ))
                                 )}
@@ -617,16 +674,16 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                         </div>
                                         <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary mb-2">
                                             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                                            SYSTEM_READY
+                                            READY
                                         </div>
-                                        <h3 className="text-base font-bold text-white tracking-tight">SIMULATION PARAMS</h3>
+                                        <h3 className="text-base font-bold text-white tracking-tight">CONFIGURATION</h3>
                                     </div>
 
                                     <div className="space-y-4">
                                         {/* Question Count Slider */}
                                         <div className="space-y-1.5">
                                             <div className="flex justify-between items-end">
-                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Target Output</label>
+                                                <label className="text-[10px] font-medium text-muted uppercase tracking-wider">Question Count</label>
                                                 <div className="text-lg font-bold text-primary tabular-nums tracking-tighter leading-none">
                                                     {config.count.toString().padStart(2, '0')}
                                                     <span className="text-[10px] font-normal text-muted-foreground ml-1">QUESTIONS</span>
@@ -670,24 +727,39 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {/* Difficulty Selector */}
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Complexity Level</label>
-                                                <div className="grid grid-cols-3 md:flex md:flex-col gap-2">
-                                                    {['Easy', 'Medium', 'Hard'].map(d => (
-                                                        <button
-                                                            key={d}
-                                                            onClick={() => setConfig({ ...config, difficulty: d })}
-                                                            className={cn(
-                                                                "relative group overflow-hidden px-2 py-2 rounded-md border text-center md:text-left transition-all duration-300",
-                                                                config.difficulty === d
-                                                                    ? "bg-primary/20 border-primary text-primary"
-                                                                    : "bg-white/5 border-white/10 text-muted-foreground"
-                                                            )}
-                                                        >
-                                                            <span className="relative z-10 text-[10px] md:text-xs font-bold">{d}</span>
-                                                        </button>
-                                                    ))}
+                                            {/* Difficulty & Language Selectors */}
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Complexity</label>
+                                                    <div className="grid grid-cols-3 md:flex md:flex-col gap-2">
+                                                        {['Easy', 'Medium', 'Hard'].map(d => (
+                                                            <button
+                                                                key={d}
+                                                                onClick={() => setConfig({ ...config, difficulty: d })}
+                                                                className={cn(
+                                                                    "relative group overflow-hidden px-2 py-2 rounded-md border text-center md:text-left transition-all duration-300",
+                                                                    config.difficulty === d
+                                                                        ? "bg-primary/20 border-primary text-primary"
+                                                                        : "bg-white/5 border-white/10 text-muted-foreground"
+                                                                )}
+                                                            >
+                                                                <span className="relative z-10 text-[10px] md:text-xs font-bold">{d}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Language</label>
+                                                    <select
+                                                        value={config.language}
+                                                        onChange={(e) => setConfig({ ...config, language: e.target.value })}
+                                                        className="w-full bg-white/5 border border-white/10 text-muted-foreground text-[10px] md:text-xs font-bold rounded-md px-2 py-2 outline-none focus:border-primary/50 transition-all cursor-pointer"
+                                                    >
+                                                        {['English', 'Spanish', 'French', 'German', 'Hindi', 'Chinese', 'Japanese', 'Arabic', 'Russian', 'Portuguese'].map(lang => (
+                                                            <option key={lang} value={lang} className="bg-black text-white">{lang}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                             </div>
 
@@ -791,7 +863,7 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                         >
                                             <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                             <Play size={16} className="mr-2 group-hover:scale-110 transition-transform" />
-                                            INITIALIZE TEST SEQUENCE
+                                            Generate Mock Test
                                         </NeonButton>
                                     </div>
                                 </div>
@@ -1012,6 +1084,21 @@ const MockTestGenerator = ({ notebookId, modelProvider, sourceIds }: MockTestGen
                                 </GlassCard>
                             ))}
                         </div>
+
+                        {test.feedbackSummary && (
+                            <div className="mb-8 text-left">
+                                <GlassCard className="p-6 border-primary/30 shadow-[0_0_20px_rgba(0,240,255,0.1)]">
+                                    <h3 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
+                                        <Sparkles size={18} />
+                                        AI Performance Analysis
+                                    </h3>
+                                    <div className="prose prose-invert prose-sm max-w-none text-muted-foreground
+                                        prose-p:leading-relaxed prose-headings:text-white prose-a:text-primary prose-strong:text-white prose-ul:pl-4 prose-li:marker:text-primary">
+                                        <MarkdownRenderer content={test.feedbackSummary} />
+                                    </div>
+                                </GlassCard>
+                            </div>
+                        )}
 
                         <NeonButton onClick={() => {
                             setStep('config');

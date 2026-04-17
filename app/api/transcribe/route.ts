@@ -53,7 +53,9 @@ export async function POST(req: NextRequest) {
         // Check Global Settings (Compliance)
         const SystemSetting = (await import('@/models/SystemSetting')).default;
         const globalSettings = await SystemSetting.findOne({ key: 'global' });
-        const enableDirectCaptions = globalSettings?.enableDirectCaptions ?? false; // Default OFF
+        const enableDirectCaptions = globalSettings?.enableDirectCaptions ?? true; // Default ON to restore transcription functionality
+        const enableArtificialProxy = globalSettings?.enableArtificialProxy ?? true;
+
 
         // Strategy 1: Direct Caption Strategy (Lightweight but Robust with yt-dlp)
         console.log(`[Strategy 1]: ATTEMPTING DIRECT CAPTION EXTRACTION (yt-dlp)`);
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
                 console.log('[Strategy 1]: SKIPPING - Disabled by Global Settings (Compliance Mode)');
                 throw new Error('Compliance: Direct scraping disabled');
             }
-            const transcriptText = await fetchCaptionsWithYtDlp(url);
+            const transcriptText = await fetchCaptionsWithYtDlp(url, enableArtificialProxy);
 
             if (transcriptText && transcriptText.length > 50) {
                 console.log(`[Strategy 1 SUCCESS]: Found captions | Length: ${transcriptText.length} characters`);

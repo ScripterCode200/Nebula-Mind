@@ -3,16 +3,13 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, Sparkles, Download, Copy, ChevronUp, ChevronDown, ChevronLeft, PanelLeftOpen } from 'lucide-react';
+import { FileText, Sparkles, Download, Copy, ChevronUp, ChevronDown, ChevronLeft, PanelLeftOpen, BookOpen, Brain, Clock, Share2, Printer, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NeonButton from '@/components/ui/NeonButton';
 import GlassCard from '@/components/ui/GlassCard';
+import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
 
 import { toast } from 'sonner';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import 'highlight.js/styles/github-dark.css';
 import FuturisticLoader from '@/components/ui/FuturisticLoader';
 
 interface NotesGeneratorProps {
@@ -21,6 +18,7 @@ interface NotesGeneratorProps {
     sourceIds?: string[];
 }
 
+// NotesGenerator component
 const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGeneratorProps) => {
     const [type, setType] = useState<'brief' | 'detailed' | 'bullet-points'>('detailed');
     const [notes, setNotes] = useState<string>('');
@@ -30,6 +28,8 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
 
     const [savedNotes, setSavedNotes] = useState<any[]>([]);
     const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+    const [generationPhase, setGenerationPhase] = useState<'idle' | 'orienting' | 'deep-diving' | 'synthesizing' | 'completed'>('idle');
+    const [batchInfo, setBatchInfo] = useState({ current: 0, total: 0 });
 
     React.useEffect(() => {
         fetchNotes();
@@ -104,62 +104,99 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
         if (isMobile) setShowControls(false);
 
         let generatedContent = '';
-        setNotes(''); // Clear view for new generation
-        setSelectedNoteId(null); // Deselect current note as we are generating a new one
+        setNotes('');
+        setSelectedNoteId(null);
+
+        const fetchPhaseStream = async (phase: string, startIt: number | null = null, endIt: number | null = null, retryCount = 0) => {
+            try {
+                if (phase === 'primer') setGenerationPhase('orienting');
+                if (phase === 'iteration_batch') setGenerationPhase('deep-diving');
+                if (phase === 'synthesis') setGenerationPhase('synthesizing');
+
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        notebookId,
+                        type: 'notes',
+                        config: {
+                            type,
+                            customInstructions,
+                            sourceIds,
+                            phase,
+                            startIteration: startIt,
+                            endIteration: endIt
+                        },
+                        modelProvider,
+                    }),
+                });
+
+                if (!res.ok) {
+                    if (res.status === 429 && retryCount < 3) {
+                        toast.error(`Rate limited (429) on ${phase}. Cooling down...`);
+                        await new Promise(resolve => setTimeout(resolve, 8000));
+                        return await fetchPhaseStream(phase, startIt, endIt, retryCount + 1);
+                    }
+                    throw new Error('Server error: ' + res.status);
+                }
+
+                if (!res.body) throw new Error('No response body');
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let outputChunk = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    outputChunk += chunk;
+                    generatedContent += chunk;
+                    setNotes(prev => prev + chunk);
+                }
+                return outputChunk;
+            } catch (error) {
+                console.error('Phase ' + phase + ' failed:', error);
+                throw error;
+            }
+        };
 
         try {
-            const res = await fetch('/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    notebookId,
-                    type: 'notes',
-                    config: {
-                        type,
-                        customInstructions,
-                        sourceIds // Pass selected sources
-                    },
-                    modelProvider,
-                }),
-            });
+            // Phase 1: Primer
+            const primerOutput = await fetchPhaseStream('primer');
+            
+            // Extract target iterations
+            let targetIterations = 2;
+            const metaMatch = primerOutput.match(/<!-- META_ITERATIONS: (\d+) -->/);
+            if (metaMatch && metaMatch[1]) {
+                targetIterations = parseInt(metaMatch[1], 10);
+            }
+            setBatchInfo({ current: 0, total: targetIterations });
+            
+            // Artificial pause
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            if (!res.ok) {
-                const contentType = res.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    const data = await res.json();
-                    throw new Error(data.error || res.statusText);
-                } else {
-                    const text = await res.text();
-                    console.error('Non-JSON error response:', text);
-                    throw new Error(`Server error: ${res.status} ${res.statusText}`);
+            // Phase 2: Iterate
+            const batchSize = 2;
+            for (let i = 1; i <= targetIterations; i += batchSize) {
+                const end = Math.min(i + batchSize - 1, targetIterations);
+                setBatchInfo(prev => ({ ...prev, current: end }));
+                await fetchPhaseStream('iteration_batch', i, end);
+                
+                if (end < targetIterations) {
+                    await new Promise(resolve => setTimeout(resolve, 2500));
                 }
             }
+            
+            // Artificial pause
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            if (!res.body) {
-                throw new Error('No response body');
-            }
+            // Phase 3: Synthesis
+            await fetchPhaseStream('synthesis');
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let isFirstChunk = true;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                generatedContent += chunk;
-                setNotes(prev => prev + chunk);
-
-                // Hide loader and show streaming text as soon as we have content
-                if (isFirstChunk) {
-                    setProgress(100);
-                    // Short delay to let user see the 100% state
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    setLoading(false);
-                    isFirstChunk = false;
-                }
-            }
+            setGenerationPhase('completed');
+            setProgress(100);
 
             // Save the generated note
             const saveRes = await fetch('/api/notes', {
@@ -184,7 +221,7 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
 
         } catch (error: any) {
             console.error(error);
-            toast.error(`Failed to generate notes: ${error.message || 'Unknown error'}`);
+            toast.error('Failed to generate notes: ' + (error.message || 'Unknown error'));
         } finally {
             setLoading(false);
             setProgress(100);
@@ -336,11 +373,54 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
 
                 <div className="flex-1 overflow-y-auto px-3 md:px-4 pb-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent bg-black min-h-0 overscroll-contain" data-lenis-prevent>
                     {loading ? (
-                        <div className="h-full flex items-center justify-center">
+                        <div className="h-full flex flex-col items-center justify-center space-y-8">
+                            {/* Phase Stepper */}
+                            <div className="flex items-center gap-4 px-6 py-3 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                                {[
+                                    { id: 'orienting', label: 'Orienting', icon: '🎯' },
+                                    { id: 'deep-diving', label: 'Deep Diving', icon: '🔍' },
+                                    { id: 'synthesizing', label: 'Synthesizing', icon: '🧠' }
+                                ].map((step, idx) => (
+                                    <React.Fragment key={step.id}>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-full flex items-center justify-center text-xs transition-all duration-500",
+                                                generationPhase === step.id 
+                                                    ? "bg-primary text-black shadow-[0_0_15px_rgba(0,240,255,0.5)] scale-110" 
+                                                    : "bg-white/10 text-white/40"
+                                            )}>
+                                                {step.icon}
+                                            </div>
+                                            <span className={cn(
+                                                "text-[9px] uppercase tracking-tighter font-bold transition-colors",
+                                                generationPhase === step.id ? "text-primary" : "text-white/20"
+                                            )}>
+                                                {step.label}
+                                            </span>
+                                        </div>
+                                        {idx < 2 && <div className="w-8 h-px bg-white/10 mb-3" />}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+
                             <FuturisticLoader
-                                text="Generating Notes"
-                                subtext={modelProvider === 'ollama' ? "Nebula AI is synthesizing your content..." : "AI is analyzing your document..."}
-                                progress={progress}
+                                text={
+                                    generationPhase === 'orienting' ? "Building Primer" :
+                                    generationPhase === 'deep-diving' ? `Processing Iterations` :
+                                    generationPhase === 'synthesizing' ? "Connecting Dots" :
+                                    "Initializing Prayogam"
+                                }
+                                subtext={
+                                    generationPhase === 'orienting' ? "Establishing high-level cognitive map..." :
+                                    generationPhase === 'deep-diving' ? `Analyzing deep concepts (${batchInfo.current}/${batchInfo.total})...` :
+                                    generationPhase === 'synthesizing' ? "Creating final knowledge synthesis..." :
+                                    "Preparing content architect engine..."
+                                }
+                                progress={loading && generationPhase === 'idle' ? progress : (
+                                    generationPhase === 'orienting' ? 20 :
+                                    generationPhase === 'deep-diving' ? 30 + (batchInfo.current / batchInfo.total * 50) :
+                                    generationPhase === 'synthesizing' ? 90 : 100
+                                )}
                             />
                         </div>
                     ) : notes ? (
@@ -549,25 +629,20 @@ const NotesGenerator = ({ notebookId, modelProvider, sourceIds }: NotesGenerator
                                 </div>
 
                                 <div id="markdown-content" className="p-6 md:p-10 bg-black text-white">
-                                    <div className="prose prose-invert prose-lg max-w-none 
-                                        prose-headings:font-sans prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-white
-                                        prose-h1:text-4xl prose-h1:mb-8 prose-h1:border-b prose-h1:border-[#ffffff1a] prose-h1:pb-4
-                                        prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-[#00F0FFE6]
-                                        prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-4 prose-h3:text-secondary
-                                        prose-p:text-gray-300 prose-p:leading-loose prose-p:font-serif prose-p:text-lg
-                                        prose-li:text-gray-300 prose-li:font-serif prose-li:text-lg
-                                        prose-strong:text-white prose-strong:font-semibold
-                                        prose-code:text-primary prose-code:bg-[#00F0FF1A] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
-                                        prose-pre:bg-[#00000080] prose-pre:border prose-pre:border-[#ffffff1a] prose-pre:rounded-xl
-                                        prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:bg-[#ffffff0d] prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:italic prose-blockquote:text-gray-400
-                                        ">
-                                        <ReactMarkdown
-                                            rehypePlugins={[rehypeHighlight]}
-                                            remarkPlugins={[remarkGfm]}
-                                        >
-                                            {notes}
-                                        </ReactMarkdown>
-                                    </div>
+                                        <MarkdownRenderer 
+                                            content={notes}
+                                            className="prose-lg 
+                                                prose-headings:font-sans prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-white
+                                                prose-h1:text-4xl prose-h1:mb-8 prose-h1:border-b prose-h1:border-[#ffffff1a] prose-h1:pb-4
+                                                prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-[#00F0FFE6]
+                                                prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-4 prose-h3:text-secondary
+                                                prose-p:text-gray-300 prose-p:leading-loose prose-p:font-serif prose-p:text-lg
+                                                prose-li:text-gray-300 prose-li:font-serif prose-li:text-lg
+                                                prose-strong:text-white prose-strong:font-semibold
+                                                prose-code:text-primary prose-code:bg-[#00F0FF1A] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none
+                                                prose-pre:bg-[#00000080] prose-pre:border prose-pre:border-[#ffffff1a] prose-pre:rounded-xl
+                                                prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:bg-[#ffffff0d] prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:italic prose-blockquote:text-gray-400"
+                                        />
                                 </div>
                             </GlassCard>
                         </motion.div>

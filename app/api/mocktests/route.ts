@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
     try {
         await connectToDatabase();
-        const { testId, userAnswers, gradingResults, score } = await req.json();
+        const { testId, userAnswers, gradingResults, score, feedbackSummary } = await req.json();
 
         if (!testId) {
             return NextResponse.json({ error: 'Test ID is required' }, { status: 400 });
@@ -34,7 +34,8 @@ export async function PUT(req: NextRequest) {
             {
                 userAnswers,
                 gradingResults,
-                score
+                score,
+                feedbackSummary
             },
             { new: true }
         );

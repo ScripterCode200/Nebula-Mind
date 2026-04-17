@@ -5,8 +5,7 @@ import { Send, Bot, User, Sparkles, Zap, BrainCircuit, Cpu } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import ReactMarkdown from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
+import MarkdownRenderer from '@/components/ui/MarkdownRenderer';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
 import { StreamText } from '@/components/ui/StreamText';
@@ -194,9 +193,7 @@ const ChatInterface = ({ notebookId, modelProvider, initialHistory, sourceIds }:
                                                 isStreaming={isLastAiMessage && isLoading}
                                             />
                                         ) : (
-                                            <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-                                                {msg.content}
-                                            </ReactMarkdown>
+                                            <MarkdownRenderer content={msg.content} />
                                         )}
                                         {isGenerating && (
                                             <span className="inline-block w-1.5 h-4 ml-1 bg-secondary align-middle animate-pulse" />

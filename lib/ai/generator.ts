@@ -1,4 +1,4 @@
-import genAI from '@/lib/gemini';
+import { getGenerativeModel } from '@/lib/gemini';
 
 export interface GoalPreference {
     id: number;
@@ -137,7 +137,7 @@ export async function generateSingleGoal(
         // NOTE: generativeModel.generateContent is fundamentally STATELESS.
         // It does not use previous chat history/context unless explicitly started with startChat().
         // Context history length is effectively "0" as requested.
-        const generativeModel = genAI.getGenerativeModel({
+        const generativeModel = await getGenerativeModel({
             model: aiModelName,
             generationConfig: {
                 maxOutputTokens: 8192, // Max output for complex reasoning/long answers

@@ -84,13 +84,13 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
         console.log('Ollama Generate Raw Output:', data.message.content);
         return data.message.content;
     } else {
-        // Vertex AI Logic
-        const { getVertexModel } = await import('@/lib/vertex-client');
+        // Unified AI Logic
+        const { getGenerativeModel } = await import('@/lib/gemini');
 
         // Determine which model to use
-        // If modelProvider is a specific Gemini model (e.g. gemini-3.0-flash), use it.
-        // If it's the generic 'gemini', check options.modelName or default to 2.0.
-        let targetModel = "gemini-2.0-flash";
+        // If modelProvider is a specific Gemini model (e.g. gemini-3.1-flash), use it.
+        // If it's the generic 'gemini', check options.modelName or default to the system's preferred flash model.
+        let targetModel = "gemini-flash";
 
         if (modelProvider.startsWith('gemini-') && modelProvider !== 'gemini') {
             targetModel = modelProvider;
@@ -100,7 +100,7 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
 
         const runGenerate = async (modelName: string) => {
             console.log(`[Generate API Helper] Attempting to use model: ${modelName}`);
-            const model = getVertexModel(modelName);
+            const model = await getGenerativeModel({ model: modelName });
             return await model.generateContent(prompt);
         };
 
@@ -111,17 +111,17 @@ async function generateWithProvider(prompt: string, modelProvider: string, optio
             console.warn(`[Generate API Helper] Failed with ${targetModel}: ${error.message}`);
 
             // Fallback Strategy
-            // 1. If we tried 3.0, fallback to 2.0
-            if (targetModel.includes('3.0')) {
+            // 1. If we tried a 3.x model, fallback to 2.5
+            if (targetModel.includes('3.')) {
                 try {
-                    console.log('[Generate API Helper] Falling back to gemini-2.0-flash...');
-                    result = await runGenerate("gemini-2.0-flash");
+                    console.log('[Generate API Helper] Falling back to gemini-2.5-flash...');
+                    result = await runGenerate("gemini-2.5-flash");
                 } catch (e) {
-                    // 2. If 2.0 fails, throw
+                    // 2. If 2.5 fails, throw
                     throw e;
                 }
             } else {
-                // Legacy fallback for 2.0
+                // Legacy fallback for older variants
                 try {
                     console.log('[Generate API Helper] Falling back to gemini-2.0-flash-001...');
                     result = await runGenerate("gemini-2.0-flash-001");
@@ -182,25 +182,95 @@ export async function POST(req: NextRequest) {
         let resultData;
 
         switch (type) {
-            case 'notes':
-                prompt = `
-          Topic: ${notebook.title}
-          
-          Based on the Topic and the following context (if available), generate ${config.type} notes.
+                        case 'notes':
+                const wordCount = context.length / 5;
+                const targetIterations = Math.max(2, Math.ceil(wordCount / 450));
+                
+                if (config.phase === 'primer') {
+                    prompt = `
+You are an expert Educational Content Architect. Phase 1: The Primer.
+Target Iterations for this content: ${targetIterations}.
+Based on the content, identify the ${targetIterations} most critical logical milestones.
 
-          ${config.customInstructions ? `
-          SPECIAL USER INSTRUCTIONS:
-          ${config.customInstructions}
-          ` : ''}
-          
-          FORMATTING INSTRUCTIONS:
-          - Use Markdown formatting.
-          - IMPORTANT: Do NOT wrap the entire output in a code block (like \`\`\`markdown ... \`\`\`).
-          - Return the raw markdown text directly.
-          
-          Context:
-          ${context}
-        `;
+Before diving into details, provide a high-level orientation:
+Overview: A 3-sentence "Big Picture" of the topic.
+What You'll Learn: A bulleted list of 3-5 specific learning objectives.
+Cognitive Map: A brief explanation of how the following iterations are logically connected.
+
+Constraints & Style:
+Tone: Academic yet accessible, encouraging, and crisp.
+Formatting: Use Markdown headers (##, ###) for clarity.
+IMPORTANT: Return the raw markdown text directly. Do NOT output the actual iterations. Only output Phase 1. Do NOT wrap the entire output in a code block.
+
+Topic: ${notebook.title}
+Target Type: ${config.type} notes
+${config.customInstructions ? `SPECIAL USER INSTRUCTIONS:
+${config.customInstructions}` : ''}
+
+Context (Source Content to Process):
+${context}
+`;
+                } else if (config.phase === 'iteration_batch') {
+                    const startIt = config.startIteration || 1;
+                    const endIt = config.endIteration || 2;
+                    prompt = `
+You are an expert Educational Content Architect. Phase 2: The Iterative Deep-Dive.
+You are generating Iterations ${startIt} to ${endIt} out of ${targetIterations} total iterations.
+
+Divide the following source content into logical, manageable "iterations" (concepts) as previously mapped.
+For EACH iteration from ${startIt} to ${endIt}, produce the following two parts:
+
+Part A: Textual Content
+Heading: Iteration Number & Title (e.g., "## Iteration ${startIt}: [Title]").
+The "Core" Explanation: A concise, high-density explanation of the concept.
+Active Recall Sidebar: One "Why this matters" or "Pro-Tip" insight.
+Key Terminology: Bold critical terms with brief definitions.
+
+Part B: Visual Anchor (SVG)
+Identify if the concept is a Static Structure (use Static SVG) or a Process/Flow (use Animated SVG).
+SVG Code Requirements: 
+* ALWAYS wrap everything in a valid <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"> container.
+* Output clean, minimalist, responsive SVG code.
+* STRICT VISUAL STYLE GUIDE: All SVGs must use stroke-width="2" and a color palette of #3B82F6 (primary nodes), #10B981 (secondary), #94A3B8 (connectors), and #1F2937 (text).
+* If Animated, use <animate> or <animateTransform> tags to demonstrate the concept.
+* IMPORTANT: You MUST wrap the SVG code in a markdown code block with the language identifier "render-svg". Do NOT output raw tags directly in the main text.
+
+Constraints & Style:
+Tone: Academic yet accessible.
+Formatting: Use Markdown headers for clarity.
+Return the raw markdown text directly, with embedded SVGs inline.
+
+Topic: ${notebook.title}
+${config.customInstructions ? `SPECIAL USER INSTRUCTIONS:
+${config.customInstructions}` : ''}
+
+Context (Source Content to Process):
+${context}
+`;
+                } else if (config.phase === 'synthesis') {
+                    prompt = `
+You are an expert Educational Content Architect. Phase 3: The Synthesis.
+Once all iterations are complete, provide the final consolidation of the topic:
+
+The Executive TL;DR: A high-level recap of the entire source.
+The "Connect the Dots" Summary: One paragraph explaining how all iterations function together as a single system.
+Knowledge Check: 3 provocative, open-ended questions designed to test deep understanding.
+
+Constraints & Style:
+Tone: Academic yet accessible.
+Formatting: Use Markdown headers (##, ###) for clarity.
+Return the raw markdown text directly, avoiding code block wrappers.
+
+Topic: ${notebook.title}
+${config.customInstructions ? `SPECIAL USER INSTRUCTIONS:
+${config.customInstructions}` : ''}
+
+Context (Source Content to Process):
+${context}
+`;
+                } else {
+                    prompt = `You are an expert. [Monolithic fallback]`;
+                }
 
                 const encoder = new TextEncoder();
                 const stream = new ReadableStream({
@@ -208,6 +278,11 @@ export async function POST(req: NextRequest) {
                         let fullContent = '';
                         let isStreamClosed = false;
                         try {
+                            if (config.phase === 'primer') {
+                                const metaStr = `<!-- META_ITERATIONS: ${targetIterations} -->\n\n`;
+                                controller.enqueue(encoder.encode(metaStr));
+                                fullContent += metaStr;
+                            }
                             if (modelProvider === 'openai') {
                                 const completion = await openai.chat.completions.create({
                                     messages: [{ role: "user", content: prompt }],
@@ -301,22 +376,20 @@ export async function POST(req: NextRequest) {
                                     if (isStreamClosed) break;
                                 }
                             } else {
-                                // Vertex AI Logic (Dynamic!)
-                                const { getVertexModel } = await import('@/lib/vertex-client');
+                                // Unified AI Logic (Dynamic!)
+                                const { getGenerativeModel } = await import('@/lib/gemini');
 
                                 // Determine Target Model
-                                let targetModel = "gemini-2.0-flash";
+                                let targetModel = "gemini-flash";
                                 // If specific gemini model name is passed, use it.
+                                // Fallback logic is now handled recursively inside getGenerativeModel implementation.
                                 if (modelProvider.startsWith('gemini-') && modelProvider !== 'gemini') {
                                     targetModel = modelProvider;
-                                } else {
-                                    // Otherwise fallback to whatever is default
-                                    targetModel = "gemini-2.0-flash";
                                 }
 
                                 const runStream = async (modelName: string) => {
                                     console.log(`[Generate API] Attempting to use model: ${modelName}`);
-                                    const model = getVertexModel(modelName);
+                                    const model = await getGenerativeModel({ model: modelName });
                                     return await model.generateContentStream(prompt);
                                 };
 
@@ -326,13 +399,13 @@ export async function POST(req: NextRequest) {
                                 } catch (error: any) {
                                     console.warn(`[Generate API] Failed with ${targetModel}: ${error.message}`);
                                     // Fallback
-                                    if (targetModel.includes('3.0')) {
+                                    if (targetModel.includes('3.')) {
                                         try {
-                                            console.log('[Generate API] Falling back to gemini-2.0-flash...');
-                                            result = await runStream("gemini-2.0-flash");
+                                            console.log('[Generate API] Falling back to gemini-2.5-flash...');
+                                            result = await runStream("gemini-2.5-flash");
                                         } catch (e) {
-                                            console.log('[Generate API] Falling back to gemini-1.5-flash-002...');
-                                            result = await runStream("gemini-1.5-flash-002");
+                                            console.log('[Generate API] Falling back to gemini-2.0-flash-001...');
+                                            result = await runStream("gemini-2.0-flash-001");
                                         }
                                     } else {
                                         // Legacy fallback
@@ -538,6 +611,9 @@ export async function POST(req: NextRequest) {
 
             case 'mocktest':
                 let questions: any[] = [];
+                const languageContext = config.language
+                    ? `Generate the entire mock test strictly in ${config.language}.`
+                    : `Generate the entire mock test strictly in English.`;
 
                 if (modelProvider === 'ollama') {
                     console.log(`Generating ${config.count} mock test questions iteratively...`);
@@ -581,6 +657,8 @@ export async function POST(req: NextRequest) {
                             - Do NOT include any conversational text.
                             - Do NOT omit the "options" field (use [] if empty).
                             
+                            ${languageContext}
+
                             Context:
                             ${context}
                             
@@ -633,6 +711,8 @@ export async function POST(req: NextRequest) {
                       
                       REQUIRED DISTRIBUTION: ${distributionStr}.
                       
+                      ${languageContext}
+
                       STRICT JSON OUTPUT REQUIREMENTS:
                       Return ONLY a valid JSON Array containing exactly ${config.count} objects.
                       
@@ -719,10 +799,48 @@ export async function POST(req: NextRequest) {
 
                 const mockTest = await MockTest.create({
                     notebookId,
+                    language: config.language || 'English',
                     questions: validQuestions,
                     score: 0
                 });
                 resultData = mockTest;
+                break;
+
+            case 'mocktest-summary':
+                // Generate a holistic performance summary
+                if (!config.questions || !config.userAnswers || Object.keys(config.gradingResults).length === 0) {
+                    throw new Error("Missing required data for summary generation.");
+                }
+
+                const summaryLanguage = config.language || 'English';
+                const qsText = config.questions.map((q: any, i: number) => {
+                    return "Q: " + q.question + "\n" +
+                           "Student's Answer: " + (config.userAnswers[i] || "No answer") + "\n" +
+                           "Correct Answer: " + q.answer + "\n" +
+                           "Score Received: " + (config.gradingResults[i]?.score || 0) + "/10\n" +
+                           "AI Feedback: " + (config.gradingResults[i]?.feedback || "");
+                }).join('\n\n');
+
+                const summaryPrompt = `
+                    You are an expert, encouraging AI tutor reviewing a student's recent mock test.
+                    
+                    Here are the test details:
+                    Number of Questions: ${config.questions.length}
+                    Total Score: ${config.score} out of ${config.questions.length * 10}
+
+                    Questions and Grading Breakdown:
+                    ${qsText}
+
+                    Task:
+                    Provide a concise, short performance summary formatted in Markdown.
+                    Discuss appropriate points based on their performance. Do not make the summary too long.
+                    
+                    Write the entire summary fluently in ${summaryLanguage}.
+                    Do NOT wrap the output in a JSON object. Return raw markdown text only.
+                `;
+
+                const rawSummary = await generateWithProvider(summaryPrompt, modelProvider, { jsonMode: false });
+                resultData = { summary: rawSummary.trim() };
                 break;
 
             case 'grading':

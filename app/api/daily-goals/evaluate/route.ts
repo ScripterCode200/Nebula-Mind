@@ -4,7 +4,6 @@ import { jwtVerify } from 'jose';
 import connectToDatabase from '@/lib/db';
 import DailyGoal from '@/models/DailyGoal';
 import Exam from '@/models/Exam';
-import vertex_ai from '@/lib/gemini';
 import User from '@/models/User';
 import TestResult from '@/models/TestResult';
 import { calculateLevel } from '@/lib/levelUtils';
@@ -143,7 +142,8 @@ export async function POST(request: Request) {
             `;
 
             try {
-                const generativeModel = vertex_ai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+                const { getGenerativeModel } = await import('@/lib/gemini');
+                const generativeModel = await getGenerativeModel({ model: 'gemini-2.0-flash' });
                 const result = await generativeModel.generateContent(prompt);
                 const response = await result.response;
 

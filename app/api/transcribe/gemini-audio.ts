@@ -1,4 +1,5 @@
-import { VertexAI, HarmCategory, HarmBlockThreshold } from '@google-cloud/vertexai';
+import { HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { getGenerativeModel } from '@/lib/gemini';
 import { Readable } from 'stream';
 import fs from 'fs';
 import path from 'path';
@@ -45,54 +46,48 @@ function formatTime(seconds: number): string {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-async function generateWithPrompt(model: any, base64Audio: string, start: number, end?: number): Promise<string> {
+async function generateWithPrompt(model: any, base64Audio: string, start: number, end?: number, retries = 3): Promise<string> {
     let prompt = "Transcribe the audio from this file accurately. Output ONLY the transcript text, no other commentary.";
 
     if (end !== undefined) {
-        // If start is 0, we can say "first X minutes" or just range. Range is safer.
         const startStr = formatTime(start);
         const endStr = formatTime(end);
-        // Explicitly instruct the model to focus on the time range.
-        // Note: Gemini 1.5/2.0 understands audio context well, but exact timestamps can sometimes be tricky.
-        // However, this is the best strategy without ffmpeg.
         prompt = `Please transcribe the audio specifically between timestamp ${startStr} and ${endStr}. Ignore any audio before ${startStr} or after ${endStr}. Output ONLY the transcript for this segment.`;
     }
 
-    const result = await model.generateContent({
-        contents: [{
-            role: 'user',
-            parts: [
-                { text: prompt },
-                { inlineData: { mimeType: 'audio/mp4', data: base64Audio } } // Mime type audio/mp4 covers m4a
-            ]
-        }]
-    });
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const result = await model.generateContent({
+                contents: [{
+                    role: 'user',
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: 'audio/mp4', data: base64Audio } }
+                    ]
+                }]
+            });
 
-    const response = await result.response;
-    return response.candidates?.[0].content.parts[0].text || '';
+            const response = await result.response;
+            return response.candidates?.[0].content.parts[0].text || '';
+        } catch (error: any) {
+            console.warn(`[Vertex Audio] Attempt ${attempt} failed: ${error.message}`);
+            // If it's a 503 error or we haven't exhausted retries yet, we wait and try again
+            if (attempt === retries) throw error;
+            
+            // Exponential backoff: Wait 2s, 4s, 8s -> helps if the server is temporarily overloaded
+            const waitTime = Math.pow(2, attempt) * 1000;
+            console.log(`[Vertex Audio] Server might be busy. Waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+    }
+    return '';
 }
 
 export async function transcribeAudioWithGemini(url: string): Promise<string> {
-    const projectId = process.env.GOOGLE_PROJECT_ID || 'nebula-mind-480116';
-    const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-    if (!clientEmail || !privateKey) {
-        throw new Error('Vertex AI credentials not defined');
-    }
-
     const videoId = extractVideoId(url);
     if (!videoId) throw new Error('Could not extract video ID');
 
-    const vertexAI = new VertexAI({
-        project: projectId,
-        location: 'us-central1',
-        googleAuthOptions: {
-            credentials: { client_email: clientEmail, private_key: privateKey, project_id: projectId }
-        }
-    });
-
-    const model = vertexAI.getGenerativeModel({
+    const model = await getGenerativeModel({
         model: 'gemini-2.0-flash',
         generationConfig: {
             maxOutputTokens: 8192,
@@ -183,11 +178,15 @@ export async function transcribeAudioWithGemini(url: string): Promise<string> {
 
                 transcript += (transcript ? ' ' : '') + chunkText;
 
-                // Advance start. Overlap logic is tricky via prompt as we don't know where it cut.
-                // Assuming "Transcribe X to Y" implies precise cut.
-                // To be safe, we just advance to End (minus small overlap if needed, but strict segmentation is cleaner here)
                 start = end;
                 chunkIndex++;
+
+                // If there are more chunks to process, enforce a strict delay to bypass rate limits
+                if (start < duration) {
+                    const delaySeconds = 65; // Wait 65 seconds between chunks (Free tier Gemini 2.5 flash throttles frequently)
+                    console.log(`[Vertex Audio] Rate limit cooldown: Waiting ${delaySeconds} seconds before processing the next chunk...`);
+                    await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+                }
             }
         }
 

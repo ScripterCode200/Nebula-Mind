@@ -1,8 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface StreamTextProps {
     content: string;
@@ -64,10 +62,9 @@ export const StreamText: React.FC<StreamTextProps> = ({
     }, [content, isStreaming, displayedContent]);
 
     return (
-        <div className={className}>
-            <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
-                {displayedContent}
-            </ReactMarkdown>
-        </div>
+        <MarkdownRenderer 
+            content={displayedContent} 
+            className={className} 
+        />
     );
 };

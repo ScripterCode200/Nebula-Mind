@@ -7,24 +7,11 @@ import ChatInterface from './ChatInterface';
 import NotesGenerator from '../generators/NotesGenerator';
 import FlashcardGenerator from '../generators/FlashcardGenerator';
 import MockTestGenerator from '../generators/MockTestGenerator';
+import InteractiveTeacher from '../generators/InteractiveTeacher';
 import { motion, AnimatePresence } from 'framer-motion';
 import FuturisticSelect from '../ui/FuturisticSelect';
 
-const InteractiveAIPlaceholder = () => (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-[#050505]/50">
-        <div className="w-16 h-16 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(0,240,255,0.1)]">
-            <Cpu size={32} className="text-primary animate-pulse" />
-        </div>
-        <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Interactive AI</h3>
-        <p className="text-sm text-muted-foreground max-w-[200px] mb-6 leading-relaxed">
-            Real-time neural interaction environment is currently booting up.
-        </p>
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-            <Sparkles size={12} className="text-primary" />
-            <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Coming Soon</span>
-        </div>
-    </div>
-);
+// Removed InteractiveAIPlaceholder
 
 interface AIToolsPanelProps {
     notebookId: string;
@@ -41,7 +28,7 @@ const tabs = [
     { id: 'notes', label: 'Notes', icon: FileText, component: NotesGenerator },
     { id: 'flashcards', label: 'Flashcards', icon: Layers, component: FlashcardGenerator },
     { id: 'tests', label: 'Mock Tests', icon: GraduationCap, component: MockTestGenerator },
-    { id: 'interactive', label: 'Interactive AI', icon: Cpu, component: InteractiveAIPlaceholder },
+    { id: 'interactive', label: 'Interactive AI', icon: Cpu, component: InteractiveTeacher },
 ];
 
 const AIToolsPanel = ({ notebookId, chatHistory, sourceIds }: AIToolsPanelProps) => {
@@ -117,9 +104,9 @@ const AIToolsPanel = ({ notebookId, chatHistory, sourceIds }: AIToolsPanelProps)
                             value={modelProvider}
                             onChange={setModelProvider}
                             options={[
-                                { value: 'gemini', label: 'Gemini 2.5 Flash', icon: <Sparkles size={14} className="text-yellow-400" /> },
-                                { value: 'gemini-3.0-flash', label: 'Gemini 3.0 Flash', icon: <Sparkles size={14} className="text-purple-400" /> },
-                                { value: 'ollama', label: 'Nebula AI 2.0', icon: <Cpu size={14} className="text-primary" /> }
+                                { value: 'gemini', label: 'Nebula 3.0 (Latest)', icon: <Sparkles size={14} className="text-yellow-400" /> },
+                                { value: 'gemini-3.0-flash', label: 'Nebula 2.0', icon: <Sparkles size={14} className="text-purple-400" /> },
+                                { value: 'ollama', label: 'Nebula 1.0', icon: <Cpu size={14} className="text-primary" /> }
                             ]}
                         />
                     </div>

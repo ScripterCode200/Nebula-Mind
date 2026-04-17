@@ -206,10 +206,9 @@ export default function EditorPage() {
                                                 }
                                             }}
                                             options={[
-                                                { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-                                                { value: 'gemini-2.0-flash-001', label: 'Gemini 2.0 Flash (v1)' },
-                                                { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-                                                { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+                                                { value: 'gemini-2.0-flash', label: 'Nebula One AI' },
+                                                { value: 'gemini-1.5-pro', label: 'Nebula 2' },
+                                                { value: 'gemini-1.5-flash', label: 'Nebula 3' },
                                             ]}
                                             className="w-full md:w-64"
                                         />

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
     Layout, BookOpen, Compass, Settings, Shield,
-    FileEdit, LogOut, ChevronLeft, User, CreditCard, Brain, PanelLeftClose, X, Trophy, Rocket
+    FileEdit, LogOut, ChevronLeft, User, CreditCard, Brain, PanelLeftClose, X, Trophy, Rocket, MessageSquare
 } from 'lucide-react';
 import { useUserStore } from '@/store/useUserStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -53,7 +53,9 @@ export default function AppSidebar() {
     const navItems = [
         { name: 'Dashboard', href: '/dashboard', icon: Layout },
         { name: 'My Notebooks', href: '/notebook', icon: BookOpen },
+        { name: 'Interactive AI', href: '/interactive-ai', icon: Brain },
         { name: 'Explore', href: '/explore', icon: Compass },
+        { name: 'Sessions', href: '/sessions', icon: MessageSquare },
         // { name: 'Play Zone', href: '/learning-booster', icon: Rocket }, // Temporarily removed
         { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
         { name: 'Profile', href: '/profile', icon: User },
@@ -91,7 +93,7 @@ export default function AppSidebar() {
         }
     };
 
-    const isNotebookPage = pathname?.startsWith('/notebook/') || pathname === '/maintenance' || pathname === '/blocked';
+    const isNotebookPage = pathname?.startsWith('/notebook/') || pathname === '/maintenance' || pathname === '/blocked' || pathname?.startsWith('/sessions/live');
     if (!user || isNotebookPage) return null;
 
     return (

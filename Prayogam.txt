@@ -1,0 +1,80 @@
+========================================================================
+             PRAYOGAM (NEBULA MIND) - COMPREHENSIVE DOCUMENTATION
+========================================================================
+
+1. OVERVIEW
+------------------------------------------------------------------------
+Prayogam (also known as Nebula Mind) is an advanced, AI-powered learning application and workspace designed to revolutionize how individuals manage, assimilate, and interact with information. Fundamentally built as a bridge between static documents and interactive knowledge, it acts as a personalized, 24/7 AI tutor. By leveraging cutting-edge Large Language Models (LLMs)—including Google Gemini, OpenAI GPT-4o, and local Ollama models—the platform seamlessly transforms conventional study materials (like PDFs) into dynamic knowledge bases.
+
+The core philosophy revolves around blending state-of-the-art AI capabilities with proven cognitive science and educational techniques. By incorporating elements of gamification, Prayogam pushes back against passive reading and fosters a consistent, daily active learning habit backed by real-time progress tracking.
+
+2. FEATURES
+------------------------------------------------------------------------
+Prayogam delivers a suite of deeply integrated features focused on study and productivity:
+
+* AI-Powered Workspace & Chat: Users can upload static PDFs and naturally converse with their documents. They can ask complex questions, request succinct summaries, and clarify concepts instantly across an entire document context.
+* Dynamic Flashcard Generator: Implements active recall by automatically extracting key concepts from user notes and documents to generate high-quality, targeted flashcards.
+* Mock Test Generator: Fosters exam-readiness by dynamically creating adaptive quizzes directly from uploaded content. Tests include a mix of Multiple Choice, True/False, and Short Answer formats.
+* AI Note Taker: Dramatically reduces manual work by distilling lengthy, dense documents into clean, well-structured study notes in seconds.
+* Gamified Progress Tracking (Study Streak): A robust system that tracks daily habits. An intelligent "Time Focused" heartbeat mechanism monitors authentic user dedication by checking visibility every 60 seconds (rejecting idle background tabs).
+* Knowledge System (XP) & Leaderboard: Rewards active learning (e.g., test taking, notebook creation) and passive studying (time spent) with an RPG-like experience system. Users unlock achievements and climb leaderboards, fostering friendly competition.
+* Live AI Interactive Sessions: Provides a high-fidelity, distraction-free live AI tutoring environment. It features a stunning "Neural Particle Star" visualizer integrated with website theme variables for aesthetic consistency. During AI processing states, it triggers a dynamic "Neural Vibration" (shiver effect) to provide immediate, immersive visual feedback.
+
+
+3. CAPABILITIES
+------------------------------------------------------------------------
+To ensure maximum flexibility and reliability, the platform implements several powerful capabilities:
+
+* Multi-Model Flexibility: The infrastructure abstracts the AI layer, enabling users to seamlessly switch between different LLMs depending on their cost, quality, and privacy needs (e.g., swapping from cloud-based OpenAI/Gemini to localized, completely private Ollama instances).
+* Real-Time Interface & Streaming: To keep users engaged without waiting, AI responses are streamed back to the client character-by-character, drastically reducing perceived latency.
+* Deep Document Contextualization: Using advanced PDF parsing (react-pdf, pdf-parse, pdf2json), the platform breaks down visual documents into readable raw text allowing the AI to effectively index and refer back to specific topics.
+* Cross-Device Portability: Thanks to secure database persistence, user interactions—notes, metrics, active chat sessions, and generated flashcards—are available anytime across desktop, tablet, and mobile browsers.
+* Enterprise-Grade Security: Integrated authentication, profile management, and proper API route guarding ensure all private learning materials remain strictly confidential.
+
+4. IMPACT
+------------------------------------------------------------------------
+Prayogam fundamentally shifts the learning paradigm from passive to active. By automating the most tedious parts of studying (summarization, note-taking, and quiz creation), the platform drastically reduces the time users spend organizing information and maximizes the time they spend actually learning it.
+
+Furthermore, its gamification approach effectively addresses "study burnout" and procrastination. By offering instant gratification via XP points, daily streak protections, and visual growth charts, it transforms habitual learning from a taxing chore into a rewarding, habit-forming experience. This democratization of an "always-on smart tutor" significantly bridges educational gaps, giving self-guided learners powerful tools once reserved for intensive, human-led tutoring.
+
+5. TECHNICAL STATS (LIBRARIES, PACKAGES, DATABASE, STRATEGIES)
+------------------------------------------------------------------------
+The architecture relies on a highly scalable, modern Javascript/Typescript stack carefully chosen for performance and developer experience.
+
+# Core Technologies & Frameworks
+* Framework: Next.js 15 (App Router) — Handles Server-Side Rendering (SSR), efficient routing, and secure backend API endpoints.
+* Language: TypeScript (Strict) — Enforces end-to-end type safety, preventing runtime bugs.
+
+# Database & Storage
+* Primary Database: MongoDB Atlas, accessed via the Mongoose ODM (v9.0.0). Enables flexible schematics for heavily nested data types like dynamic quizzes and chat arrays.
+* Session/State Integrity: Secure MongoDB models hold everything from the core "SystemSetting" down to individual user statistics.
+
+# AI & Machine Learning Integration
+* Google Generative AI SDK (@google/generative-ai, @google-cloud/vertexai)
+* OpenAI Node SDK (openai)
+* Ollama Integration (for local, open-source model support)
+* Strategy: Abstracted Factory/Service patterns internally route prompts dynamically depending on user model selection.
+
+# Frontend & UI Packages
+* Styling: Tailwind CSS v4, initialized with PostCSS, paired with Vanilla CSS variables for robust "Glassmorphism" theming and complex dynamic gradients.
+* Dynamic Class Utilities: tailwind-merge and clsx ensure CSS class conflicts are automatically resolved.
+* Animations: Framer Motion for liquid-smooth transitions, page loads, and micro-interactions. react-confetti for achievement unlocks.
+* Scrolling: Lenis for specialized, buttery-smooth momentum scrolling.
+* State Management: Zustand provides a lightweight, blazingly fast global state devoid of React Context re-render bloat.
+* Notifications: Sonner handles non-intrusive, stackable toast notifications.
+
+# Document Processing & Utilities
+* PDF Handling: pdf-parse, pdf2json, react-pdf, and pdf-lib
+* Word/Markup: docx-preview, mammoth, html2pdf.js, react-markdown, remark-gfm, rehype-highlight
+* External Integration: youtube-transcript and youtubei.js allow the ingestion of video lessons natively.
+* Upload Handling: react-dropzone manages file states locally before server transmission.
+* Security: bcryptjs (password hashing), jose (JWT handling), uuid.
+
+# Strategies & Architecture
+* Edge / API Rendering Strategy: Uses Next.js API routes with streaming protocols (like `ai` SDK where applicable) mapped against AI providers.
+* Granular Tracking Strategy: An asynchronous interval-based strategy pings the server periodically with timestamps to legitimately calculate active "Time Focused".
+* Gamified Reinforcement Strategy: Implementation of "Active Recall" combined with instantaneous variable rewards (XP) maps precisely to psychological habit loops (Cue -> Routine -> Reward).
+
+6. FINAL SUMMARY
+------------------------------------------------------------------------
+Prayogam (Nebula Mind) is far more than just a wrapper around chat-bots. It is a thoughtfully engineered, vertically integrated educational platform. By harmonizing an aesthetically striking UI, deeply resilient and scalable Next.js/MongoDB architecture, and the raw computational reasoning of modern LLMs, it stands as a premier solution for students, professionals, and lifelong learners. It successfully transforms static knowledge consumption into a modern, highly interactive, and gamified pursuit of mastery.

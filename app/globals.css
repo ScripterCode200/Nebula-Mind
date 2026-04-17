@@ -16,6 +16,7 @@
   --font-outfit: var(--font-outfit);
 
   --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-spin-slow: spin 8s linear infinite;
   --animate-float: float 6s ease-in-out infinite;
 
   @keyframes float {

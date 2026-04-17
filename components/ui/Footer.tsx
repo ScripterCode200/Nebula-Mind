@@ -87,7 +87,7 @@ export default function Footer() {
         }
     };
 
-    if (pathname?.startsWith('/notebook') || pathname === '/maintenance' || pathname === '/blocked') {
+    if (pathname?.startsWith('/notebook') || pathname === '/maintenance' || pathname === '/blocked' || pathname?.startsWith('/sessions/live')) {
         return null;
     }
 

@@ -364,57 +364,29 @@ const WordViewer = ({ contentHtml: initialHtml, url, notebookId, isMobile = fals
                         )}
 
                         <style>{`
-                            .docx-content-wrapper * {
-                                color: black !important;
-                                font-family: "Calibri", "Arial", sans-serif !important;
-                                -webkit-font-smoothing: antialiased;
+                            /* Minimal container styling allowing docx-preview to render authentic documents */
+                            .docx-content-wrapper {
+                                background: #f3f4f6; /* Subtle backdrop if pages don't cover everything */
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                padding: 2rem 0;
                             }
-                            /* Remove potential extra padding from docx-preview generic styles */
-                            .docx_preview {
+                            
+                            /* Ensure individual pages look like pages */
+                            .docx-content-wrapper > section {
+                                background: white;
+                                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+                                margin-bottom: 2rem;
+                            }
+                            
+                            /* Ensure any dark mode app styles don't accidentally leak into the word doc text flow */
+                            .docx-wrapper {
+                                background: transparent !important;
                                 padding: 0 !important;
-                                margin: 0 !important;
-                            }
-                            
-                            /* Compact Paragraph Spacing */
-                            .docx-content-wrapper p {
-                                margin-bottom: 0.5em !important;
-                                margin-top: 0 !important;
-                                line-height: 1.4 !important;
-                            }
-                            
-                            /* Fix Page Margins */
-                            .docx-content-wrapper section {
-                                padding: 2.54cm !important; /* Standard Word 1-inch margin */
-                                margin: 0 !important;
-                                box-shadow: none !important; /* Remove individual page shadows if any */
-                                background: white !important;
-                            }
-                            
-                            /* Proper Table Viewing */
-                            .docx-content-wrapper table {
-                                border-collapse: collapse !important;
-                                width: 100% !important;
-                                margin-bottom: 1em !important;
-                                border: 1px solid black !important;
-                            }
-                            .docx-content-wrapper td, 
-                            .docx-content-wrapper th {
-                                border: 1px solid black !important;
-                                padding: 4px 8px !important;
-                                vertical-align: top !important;
-                            }
-
-                            /* Ensure headers are bold and black */
-                            .docx-content-wrapper h1, 
-                            .docx-content-wrapper h2, 
-                            .docx-content-wrapper h3, 
-                            .docx-content-wrapper h4, 
-                            .docx-content-wrapper strong, 
-                            .docx-content-wrapper b {
-                                font-weight: bold !important;
-                                color: black !important;
                             }
                         `}</style>
+
 
 
                         {/* docx-preview renders here */}

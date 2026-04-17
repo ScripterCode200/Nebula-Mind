@@ -1,9 +1,9 @@
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // Use SSL
+    host: process.env.NODEMAILER_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.NODEMAILER_PORT || '465'),
+    secure: true, // Use SSL/TLS
     auth: {
         user: process.env.NODEMAILER_USER,
         pass: process.env.NODEMAILER_PASS

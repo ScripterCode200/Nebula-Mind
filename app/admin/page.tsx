@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Users, Lock, Unlock, Zap, Search, Bell, Target, Cpu, Activity, Server, AlertTriangle, UserCheck, Trash2, Edit, User } from 'lucide-react';
+import { Shield, Users, Lock, Unlock, Zap, Search, Bell, Target, Cpu, Activity, Server, AlertTriangle, UserCheck, Trash2, Edit, User, Globe } from 'lucide-react';
 import Link from 'next/link';
 import GlassCard from '@/components/ui/GlassCard';
 import NeonButton from '@/components/ui/NeonButton';
@@ -61,6 +61,10 @@ export default function AdminPage() {
     const [antiCheatEnabled, setAntiCheatEnabled] = useState(false);
     const [enableDirectCaptions, setEnableDirectCaptions] = useState(false); // Strategy 1
     const [enableAutoDailyGoals, setEnableAutoDailyGoals] = useState(true);
+    const [useVertexAI, setUseVertexAI] = useState(false); // Vertex AI vs Standard Gemini Toggle
+    const [aiModel, setAiModel] = useState('gemini-2.0-flash');
+    const [enableArtificialProxy, setEnableArtificialProxy] = useState(true);
+    const [orchestratorVisualType, setOrchestratorVisualType] = useState<'svg' | 'image'>('svg');
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
@@ -104,6 +108,10 @@ export default function AdminPage() {
                 setAntiCheatEnabled(settings.antiCheatEnabled);
                 setEnableDirectCaptions(settings.enableDirectCaptions ?? false); // Default OFF
                 setEnableAutoDailyGoals(settings.enableAutoDailyGoals ?? true);
+                setUseVertexAI(settings.useVertexAI ?? false); // Default OFF (Standard Gemini)
+                setAiModel(settings.aiModel ?? 'gemini-2.0-flash');
+                setEnableArtificialProxy(settings.enableArtificialProxy ?? true);
+                setOrchestratorVisualType(settings.orchestratorVisualType ?? 'svg');
             }
         } catch (error) {
             console.error('Failed to refresh admin data');
@@ -319,6 +327,123 @@ export default function AdminPage() {
         });
     };
 
+    const toggleVertexAIClick = () => {
+        const newState = !useVertexAI;
+        confirmAction({
+            title: newState ? 'ENABLE VERTEX AI' : 'ENABLE STANDARD GEMINI',
+            message: newState
+                ? 'System will use Google Cloud Vertex AI. Ensure Vertex subscription is active.'
+                : 'System will use Standard Google AI Studio (Gemini API).',
+            type: newState ? 'warning' : 'info',
+            actionLabel: newState ? 'Use Vertex' : 'Use Standard',
+            onConfirm: async () => {
+                try {
+                    setUseVertexAI(newState);
+                    const res = await fetch('/api/admin/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ useVertexAI: newState })
+                    });
+                    if (res.ok) {
+                        toast.success(`AI Provider: ${newState ? 'Vertex AI' : 'Standard Gemini'}`);
+                    } else {
+                        setUseVertexAI(!newState);
+                        toast.error('Failed to update AI setting');
+                    }
+                } catch (error) {
+                    setUseVertexAI(!useVertexAI);
+                    toast.error('Failed to update AI setting');
+                }
+            }
+        });
+    };
+
+    const handleModelChange = async (newModel: string) => {
+        confirmAction({
+            title: 'HOT-SWAP AI MODEL',
+            message: `You are about to switch the system's core intelligence to ${newModel.toUpperCase()}. This will affect all ongoing generations globally.`,
+            type: 'info',
+            actionLabel: 'Switch Engine',
+            onConfirm: async () => {
+                try {
+                    setAiModel(newModel);
+                    const res = await fetch('/api/admin/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ aiModel: newModel })
+                    });
+                    if (res.ok) {
+                        toast.success(`Active Engine: ${newModel}`);
+                    } else {
+                        toast.error('Failed to update model');
+                    }
+                } catch (error) {
+                    toast.error('Error updating model');
+                }
+            }
+        });
+    };
+
+    const toggleArtificialProxyClick = () => {
+        const newState = !enableArtificialProxy;
+        confirmAction({
+            title: newState ? 'ENABLE ARTIFICIAL PROXY' : 'ENABLE DIRECT SERVER IP',
+            message: newState
+                ? 'System will use rotating proxy servers for YouTube extraction. Recommended to bypass IP bans.'
+                : 'System will use your direct server/laptop IP. Use only if external proxies are failing.',
+            type: newState ? 'success' : 'warning',
+            actionLabel: newState ? 'Enable Proxies' : 'Use Direct IP',
+            onConfirm: async () => {
+                try {
+                    setEnableArtificialProxy(newState);
+                    const res = await fetch('/api/admin/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enableArtificialProxy: newState })
+                    });
+                    if (res.ok) {
+                        toast.success(`Network Mode: ${newState ? 'Artificial Proxy' : 'Direct Server IP'}`);
+                    } else {
+                        setEnableArtificialProxy(!newState);
+                        toast.error('Failed to update network setting');
+                    }
+                } catch (error) {
+                    setEnableArtificialProxy(!enableArtificialProxy);
+                    toast.error('Failed to update network setting');
+                }
+            }
+        });
+    };
+
+    const toggleVisualTypeClick = () => {
+        const nextType = orchestratorVisualType === 'svg' ? 'image' : 'svg';
+        confirmAction({
+            title: `SWITCH TO ${nextType.toUpperCase()} MODE`,
+            message: `The system will now generate ${nextType === 'image' ? 'AI images (via DALL-E)' : 'animated SVGs'} for all lesson topics.`,
+            type: 'info',
+            actionLabel: 'Switch Mode',
+            onConfirm: async () => {
+                try {
+                    setOrchestratorVisualType(nextType);
+                    const res = await fetch('/api/admin/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orchestratorVisualType: nextType })
+                    });
+                    if (res.ok) {
+                        toast.success(`Visual Mode: ${nextType.toUpperCase()}`);
+                    } else {
+                        setOrchestratorVisualType(orchestratorVisualType);
+                        toast.error('Failed to update visual setting');
+                    }
+                } catch (error) {
+                    setOrchestratorVisualType(orchestratorVisualType);
+                    toast.error('Failed to update visual setting');
+                }
+            }
+        });
+    };
+
     const filteredUsers = users.filter(u =>
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -443,6 +568,65 @@ export default function AdminPage() {
                             Auto Goals
                             <div className={cn("w-2 h-2 rounded-full ml-2", enableAutoDailyGoals ? "bg-blue-500 shadow-[0_0_10px_currentColor]" : "bg-white/20")} />
                         </button>
+
+                        <button
+                            onClick={toggleVertexAIClick}
+                            className={cn(
+                                "flex items-center gap-3 px-6 py-3 rounded-lg border transition-all duration-300 font-mono text-sm uppercase tracking-wider relative overflow-hidden group",
+                                useVertexAI
+                                    ? "bg-purple-500/10 border-purple-500/50 text-purple-400 shadow-[0_0_20px_-5px_rgba(168,85,247,0.3)]"
+                                    : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10"
+                            )}
+                        >
+                            <Cpu size={18} />
+                            Vertex AI
+                            <div className={cn("w-2 h-2 rounded-full ml-2", useVertexAI ? "bg-purple-500 shadow-[0_0_10px_currentColor]" : "bg-white/20")} />
+                        </button>
+
+                        <button
+                            onClick={toggleArtificialProxyClick}
+                            className={cn(
+                                "flex items-center gap-3 px-6 py-3 rounded-lg border transition-all duration-300 font-mono text-sm uppercase tracking-wider relative overflow-hidden group",
+                                enableArtificialProxy
+                                    ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)]"
+                                    : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10"
+                            )}
+                        >
+                            <Globe size={18} />
+                            Proxies
+                            <div className={cn("w-2 h-2 rounded-full ml-2", enableArtificialProxy ? "bg-emerald-500 shadow-[0_0_10px_currentColor]" : "bg-white/20")} />
+                        </button>
+
+                        <button
+                            onClick={toggleVisualTypeClick}
+                            className={cn(
+                                "flex items-center gap-3 px-6 py-3 rounded-lg border transition-all duration-300 font-mono text-sm uppercase tracking-wider relative overflow-hidden group",
+                                orchestratorVisualType === 'image'
+                                    ? "bg-primary/10 border-primary/50 text-primary shadow-[0_0_20px_-5px_rgba(0,240,255,0.3)]"
+                                    : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10"
+                            )}
+                        >
+                            {orchestratorVisualType === 'image' ? <Search size={18} /> : <Zap size={18} className="rotate-45" />}
+                            {orchestratorVisualType === 'image' ? 'IMAGE MODE' : 'SVG MODE'}
+                            <div className={cn("w-2 h-2 rounded-full ml-2", orchestratorVisualType === 'image' ? "bg-primary shadow-[0_0_10px_currentColor]" : "bg-zinc-500")} />
+                        </button>
+
+                        {/* Model Selector Dropdown */}
+                        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg pl-4 pr-1 h-[46px] group hover:border-primary/50 transition-colors">
+                            <Cpu size={18} className="text-primary" />
+                            <span className="text-[10px] font-mono text-muted-foreground uppercase mr-2 border-r border-white/10 pr-2">Engine</span>
+                            <FuturisticDropdown
+                                value={aiModel}
+                                onChange={handleModelChange}
+                                onOpenChange={(open) => setActiveDropdownId(open ? 'system-model' : null)}
+                                options={[
+                                    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Stable)', icon: <Zap size={12} />, color: 'blue' },
+                                    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', icon: <Cpu size={12} />, color: 'green' },
+                                    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', icon: <Activity size={12} />, color: 'yellow' },
+                                    { value: 'gemini-3.1-flash', label: '3.1 Flash (Experimental)', icon: <Zap size={12} />, color: 'purple' }
+                                ]}
+                            />
+                        </div>
                     </div>
 
                     {/* Search */}

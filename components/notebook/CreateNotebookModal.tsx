@@ -30,9 +30,23 @@ const extractPdfText = async (fileOrUrl: File | string): Promise<string> => {
 
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map((item: any) => item.str).join(' ');
-            fullText += pageText + '\n';
+            const content = await page.getTextContent();
+            
+            // Smarter PDF Extraction: Preserve line breaks based on Y-coordinates
+            let lastY = -1;
+            let pageText = '';
+            for (const item of content.items) {
+                if ('str' in item && 'transform' in item) {
+                    if (lastY !== -1 && Math.abs(item.transform[5] - lastY) > 5) {
+                        pageText += '\n'; 
+                    } else if (lastY !== -1) {
+                        pageText += ' '; 
+                    }
+                    pageText += item.str;
+                    lastY = item.transform[5];
+                }
+            }
+            fullText += pageText + '\n\n--- Page Break ---\n\n';
         }
 
         return fullText.trim();

@@ -146,27 +146,27 @@ async function _fetchCaptionsInternal(url: string, videoId: string, proxy: strin
 /**
  * Public function to fetch captions with robust proxy rotation and retries.
  */
-export async function fetchCaptionsWithYtDlp(url: string): Promise<string | null> {
+export async function fetchCaptionsWithYtDlp(url: string, useArtificialProxy: boolean = true): Promise<string | null> {
     const videoId = extractVideoId(url);
     if (!videoId) {
         console.warn('[yt-dlp-captions] Could not extract video ID');
         return null;
     }
 
-    const proxies = getProxyList();
-    // Shuffle proxies for better distribution
-    const shuffledProxies = [...proxies].sort(() => 0.5 - Math.random());
+    let attemptList: string[] = [];
 
-    // Attempt list: proxies first, then direct as fallback (optional, maybe direct is blocked too)
-    // If user specifically bought proxies to avoid blocking, maybe we should ONLY use proxies?
-    // But if they all fail, trying direct is a valid last resort.
-    const attemptList = [...shuffledProxies];
-    if (attemptList.length > 0) {
-        attemptList.push(null as unknown as string); // Add null for direct
+    if (useArtificialProxy) {
+        const proxies = getProxyList();
+        // Shuffle proxies for better distribution
+        const shuffledProxies = [...proxies].sort(() => 0.5 - Math.random());
+        attemptList = [...shuffledProxies];
     } else {
-        attemptList.push(null as unknown as string);
+        console.log(`[yt-dlp-captions] Artificial Proxy Mode disabled. Using Server IP.`);
     }
 
+    // Always attempt direct fallback AT LEAST once (if list is empty, it means we only try direct)
+    attemptList.push(null as unknown as string); 
+    
     // Cap attempts
     const MAX_ATTEMPTS = Math.min(attemptList.length, 6); // Try up to 6 distinct IPs
 

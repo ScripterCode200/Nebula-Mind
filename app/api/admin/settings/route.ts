@@ -33,7 +33,9 @@ export async function GET() {
             maintenanceMode: false,
             antiCheatEnabled: false,
             enableDirectCaptions: false, // Default OFF
-            enableAutoDailyGoals: true
+            enableAutoDailyGoals: true,
+            useVertexAI: false, // Default to standard Gemini
+            enableArtificialProxy: true // Default ON
         });
     }
     return NextResponse.json(setting);
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { maintenanceMode, aiModel, antiCheatEnabled, enableDirectCaptions, enableAutoDailyGoals } = await req.json();
+        const { maintenanceMode, aiModel, antiCheatEnabled, enableDirectCaptions, enableAutoDailyGoals, useVertexAI, enableArtificialProxy, orchestratorVisualType } = await req.json();
         await connectToDatabase();
 
         const updateData: any = {};
@@ -54,6 +56,9 @@ export async function POST(req: Request) {
         if (antiCheatEnabled !== undefined) updateData.antiCheatEnabled = antiCheatEnabled;
         if (enableDirectCaptions !== undefined) updateData.enableDirectCaptions = enableDirectCaptions;
         if (enableAutoDailyGoals !== undefined) updateData.enableAutoDailyGoals = enableAutoDailyGoals;
+        if (useVertexAI !== undefined) updateData.useVertexAI = useVertexAI;
+        if (enableArtificialProxy !== undefined) updateData.enableArtificialProxy = enableArtificialProxy;
+        if (orchestratorVisualType !== undefined) updateData.orchestratorVisualType = orchestratorVisualType;
 
         // Ensure 'value' exists if upserting a new doc
         const setting = await SystemSetting.findOneAndUpdate(

@@ -219,7 +219,7 @@ export default function Navbar() {
 
     const isTestActive = useGoalStore(state => state.isTestActive);
 
-    if (isNotebookDetail || pathname === '/maintenance' || pathname === '/blocked' || isTestActive) {
+    if (isNotebookDetail || pathname === '/maintenance' || pathname === '/blocked' || isTestActive || pathname?.startsWith('/sessions/live')) {
         return null;
     }
 

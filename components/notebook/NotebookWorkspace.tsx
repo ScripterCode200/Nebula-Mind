@@ -309,18 +309,33 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     const mammoth = await import('mammoth');
                     const arrayBuffer = await file.arrayBuffer();
 
-                    // Simple timeout wrapper
-                    const extractPromise = mammoth.extractRawText({ arrayBuffer });
+                    // Preserve formatting by converting to HTML first, then basic Markdown
+                    const extractPromise = mammoth.convertToHtml({ arrayBuffer });
                     const timeoutPromise = new Promise<{ value: string }>((_, reject) =>
                         setTimeout(() => reject(new Error('Extraction timed out')), 10000)
                     );
 
                     const result = await Promise.race([extractPromise, timeoutPromise]);
-                    uploadedText = result.value;
+                    let htmlText = result.value;
+
+                    // Convert basic HTML to Markdown to preserve structure for AI
+                    htmlText = htmlText.replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n');
+                    htmlText = htmlText.replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n');
+                    htmlText = htmlText.replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n');
+                    htmlText = htmlText.replace(/<strong>(.*?)<\/strong>/gi, '**$1**');
+                    htmlText = htmlText.replace(/<b>(.*?)<\/b>/gi, '**$1**');
+                    htmlText = htmlText.replace(/<em>(.*?)<\/em>/gi, '*$1*');
+                    htmlText = htmlText.replace(/<i>(.*?)<\/i>/gi, '*$1*');
+                    htmlText = htmlText.replace(/<li>(.*?)<\/li>/gi, '- $1\n');
+                    htmlText = htmlText.replace(/<p>(.*?)<\/p>/gi, '$1\n\n');
+                    htmlText = htmlText.replace(/<br\s*\/?>/gi, '\n');
+                    htmlText = htmlText.replace(/<[^>]+>/g, ''); // Strip remaining tags
+
+                    uploadedText = htmlText;
 
                     // Basic cleanup
                     if (uploadedText) {
-                        uploadedText = uploadedText.replace(/\n\s*\n/g, '\n').trim();
+                        uploadedText = uploadedText.replace(/\n\s*\n/g, '\n\n').trim();
                     }
 
                 } catch (e) {
@@ -344,7 +359,22 @@ const NotebookWorkspace = ({ notebook }: NotebookWorkspaceProps) => {
                     for (let i = 1; i <= maxPages; i++) {
                         const page = await pdf.getPage(i);
                         const content = await page.getTextContent();
-                        uploadedText += content.items.map((item: any) => item.str).join(' ') + '\n';
+                        
+                        // Smarter PDF Extraction: Preserve line breaks based on Y-coordinates
+                        let lastY = -1;
+                        let pageText = '';
+                        for (const item of content.items) {
+                            if ('str' in item && 'transform' in item) {
+                                if (lastY !== -1 && Math.abs(item.transform[5] - lastY) > 5) {
+                                    pageText += '\n'; 
+                                } else if (lastY !== -1) {
+                                    pageText += ' '; 
+                                }
+                                pageText += item.str;
+                                lastY = item.transform[5];
+                            }
+                        }
+                        uploadedText += pageText + '\n\n--- Page Break ---\n\n';
                     }
                 } catch (e) {
                     console.error("Client side PDF parse failed", e);

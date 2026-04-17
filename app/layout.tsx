@@ -89,11 +89,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  //   const headersList = await headers();
-  //   const pathname = headersList.get('x-current-path') || '';
-  //   // Hide global nav on special pages and inside notebooks
-  //   const isSpecialPage = ['/maintenance', '/blocked'].includes(pathname) || pathname.startsWith('/notebook/');
-
   return (
     <html lang="en">
       <body
@@ -106,15 +101,9 @@ export default async function RootLayout({
             <MaintenanceListener />
             <ActivityTracker />
             <GlobalGoalManager />
-            <div className="flex min-h-screen">
-              <AppSidebar />
-
-              <LayoutWrapper>
-                <Navbar />
-                {children}
-                <Footer />
-              </LayoutWrapper>
-            </div>
+            <LayoutWrapper>
+              {children}
+            </LayoutWrapper>
           </AuthInitializer>
         </AuthGuard>
         <Toaster position="top-center" theme="dark" />
