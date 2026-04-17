@@ -1,19 +1,49 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-    host: process.env.NODEMAILER_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.NODEMAILER_PORT || '465'),
-    secure: true, // Use SSL/TLS
-    auth: {
-        user: process.env.NODEMAILER_USER,
-        pass: process.env.NODEMAILER_PASS
+/**
+ * Lazy-initialized transporter to ensure environment variables are fully loaded
+ * at the time of transporter creation.
+ */
+let transporter: nodemailer.Transporter | null = null;
+
+const getTransporter = () => {
+    if (transporter) return transporter;
+
+    const host = process.env.NODEMAILER_HOST || 'smtp.hostinger.com';
+    const port = parseInt(process.env.NODEMAILER_PORT || '465');
+    const user = process.env.NODEMAILER_USER;
+    const pass = process.env.NODEMAILER_PASS;
+
+    if (!user || !pass) {
+        console.error('[Mail] Missing NODEMAILER_USER or NODEMAILER_PASS in environment.');
     }
-});
+
+    transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465, // True for 465, false for 587
+        auth: {
+            user,
+            pass
+        },
+        // Hostinger specific settings for better reliability
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100
+    });
+
+    return transporter;
+};
 
 export const sendOTP = async (email: string, otp: string) => {
     try {
-        await transporter.sendMail({
-            from: `"Nebula Mind" <${process.env.NODEMAILER_USER}>`,
+        const mailTransporter = getTransporter();
+        const senderEmail = process.env.NODEMAILER_USER;
+
+        console.log(`[Mail] Attempting to send OTP to ${email} via ${senderEmail}...`);
+
+        const info = await mailTransporter.sendMail({
+            from: `"Nebula Mind" <${senderEmail}>`,
             to: email,
             subject: 'Your Access Code - Nebula Mind',
             html: `
@@ -74,8 +104,11 @@ export const sendOTP = async (email: string, otp: string) => {
 
 export const sendPasswordResetEmail = async (email: string, resetLink: string) => {
     try {
-        await transporter.sendMail({
-            from: `"Nebula Mind" <${process.env.NODEMAILER_USER}>`,
+        const mailTransporter = getTransporter();
+        const senderEmail = process.env.NODEMAILER_USER;
+
+        const info = await mailTransporter.sendMail({
+            from: `"Nebula Mind" <${senderEmail}>`,
             to: email,
             subject: 'Reset Your Password - Nebula Mind',
             html: `
@@ -87,9 +120,10 @@ export const sendPasswordResetEmail = async (email: string, resetLink: string) =
                 </html>
             `
         });
+        console.log(`[Mail] Reset email sent to ${email}: ${info.messageId}`);
         return true;
     } catch (error: any) {
-        console.error('Email sending failed:', error.message || error);
+        console.error('[Mail] Reset email failed:', error.message || error);
         return false;
     }
 };

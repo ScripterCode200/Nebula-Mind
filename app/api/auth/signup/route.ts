@@ -50,10 +50,14 @@ export async function POST(req: Request) {
                 const { sendOTP } = await import('@/lib/mail');
                 const success = await sendOTP(email, otp);
                 if (!success) throw new Error('Email sending returned false');
-            } catch (emailError) {
-                console.error('Failed to send OTP:', emailError);
+                console.log(`[Signup] OTP successfully sent to ${email}`);
+            } catch (emailError: any) {
+                console.error('[Signup] Failed to send OTP:', emailError.message || emailError);
                 await User.findByIdAndDelete(newUser._id);
-                return NextResponse.json({ error: 'Failed to send verification email. Please check your email address.' }, { status: 500 });
+                return NextResponse.json({ 
+                    error: 'Failed to send verification email. Please check your email address.',
+                    details: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+                }, { status: 500 });
             }
         }
 
