@@ -205,6 +205,9 @@ const InteractiveTeacher = ({ notebookId }: InteractiveTeacherProps) => {
             return;
         }
 
+        // Open window immediately before any async gap to avoid browser popup blockers
+        const newWindow = window.open('about:blank', '_blank');
+
         setIsLoading(true);
         setLoadingStep("Starting your session...");
 
@@ -242,10 +245,19 @@ const InteractiveTeacher = ({ notebookId }: InteractiveTeacherProps) => {
 
             const sessionUrl = `/interactive-ai/session/${sessionData.sessionId}`;
             toast.success("Ready to start!");
-            window.open(sessionUrl, '_blank');
+            
+            if (newWindow) {
+                newWindow.location.href = sessionUrl;
+            } else {
+                // Fallback in case popup blocker is aggressive even on sync call
+                window.location.href = sessionUrl;
+            }
 
         } catch (error: any) {
             toast.error("Failed to start: " + error.message);
+            if (newWindow) {
+                newWindow.close();
+            }
         } finally {
             setIsLoading(false);
         }

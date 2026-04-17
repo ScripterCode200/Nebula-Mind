@@ -196,20 +196,20 @@ export default function InteractiveSessionContainer({ session }: Props) {
         }
     }, [topicTree, cacheName, notebookId]);
 
-    const fetchVisualization = async (index: number, script: string, gen: number) => {
-        const cached = moduleCache.current.get(index);
-        if (cached?.visual_schema) {
-            setVisualSchema(cached.visual_schema);
+    const fetchVisualization = async (topicIndex: number, partIndex: number, script: string, gen: number) => {
+        const cached = moduleCache.current.get(topicIndex);
+        if (cached?.parts?.[partIndex]?.visual_schema) {
+            setVisualSchema(cached.parts[partIndex].visual_schema);
             return;
         }
 
-        const topic = topicTree[index];
+        const topic = topicTree[topicIndex];
         try {
             const res = await fetch('/api/orchestrator/visualize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    topicTitle: topic.title,
+                    topicTitle: `${topic.title} (Part ${partIndex + 1})`,
                     topicScope: topic.scope,
                     audioScript: script,
                     language: config.language
@@ -219,8 +219,11 @@ export default function InteractiveSessionContainer({ session }: Props) {
             const schema = await res.json();
             
             // Save to cache
-            const current = moduleCache.current.get(index) || {};
-            moduleCache.current.set(index, { ...current, visual_schema: schema });
+            const current = moduleCache.current.get(topicIndex) || {};
+            if (!current.parts) current.parts = [];
+            if (!current.parts[partIndex]) current.parts[partIndex] = {};
+            current.parts[partIndex].visual_schema = schema;
+            moduleCache.current.set(topicIndex, current);
 
             // Only update UI if the session generation matches (meaning we haven't skipped to next topic)
             if (sessionGenRef.current === gen) {
@@ -262,31 +265,19 @@ export default function InteractiveSessionContainer({ session }: Props) {
                 if (isAborted()) return;
             } else {
                 setIsThinking(false);
-                // Instant Visual Restore
-                if (payload.visual_schema) {
-                    setVisualSchema(payload.visual_schema);
-                } else {
-                    setVisualSchema(null);
-                }
             }
 
             let parts: any[] = payload.parts;
             if (!parts || !Array.isArray(parts)) {
                 parts = [{
                     audio_script: payload.audio_script || payload.text || 'Showing content.',
+                    visual_schema: payload.visual_schema || null,
                     question: payload.interaction_point ? {
                         text: payload.interaction_point,
                         correct_answer: true,
                         explanation: "Let's continue."
                     } : null
                 }];
-            }
-
-            const fullScriptText = parts.map(p => p.audio_script).join(' ');
-            
-            // Handle Visualization
-            if (!payload.visual_schema) {
-                fetchVisualization(index, fullScriptText, gen);
             }
 
             prefetchModule(index + 1);
@@ -299,6 +290,13 @@ export default function InteractiveSessionContainer({ session }: Props) {
                 if (isAborted()) return;
                 const part = parts[pIdx];
                 const scriptText = part.audio_script;
+                
+                // --- SUB-MODULE VISUALIZATION ---
+                setVisualSchema(part.visual_schema || null);
+                if (!part.visual_schema) {
+                    fetchVisualization(index, pIdx, scriptText, gen);
+                }
+
                 const words = scriptText.split(/\s+/);
                 setActiveScriptWords(words);
                 setActiveWordIndex(-1);

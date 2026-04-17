@@ -33,10 +33,10 @@ async function testMail() {
         console.log('Sending test email...');
         const info = await transporter.sendMail({
             from: `"Nebula Mind Test" <${process.env.NODEMAILER_USER}>`,
-            to: process.env.NODEMAILER_USER, // Send to self
-            subject: 'Test Email - Nebula Mind',
-            text: 'This is a test email to verify SMTP configuration.',
-            html: '<b>This is a test email to verify SMTP configuration.</b>'
+            to: 'shivamsainishivam5211@gmail.com', // Test with user's email
+            subject: 'Test Email - Nebula Mind External',
+            text: 'This is a test email to verify SMTP configuration to external Gmail.',
+            html: '<b>This is a test email to verify SMTP configuration to external Gmail.</b>'
         });
 
         console.log('✅ Email sent successfully!');

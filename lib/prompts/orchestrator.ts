@@ -73,9 +73,11 @@ For EACH part, you must provide:
 1. "audio_script": A clean, natural-language narrative paragraph (no markdown, no parentheticals) optimized for High-Quality TTS.
    - Language: ${language}
    - Punctuation: Use commas, periods, and exclamation marks generously to guide speech pacing and emphasis.
-   - Tone: Warm, welcoming, and engaging. Avoid robotic phrasing.
+   - Tone: Enthusiastic, storytelling-driven, and highly engaging. Speak directly to the listener as a passionate mentor.
+   - Technique: Employ Story-Based Learning. Weave concepts into relatable narratives or analogical scenarios rather than delivering dry theoretical lectures.
+   - Applications & Examples: Every abstract concept MUST be grounded with concrete, real-life applications or vivid examples. Show the user *why* this matters in the real world.
    - Length: Each part should be robust (around 150-250 words) to ensure the total topic explores the material thoroughly.
-   - Depth: Go in-depth. Explain every detail logically. Avoid broad abstractions and use concrete examples.
+   - Structure: Unpack technical details simply through the lens of a story or example, and tie it back to the big picture.
 2. "question": A simple True/False interactive checkpoint related to the paragraph you just generated to verify user engagement.
 
 Output Format (valid JSON only, no markdown fences):
@@ -103,7 +105,7 @@ export const getVisualizationPrompt = (
     language: string = 'English'
 ) => `
 Task: You are a world-class Pedagogical Infographic Designer. 
-Your goal is to generate a HIGH-QUALITY, COMPREHENSIVE SVG diagram that reflects the core conceptual framework of the provided module.
+Your goal is to generate a HIGH-QUALITY, COMPREHENSIVE SVG diagram that reflects the core conceptual framework of the provided module in ${language}.
 
 TOPIC: "${topicTitle}"
 MODULE SCOPE: "${topicScope}"
@@ -115,41 +117,56 @@ ${audioScript}
 ═══════════════════════════════════════
 PHASE 1: CONCEPT MAPPING
 ═══════════════════════════════════════
-First, identify the 3-5 most critical technical nouns or processes mentioned in the lesson script. 
-Analyze the relationships between them (Linear process? Hub-and-spoke? Hierarchical layers? Comparison?).
+First, identify the most critical technical nouns or processes mentioned in the lesson script. 
+Analyze the relationships between them.
 
 ═══════════════════════════════════════
-PHASE 2: DESIGN EXECUTION ("Nebula" System)
+PHASE 2: DESIGN EXECUTION
 ═══════════════════════════════════════
 
 Color Palette:
-  • Concept Nodes:    "#00F0FF" (Electric Cyan)
-  • Flow / Process:   "#7000FF" (Nebula Purple)  
-  • Warnings / Key:   "#FFB800" (Golden Amber)
-  • Labels & Lines:   "#FFFFFF" (White)
-  • Muted / Secondary: "#888888" (Gray)
+  • Primary / Nodes:  "#00F0FF"
+  • Process / Hub:    "#7000FF"
+  • Warnings / Base:  "#FFB800"
 
-Canvas:
-  • viewBox: "0 0 400 300" (STRICT)
-  • Safe Zone: x ∈ [25, 375], y ∈ [25, 275]
-  • Background: TRANSPARENT
+Layout Templates (CHOOSE ONE based on the concepts, COPY THE EXACT COORDINATES):
 
-Layout Templates (CHOOSE ONE based on the concepts):
-A) HORIZONTAL PROCESS: For linear flows (e.g., Data -> Processing -> Result).
-   - Nodes at y=160, spaced horizontally (x=80, 200, 320).
-B) HUB & SPOKE: For a central concept with multiple attributes.
-   - Central Hub (r=45, x=200, y=165). Spokes radiating out.
-C) VERTICAL LAYERS: For architectures or hierarchies.
-   - Rectangles at x=100, varying y (70, 140, 210).
+A) HORIZONTAL PROCESS (Linear, 3 Steps):
+[
+  { "type": "rect", "id": "1", "x": 30, "y": 120, "width": 80, "height": 60, "rx": 10, "stroke": "#00F0FF", "fill": "#00F0FF20", "label": "Step 1" },
+  { "type": "line", "id": "l1", "x1": 110, "y1": 150, "x2": 160, "y2": 150, "stroke": "#FFFFFF", "strokeWidth": 2 },
+  { "type": "rect", "id": "2", "x": 160, "y": 120, "width": 80, "height": 60, "rx": 10, "stroke": "#7000FF", "fill": "#7000FF20", "label": "Step 2" },
+  { "type": "line", "id": "l2", "x1": 240, "y1": 150, "x2": 290, "y2": 150, "stroke": "#FFFFFF", "strokeWidth": 2 },
+  { "type": "rect", "id": "3", "x": 290, "y": 120, "width": 80, "height": 60, "rx": 10, "stroke": "#FFB800", "fill": "#FFB80020", "label": "Step 3" }
+]
+
+B) HUB & SPOKE (Central Concept with 4 connecting ideas):
+[
+  { "type": "circle", "id": "center", "cx": 200, "cy": 150, "r": 45, "stroke": "#7000FF", "fill": "#7000FF20", "label": "Main Topic" },
+  { "type": "line", "id": "tl", "x1": 130, "y1": 80, "x2": 170, "y2": 120, "stroke": "#FFFFFF" },
+  { "type": "circle", "id": "tl_c", "cx": 110, "cy": 60, "r": 35, "stroke": "#00F0FF", "fill": "#00F0FF20", "label": "Attr 1" },
+  { "type": "line", "id": "tr", "x1": 270, "y1": 80, "x2": 230, "y2": 120, "stroke": "#FFFFFF" },
+  { "type": "circle", "id": "tr_c", "cx": 290, "cy": 60, "r": 35, "stroke": "#00F0FF", "fill": "#00F0FF20", "label": "Attr 2" },
+  { "type": "line", "id": "bl", "x1": 130, "y1": 220, "x2": 170, "y2": 180, "stroke": "#FFFFFF" },
+  { "type": "circle", "id": "bl_c", "cx": 110, "cy": 240, "r": 35, "stroke": "#00F0FF", "fill": "#00F0FF20", "label": "Attr 3" },
+  { "type": "line", "id": "br", "x1": 270, "y1": 220, "x2": 230, "y2": 180, "stroke": "#FFFFFF" },
+  { "type": "circle", "id": "br_c", "cx": 290, "cy": 240, "r": 35, "stroke": "#00F0FF", "fill": "#00F0FF20", "label": "Attr 4" }
+]
+
+C) PYRAMID / LAYERS (Hierarchy of 3 levels):
+[
+  { "type": "rect", "id": "top", "x": 120, "y": 40, "width": 160, "height": 50, "rx": 8, "stroke": "#00F0FF", "fill": "#00F0FF20", "label": "Top Level" },
+  { "type": "rect", "id": "mid", "x": 100, "y": 125, "width": 200, "height": 50, "rx": 8, "stroke": "#7000FF", "fill": "#7000FF20", "label": "Middle Level" },
+  { "type": "rect", "id": "bot", "x": 80, "y": 210, "width": 240, "height": 50, "rx": 8, "stroke": "#FFB800", "fill": "#FFB80020", "label": "Base Level" }
+]
 
 ═══════════════════════════════════════
 ABSOLUTE RULES
 ═══════════════════════════════════════
-1. Output ONLY raw JSON — no markdown, no fences.
-2. Every shape MUST have a "label" property (centered automatically).
-3. Do NOT use "text" nodes for labels inside shapes.
-4. Use unique IDs for all elements.
-5. Ensure the diagram COMPREHENSIVELY summarizes the specific technical details from the script. Do not be generic.
+1. Output ONLY raw JSON format: { "viewBox": "0 0 400 300", "elements": [ ... chosen template ... ] }. No markdown.
+2. DO NOT use the type "text" anywhere. Our renderer automatically centers labels on shapes via the "label" property.
+3. Replace the placeholder labels (like "Step 1", "Attr 1") with actual, short technical terms from the script.
+4. COPY the EXACT layout objects from the chosen template above. Do not try to invent your own math or coordinates. Just change the "label", "stroke", and "fill" properties to match the content.
 
 JSON Output:`;
 
