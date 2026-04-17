@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { safeFetch } from '@/lib/api-client';
 
 interface UIState {
     isSidebarOpen: boolean;
@@ -19,13 +20,17 @@ export const useUIStore = create<UIState>((set) => ({
     setHasUnreadNotifications: (status) => set({ hasUnreadNotifications: status }),
     checkUnreadNotifications: async () => {
         try {
-            const res = await fetch('/api/notifications?check=true');
-            if (res.ok) {
-                const data = await res.json();
+            // Use safeFetch for robust background polling (includes timeout and offline checks)
+            const data = await safeFetch<{ hasUnread: boolean }>('/api/notifications?check=true');
+            if (data) {
                 set({ hasUnreadNotifications: data.hasUnread });
             }
-        } catch (error) {
-            console.error('Failed to check notifications:', error);
+        } catch (error: any) {
+            // Mute background polling errors in console unless they are critical
+            // Next.js 'Failed to fetch' is usually a 500 Network Error in safeFetch
+            if (error.status !== 500 && error.status !== 0) {
+                console.debug('Notification check skipped:', error.message);
+            }
         }
     }
 }));
