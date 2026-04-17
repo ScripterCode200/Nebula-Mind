@@ -71,6 +71,8 @@ export const getOrchestratorModel = async (options: {
             
             // Default to Vertex AI unless explicitly forced to UseSvgKey (Standard API)
             if (!options.useSvgKey) {
+                /* 
+                // Context caching is not yet available in the Vertex AI SDK version currently installed.
                 if (options.cachedContentName) {
                     try {
                         console.log(`[Orchestrator] Using Context Cache: ${options.cachedContentName}`);
@@ -87,6 +89,7 @@ export const getOrchestratorModel = async (options: {
                         console.warn(`[Orchestrator] Cache retrieval failed for ${modelName}, falling back to direct.`);
                     }
                 }
+                */
 
                 if (!model) {
                     model = vertex_ai.getGenerativeModel({
@@ -129,7 +132,7 @@ export const createContextCache = async (metadata: {
     model: string,
     contents: any[],
     ttlSeconds?: number
-}) => {
+}): Promise<any> => {
     // Intentionally disabled: vertex_ai.cachedContents is not available in this SDK version.
     // The orchestrator falls back gracefully to direct context injection.
     throw new Error('Context caching is not available in this environment. Using direct injection.');
@@ -163,7 +166,7 @@ export const getGenerativeModel = async (options: { model: string, [key: string]
 
         const safeGenerateContent = async (...args: any[]) => {
             try {
-                return await originalGenerateContent(...args);
+                return await originalGenerateContent(args[0]);
             } catch (error: any) {
                 console.warn(`[AI Route] Vertex AI Failed (${error.message}). Falling back to Standard Gemini API.`);
                 if (!standardGenAI) throw new Error("Fallback failed: Standard GEMINI_API_KEY is not configured.");
@@ -175,7 +178,7 @@ export const getGenerativeModel = async (options: { model: string, [key: string]
         const safeGenerateContentStream = async (...args: any[]) => {
             try {
                 if (!originalGenerateContentStream) throw new Error("Stream not supported by client");
-                return await originalGenerateContentStream(...args);
+                return await originalGenerateContentStream(args[0]);
             } catch (error: any) {
                 console.warn(`[AI Route] Vertex AI Stream Failed (${error.message}). Falling back to Standard Gemini API.`);
                 if (!standardGenAI) throw new Error("Fallback failed: Standard GEMINI_API_KEY is not configured.");
